@@ -1,0 +1,147 @@
+import type { ShipType, ShipTypeId } from '../engine/types'
+
+// Ship roster based on the original documentation's described capabilities.
+export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
+  flea: {
+    id: 'flea',
+    price: 2000,
+    cargoBays: 10,
+    weaponSlots: 0,
+    shieldSlots: 0,
+    gadgetSlots: 0,
+    crewQuarters: 1,
+    fuelTanks: 20,
+    hullStrength: 25,
+    fuelCostPerParsec: 1,
+    repairCostPerUnit: 1,
+    minTechLevel: 4
+  },
+  gnat: {
+    id: 'gnat',
+    price: 10000,
+    cargoBays: 15,
+    weaponSlots: 1,
+    shieldSlots: 0,
+    gadgetSlots: 1,
+    crewQuarters: 1,
+    fuelTanks: 14,
+    hullStrength: 100,
+    fuelCostPerParsec: 2,
+    repairCostPerUnit: 1,
+    minTechLevel: 4
+  },
+  firefly: {
+    id: 'firefly',
+    price: 25000,
+    cargoBays: 20,
+    weaponSlots: 1,
+    shieldSlots: 1,
+    gadgetSlots: 1,
+    crewQuarters: 1,
+    fuelTanks: 17,
+    hullStrength: 100,
+    fuelCostPerParsec: 3,
+    repairCostPerUnit: 1,
+    minTechLevel: 5
+  },
+  mosquito: {
+    id: 'mosquito',
+    price: 30000,
+    cargoBays: 15,
+    weaponSlots: 2,
+    shieldSlots: 1,
+    gadgetSlots: 1,
+    crewQuarters: 1,
+    fuelTanks: 13,
+    hullStrength: 100,
+    fuelCostPerParsec: 5,
+    repairCostPerUnit: 1,
+    minTechLevel: 5
+  },
+  bumblebee: {
+    id: 'bumblebee',
+    price: 60000,
+    cargoBays: 20,
+    weaponSlots: 1,
+    shieldSlots: 2,
+    gadgetSlots: 2,
+    crewQuarters: 2,
+    fuelTanks: 15,
+    hullStrength: 100,
+    fuelCostPerParsec: 7,
+    repairCostPerUnit: 2,
+    minTechLevel: 5
+  },
+  beetle: {
+    id: 'beetle',
+    price: 80000,
+    cargoBays: 50,
+    weaponSlots: 0,
+    shieldSlots: 1,
+    gadgetSlots: 1,
+    crewQuarters: 3,
+    fuelTanks: 14,
+    hullStrength: 50,
+    fuelCostPerParsec: 10,
+    repairCostPerUnit: 2,
+    minTechLevel: 5
+  },
+  hornet: {
+    id: 'hornet',
+    price: 100000,
+    cargoBays: 20,
+    weaponSlots: 3,
+    shieldSlots: 2,
+    gadgetSlots: 1,
+    crewQuarters: 2,
+    fuelTanks: 16,
+    hullStrength: 150,
+    fuelCostPerParsec: 15,
+    repairCostPerUnit: 3,
+    minTechLevel: 6
+  },
+  grasshopper: {
+    id: 'grasshopper',
+    price: 150000,
+    cargoBays: 30,
+    weaponSlots: 2,
+    shieldSlots: 2,
+    gadgetSlots: 3,
+    crewQuarters: 3,
+    fuelTanks: 15,
+    hullStrength: 150,
+    fuelCostPerParsec: 15,
+    repairCostPerUnit: 3,
+    minTechLevel: 6
+  },
+  termite: {
+    id: 'termite',
+    price: 225000,
+    cargoBays: 60,
+    weaponSlots: 1,
+    shieldSlots: 3,
+    gadgetSlots: 2,
+    crewQuarters: 3,
+    fuelTanks: 13,
+    hullStrength: 200,
+    fuelCostPerParsec: 20,
+    repairCostPerUnit: 4,
+    minTechLevel: 7
+  },
+  wasp: {
+    id: 'wasp',
+    price: 300000,
+    cargoBays: 35,
+    weaponSlots: 3,
+    shieldSlots: 2,
+    gadgetSlots: 2,
+    crewQuarters: 3,
+    fuelTanks: 14,
+    hullStrength: 200,
+    fuelCostPerParsec: 20,
+    repairCostPerUnit: 4,
+    minTechLevel: 7
+  }
+}
+
+export const SHIP_TYPE_IDS = Object.keys(SHIP_TYPES) as ShipTypeId[]
