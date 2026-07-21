@@ -6,6 +6,8 @@ const ITEMS: { screen: Screen; icon: string; key: string }[] = [
   { screen: 'market', icon: '💱', key: 'nav.market' },
   { screen: 'shipyard', icon: '🛠️', key: 'nav.shipyard' },
   { screen: 'bank', icon: '🏦', key: 'nav.bank' },
+  { screen: 'crew', icon: '🧑‍🚀', key: 'nav.crew' },
+  { screen: 'quests', icon: '📋', key: 'nav.quests' },
   { screen: 'chart', icon: '🗺️', key: 'nav.chart' },
   { screen: 'ship', icon: '🚀', key: 'nav.ship' },
   { screen: 'log', icon: '📜', key: 'nav.log' }

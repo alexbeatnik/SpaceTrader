@@ -60,6 +60,7 @@ export const resourceName = (id: string): string => t(`resource.${id}`)
 export const weaponName = (id: string): string => t(`weapon.${id}`)
 export const shieldName = (id: string): string => t(`shield.${id}`)
 export const gadgetName = (id: string): string => t(`gadget.${id}`)
+export const mercName = (id: string): string => t(`merc.${id}`)
 
 /**
  * Translate a log/encounter message, auto-localising known id params
@@ -73,5 +74,6 @@ export function renderMessage(
   const mapped: Record<string, string | number> = { ...params }
   if (typeof mapped.good === 'string') mapped.good = goodName(mapped.good)
   if (typeof mapped.ship === 'string') mapped.ship = shipName(mapped.ship)
+  if (typeof mapped.name === 'string') mapped.name = mercName(mapped.name)
   return t(key, mapped)
 }

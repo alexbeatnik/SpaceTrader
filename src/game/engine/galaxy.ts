@@ -9,6 +9,7 @@ import { Rng } from './rng'
 import { POLITICS, POLITICS_IDS } from '../data/politics'
 import { SYSTEM_NAMES } from '../data/systemNames'
 import { GOOD_IDS } from '../data/goods'
+import { MERCENARY_IDS } from '../data/mercenaries'
 
 export const GALAXY_WIDTH = 150
 export const GALAXY_HEIGHT = 110
@@ -81,8 +82,16 @@ export function generateGalaxy(seed: number): SolarSystem[] {
       buyPrice: emptyGoodRecord() as SolarSystem['buyPrice'],
       sellPrice: emptyGoodRecord() as SolarSystem['sellPrice'],
       visited: false,
-      wormholeTo: null
+      wormholeTo: null,
+      mercenaryId: null
     })
+  }
+
+  // Distribute mercenaries across distinct systems.
+  const mercPool = [...MERCENARY_IDS].sort(() => rng.next() - 0.5)
+  const sysPool = [...systems].sort(() => rng.next() - 0.5)
+  for (let i = 0; i < mercPool.length && i < sysPool.length; i++) {
+    sysPool[i].mercenaryId = mercPool[i]
   }
 
   // Create a few wormholes linking distant systems.

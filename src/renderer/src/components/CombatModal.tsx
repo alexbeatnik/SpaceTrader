@@ -8,6 +8,7 @@ import {
   currentShieldCharge,
   SHIP_TYPES
 } from '@game/index'
+import { ShipArt } from './ShipArt'
 
 export function CombatModal(): React.JSX.Element | null {
   const game = useGameStore((s) => s.game)!
@@ -40,7 +41,7 @@ export function CombatModal(): React.JSX.Element | null {
 
         {/* Opponent status */}
         <div className="ship-visual" style={{ marginBottom: 12 }}>
-          <span className="ship-emoji">{enc.kind === 'police' ? '🛡️' : enc.kind === 'pirate' ? '☠️' : '🚀'}</span>
+          <ShipArt type={opp.shipType} size={64} flip accent={enc.kind === 'pirate' ? '#ff5d6c' : enc.kind === 'police' ? '#ffc04a' : undefined} />
           <div style={{ flex: 1 }}>
             <div className="kv">
               <span className="k">{shipName(opp.shipType)}</span>
@@ -59,7 +60,7 @@ export function CombatModal(): React.JSX.Element | null {
 
         {/* Player status */}
         <div className="ship-visual" style={{ marginBottom: 12 }}>
-          <span className="ship-emoji">🚀</span>
+          <ShipArt type={ship.type} size={64} />
           <div style={{ flex: 1 }}>
             <div className="kv">
               <span className="k">{shipName(ship.type)}</span>

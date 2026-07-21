@@ -31,9 +31,88 @@ export const en = {
     market: 'Market',
     shipyard: 'Shipyard',
     bank: 'Bank',
+    crew: 'Crew',
+    quests: 'Quests',
     chart: 'Star Chart',
     ship: 'Ship',
     log: 'Log'
+  },
+  quest: {
+    title: 'Quests',
+    active: 'Active',
+    done: 'Completed',
+    none: 'You have no assignments. Explore systems to be offered some.',
+    offerTitle: 'Special Assignment',
+    accept: 'Accept',
+    decline: 'Decline',
+    reward: 'Reward',
+    type: {
+      delivery: 'Courier delivery',
+      relief: 'Relief mission',
+      bounty: 'Bounty hunt'
+    },
+    desc: {
+      delivery: 'Deliver a package to the {system} system.',
+      relief: 'Deliver {amount} × {good} to {system}, a system in crisis.',
+      bounty: 'Track down and destroy the pirate {bounty} (headed for {system}).'
+    },
+    accepted: 'Assignment accepted — reward {reward} cr.',
+    completed: 'Assignment completed — reward {reward} cr.',
+    completedToast: 'Assignment complete! +{reward} cr'
+  },
+  crew: {
+    title: 'Crew',
+    wages: 'Daily wages',
+    quarters: 'Free quarters',
+    hired: 'Hired crew',
+    noneHired: 'No crew hired',
+    commanderSkills: 'Effective skills (with crew)',
+    roster: 'Personnel roster',
+    noneAvailable: 'No mercenaries available here',
+    hire: 'Hire',
+    fire: 'Dismiss',
+    noQuarters: 'No free crew quarters'
+  },
+  merc: {
+    alyssa: 'Alyssa', bran: 'Bran', cyra: 'Cyra', dex: 'Dex', elin: 'Elin',
+    ferro: 'Ferro', gwen: 'Gwen', hoshi: 'Hoshi', ivo: 'Ivo', juno: 'Juno',
+    kai: 'Kai', lena: 'Lena', mira: 'Mira', nox: 'Nox', orin: 'Orin', pax: 'Pax'
+  },
+  event: {
+    derelict: {
+      title: 'Derelict ship',
+      body: 'You board a drifting derelict and salvage {qty} × {good} from its holds.',
+      log: 'Salvaged a derelict: +{qty} {good}.'
+    },
+    fuelLeak: {
+      title: 'Fuel leak',
+      body: 'A hairline crack in the tank cost you {lost} pc of fuel.',
+      log: 'Fuel leak: -{lost} pc.'
+    },
+    micrometeorite: {
+      title: 'Micrometeorite swarm',
+      body: 'Your hull took {dmg} damage from a micrometeorite swarm.',
+      log: 'Micrometeorites: -{dmg} hull.'
+    },
+    lottery: {
+      title: 'Unexpected windfall',
+      body: 'You won {prize} cr in the galactic lottery!',
+      log: 'Lottery win: +{prize} cr.'
+    },
+    toll: {
+      title: 'Toll gate',
+      body: 'A local checkpoint charged a {toll} cr passage toll.',
+      log: 'Paid a toll: -{toll} cr.'
+    },
+    newsTip: {
+      title: 'Fresh news',
+      body: 'The papers report: {system} is experiencing {status}. A trading opportunity may await.'
+    },
+    wanderer: {
+      title: 'Wandering expert',
+      body: 'A seasoned engineer shared some tricks. Your Engineer skill rose by 1.',
+      log: 'Wandering expert: +1 Engineer.'
+    }
   },
   menu: {
     newGame: 'New Game',
@@ -99,7 +178,8 @@ export const en = {
     buyEscapePod: 'Buy escape pod',
     hasEscapePod: 'Escape pod installed',
     equip: 'Install',
-    cargoBaysGadget: '+5 cargo bays'
+    cargoBaysGadget: '+5 cargo bays',
+    installed: 'Installed modules'
   },
   bank: {
     title: 'Galactic Bank',
@@ -185,13 +265,18 @@ export const en = {
       plundered: 'Pirates plundered your hold ({qty} units).',
       extort: 'Pirates extorted a ransom: {amount} cr.'
     },
+    bounty: {
+      appear: 'The wanted pirate {name} attacks!',
+      done: '{name} eliminated! Reward {reward} cr.'
+    },
     police: {
       appear: 'A police patrol in a {ship} orders you to stop.',
       clean: 'Inspection complete. No illegal goods found.',
       impound: 'Contraband found! Confiscated and fined {fine} cr.',
       incorruptible: 'These officers are incorruptible.',
       bribed: 'Bribe accepted ({amount} cr). You are waved through.',
-      arrested: 'You are arrested. Fine of {fine} cr.'
+      arrested: 'You are arrested. Fine of {fine} cr.',
+      hidden: 'The hidden compartment held — the contraband went unnoticed.'
     },
     action: {
       attack: 'Attack',
@@ -222,7 +307,8 @@ export const en = {
     gameStart: 'Journey begins in the {system} system.',
     arrived: 'Arrived at {system} ({distance} pc).',
     wormhole: 'Wormhole jump to {system} (tax {tax} cr).',
-    plunderedTrader: 'You plundered a trader ({qty} units).'
+    plunderedTrader: 'You plundered a trader ({qty} units).',
+    crewLeft: 'You could not pay your crew — they left you.'
   },
   info: {
     bought: 'Bought {qty} × {good} for {cost} cr.',
@@ -231,8 +317,11 @@ export const en = {
     refuelled: 'Refuelled {parsecs} pc for {cost} cr.',
     repaired: 'Repaired {units} hull for {cost} cr.',
     equipmentBought: 'Equipment purchased.',
+    equipmentSold: 'Equipment sold.',
     escapePodBought: 'Escape pod installed.',
     shipBought: 'New ship purchased.',
+    mercHired: '{name} joined your crew.',
+    mercFired: '{name} left your crew.',
     loanTaken: 'Loan of {amount} cr received.',
     debtPaid: 'Paid off {amount} cr of debt.',
     insuranceBought: 'Insurance purchased.',
@@ -262,7 +351,12 @@ export const en = {
     noInsurance: 'No insurance in place.',
     invalidTarget: 'Invalid target.',
     notEnoughFuel: 'Not enough fuel for the jump.',
-    cannotAffordWormhole: 'Cannot afford the wormhole tax.'
+    cannotAffordWormhole: 'Cannot afford the wormhole tax.',
+    nothingToRemove: 'Nothing to remove.',
+    mercNotHere: 'That mercenary is not here.',
+    noQuarters: 'No free crew quarters.',
+    alreadyHired: 'Already in your crew.',
+    notInCrew: 'Not in your crew.'
   },
   tech: {
     preAgricultural: 'Pre-agricultural',
@@ -321,17 +415,22 @@ export const en = {
   weapon: {
     pulse: 'Pulse laser',
     beam: 'Beam laser',
-    military: 'Military laser'
+    plasma: 'Plasma cannon',
+    military: 'Military laser',
+    fusion: 'Fusion cannon'
   },
   shield: {
     energy: 'Energy shield',
-    reflective: 'Reflective shield'
+    reflective: 'Reflective shield',
+    deflector: 'Deflector shield'
   },
   gadget: {
     cargoBays: 'Extra cargo bays (+5)',
     autoRepair: 'Auto-repair system',
     navigation: 'Navigation system',
     targeting: 'Targeting system',
+    fuelCompactor: 'Fuel compactor (+3 pc)',
+    hiddenCompartment: 'Hidden compartment',
     cloaking: 'Cloaking device'
   }
 } as const

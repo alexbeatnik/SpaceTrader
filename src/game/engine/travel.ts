@@ -1,6 +1,6 @@
 import type { GameState, SolarSystem } from './types'
-import { SHIP_TYPES } from '../data/ships'
 import { distance } from './galaxy'
+import { maxFuel } from './game'
 
 /** Distance in parsecs between two systems (galaxy units == parsecs). */
 export function systemDistance(a: SolarSystem, b: SolarSystem): number {
@@ -9,7 +9,7 @@ export function systemDistance(a: SolarSystem, b: SolarSystem): number {
 
 /** Max range the current ship can travel on a full tank. */
 export function maxRange(state: GameState): number {
-  return SHIP_TYPES[state.ship.type].fuelTanks
+  return maxFuel(state.ship)
 }
 
 /** Systems reachable given current fuel (excluding the current system). */

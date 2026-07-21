@@ -1,10 +1,11 @@
-import type { GameState, GoodId, ShipTypeId, WeaponId } from './types'
+import type { GameState, GoodId, ShipTypeId, WeaponId, ShieldId } from './types'
 import { Rng } from './rng'
 import { SHIP_TYPES } from '../data/ships'
 import { WEAPONS, SHIELDS } from '../data/equipment'
 import { GOOD_IDS } from '../data/goods'
 import { POLITICS } from '../data/politics'
 import { effectiveSkills, weaponPower, freeCargoBays, pushLog } from './game'
+import { completeBounty } from './quests'
 
 export type EncounterKind = 'trader' | 'pirate' | 'police'
 
@@ -40,6 +41,9 @@ export interface Encounter {
   status: EncounterStatus
   round: number
   bribeCost: number
+  /** Set when this pirate is a bounty target from an active quest. */
+  bountyQuestId?: string
+  bountyName?: string
   /** Rounds log keyed for i18n. */
   messages: { key: string; params?: Record<string, string | number> }[]
 }
@@ -73,25 +77,39 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
   return null
 }
 
-function scaleShipForWorth(state: GameState): ShipTypeId {
-  // Richer/more notorious players attract stronger opponents.
-  const worth = state.credits + (state.record.reputation ?? 0) * 100
-  if (worth > 150000) return 'wasp'
-  if (worth > 80000) return 'hornet'
-  if (worth > 40000) return 'mosquito'
-  if (worth > 15000) return 'firefly'
-  return 'gnat'
+/**
+ * Threat level (0..5) an opponent scales to. Grows with the player's wealth and
+ * combat reputation; for the police it also grows with how wanted the player is.
+ */
+function threatLevel(kind: EncounterKind, state: GameState): number {
+  let worth = state.credits + Math.max(0, state.record.reputation) * 120
+  if (kind === 'police') worth += Math.max(0, -state.record.policeRecord) * 6000
+  if (worth > 150000) return 5
+  if (worth > 80000) return 4
+  if (worth > 40000) return 3
+  if (worth > 15000) return 2
+  if (worth > 5000) return 1
+  return 0
+}
+
+function shipForThreat(threat: number): ShipTypeId {
+  return (['gnat', 'firefly', 'mosquito', 'hornet', 'wasp', 'wasp'] as ShipTypeId[])[threat]
 }
 
 function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encounter {
-  const shipType = kind === 'trader' ? rng.pick(['flea', 'gnat', 'firefly', 'beetle'] as ShipTypeId[]) : scaleShipForWorth(state)
+  const threat = threatLevel(kind, state)
+  const shipType =
+    kind === 'trader'
+      ? rng.pick(['flea', 'gnat', 'firefly', 'beetle'] as ShipTypeId[])
+      : shipForThreat(threat)
   const type = SHIP_TYPES[shipType]
 
-  const oppShields = type.shieldSlots > 0 ? SHIELDS.energy.power * Math.min(type.shieldSlots, 2) : 0
+  // Higher-threat opponents field better shields and weapons.
+  const shieldTier: ShieldId = threat >= 4 ? 'reflective' : 'energy'
+  const oppShields = type.shieldSlots > 0 ? SHIELDS[shieldTier].power * Math.min(type.shieldSlots, 2) : 0
+  const weaponTier: WeaponId = threat >= 4 ? 'military' : threat >= 2 ? 'beam' : 'pulse'
   const oppWeapon =
-    type.weaponSlots > 0
-      ? WEAPONS[rng.pick(['pulse', 'beam'] as WeaponId[])].power * Math.min(type.weaponSlots, 2)
-      : 0
+    type.weaponSlots > 0 ? WEAPONS[weaponTier].power * Math.min(type.weaponSlots, 2) : 0
 
   const cargo = {} as Record<GoodId, number>
   for (const g of GOOD_IDS) cargo[g] = 0
@@ -109,8 +127,8 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
     shieldPoints: oppShields,
     maxShield: oppShields,
     weaponPower: kind === 'police' ? Math.max(oppWeapon, WEAPONS.pulse.power) : oppWeapon,
-    pilot: rng.int(3, 9),
-    fighter: rng.int(3, 9),
+    pilot: Math.min(12, rng.int(3, 8) + threat),
+    fighter: Math.min(12, rng.int(3, 8) + threat),
     cargo,
     fleeing: false
   }
@@ -127,6 +145,26 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
     bribeCost,
     messages: [{ key: `encounter.${kind}.appear`, params: { ship: shipType } }]
   }
+}
+
+/** Build a tough pirate encounter for a bounty quest target. */
+export function createBountyEncounter(
+  state: GameState,
+  questId: string,
+  bountyName: string,
+  rng: Rng
+): Encounter {
+  const enc = makeEncounter('pirate', state, rng)
+  const type = SHIP_TYPES[enc.opponent.shipType]
+  // Bounty targets are notably tougher than the usual rabble.
+  enc.opponent.hull = Math.round(type.hullStrength * 1.3)
+  enc.opponent.maxHull = enc.opponent.hull
+  enc.opponent.fighter = Math.min(12, enc.opponent.fighter + 2)
+  enc.opponent.pilot = Math.min(12, enc.opponent.pilot + 2)
+  enc.bountyQuestId = questId
+  enc.bountyName = bountyName
+  enc.messages = [{ key: 'encounter.bounty.appear', params: { name: bountyName } }]
+  return enc
 }
 
 // --- Combat resolution -------------------------------------------------------
@@ -178,6 +216,13 @@ export function resolveRound(
 
   if (action === 'submit' && enc.kind === 'police') {
     const illegal = state.ship.cargo.firearms + state.ship.cargo.narcotics
+    // A hidden compartment may conceal contraband from the inspection.
+    if (illegal > 0 && state.ship.gadgets.includes('hiddenCompartment') && rng.chance(0.6)) {
+      state.record.policeRecord += 1
+      msg('encounter.police.hidden')
+      enc.status = 'inspected'
+      return
+    }
     if (illegal > 0) {
       state.ship.cargo.firearms = 0
       state.ship.cargo.narcotics = 0
@@ -283,6 +328,11 @@ export function resolveRound(
       }
       if (enc.kind === 'pirate') state.record.policeRecord += 1
       if (enc.kind === 'police') state.record.policeRecord -= 5
+      // Bounty target destroyed -> complete the quest and pay out.
+      if (enc.bountyQuestId) {
+        const q = completeBounty(state, enc.bountyQuestId)
+        if (q) msg('encounter.bounty.done', { name: enc.bountyName ?? '', reward: q.reward })
+      }
       msg('encounter.oppDestroyed')
       return
     }

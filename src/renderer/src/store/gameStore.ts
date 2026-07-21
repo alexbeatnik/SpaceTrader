@@ -13,6 +13,11 @@ import {
   buyGadget,
   buyEscapePod,
   buyShip,
+  sellWeapon,
+  sellShield,
+  sellGadget,
+  hireMercenary,
+  fireMercenary,
   getLoan,
   payDebt,
   buyInsurance,
@@ -20,11 +25,14 @@ import {
   warp,
   resolveRound,
   plunder,
+  acceptQuest,
   pushLog,
   Rng,
   SHIP_TYPES,
   type GameState,
   type Encounter,
+  type GameEvent,
+  type Quest,
   type CombatAction,
   type ActionResult,
   type GoodId,
@@ -36,7 +44,17 @@ import {
 } from '@game/index'
 import { renderMessage } from '@i18n/index'
 
-export type Screen = 'menu' | 'system' | 'market' | 'shipyard' | 'bank' | 'chart' | 'ship' | 'log'
+export type Screen =
+  | 'menu'
+  | 'system'
+  | 'market'
+  | 'shipyard'
+  | 'bank'
+  | 'crew'
+  | 'quests'
+  | 'chart'
+  | 'ship'
+  | 'log'
 
 export interface Toast {
   id: number
@@ -47,6 +65,8 @@ export interface Toast {
 interface GameStore {
   game: GameState | null
   encounter: Encounter | null
+  event: GameEvent | null
+  questOffer: Quest | null
   screen: Screen
   toast: Toast | null
   gameOver: boolean
@@ -73,6 +93,13 @@ interface GameStore {
   buyGadget: (id: GadgetId) => void
   buyEscapePod: () => void
   buyShip: (id: ShipTypeId) => void
+  sellWeapon: (index: number) => void
+  sellShield: (index: number) => void
+  sellGadget: (index: number) => void
+
+  // crew
+  hireMercenary: (id: string) => void
+  fireMercenary: (id: string) => void
 
   // bank
   getLoan: (amount: number) => void
@@ -85,6 +112,9 @@ interface GameStore {
   combatAction: (action: CombatAction) => void
   plunderNow: () => void
   dismissEncounter: () => void
+  dismissEvent: () => void
+  acceptQuestOffer: () => void
+  declineQuestOffer: () => void
 }
 
 let toastCounter = 0
@@ -123,13 +153,23 @@ export const useGameStore = create<GameStore>((set, get) => {
   return {
     game: null,
     encounter: null,
+    event: null,
+    questOffer: null,
     screen: 'menu',
     toast: null,
     gameOver: false,
 
     startNewGame: (opts) => {
       const game = newGame(opts)
-      set({ game, screen: 'system', encounter: null, gameOver: false, toast: null })
+      set({
+        game,
+        screen: 'system',
+        encounter: null,
+        event: null,
+        questOffer: null,
+        gameOver: false,
+        toast: null
+      })
       void get().saveGame()
     },
 
@@ -169,6 +209,12 @@ export const useGameStore = create<GameStore>((set, get) => {
     buyGadget: (id) => withGame((g) => applyResult(g, buyGadget(g, id))),
     buyEscapePod: () => withGame((g) => applyResult(g, buyEscapePod(g))),
     buyShip: (id) => withGame((g) => applyResult(g, buyShip(g, id))),
+    sellWeapon: (index) => withGame((g) => applyResult(g, sellWeapon(g, index))),
+    sellShield: (index) => withGame((g) => applyResult(g, sellShield(g, index))),
+    sellGadget: (index) => withGame((g) => applyResult(g, sellGadget(g, index))),
+
+    hireMercenary: (id) => withGame((g) => applyResult(g, hireMercenary(g, id))),
+    fireMercenary: (id) => withGame((g) => applyResult(g, fireMercenary(g, id))),
 
     getLoan: (amount) => withGame((g) => applyResult(g, getLoan(g, amount))),
     payDebt: (amount) => withGame((g) => applyResult(g, payDebt(g, amount))),
@@ -182,11 +228,21 @@ export const useGameStore = create<GameStore>((set, get) => {
           set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error!) } })
           return
         }
-        if (result.encounter) {
-          set({ game: clone(g), encounter: clone(result.encounter), screen: 'system' })
-        } else {
-          set({ game: clone(g), encounter: null, screen: 'system' })
-        }
+        const done = result.questsCompleted ?? []
+        set({
+          game: clone(g),
+          encounter: result.encounter ? clone(result.encounter) : null,
+          event: result.event ? clone(result.event) : null,
+          questOffer: result.questOffer ? clone(result.questOffer) : null,
+          screen: 'system',
+          toast: done.length
+            ? {
+                id: ++toastCounter,
+                type: 'info',
+                text: renderMessage('quest.completedToast', { reward: done.reduce((s, q) => s + q.reward, 0) })
+              }
+            : get().toast
+        })
         void get().saveGame()
       }),
 
@@ -220,7 +276,20 @@ export const useGameStore = create<GameStore>((set, get) => {
       const g = get().game
       set({ encounter: null })
       if (g) void get().saveGame()
-    }
+    },
+
+    dismissEvent: () => set({ event: null }),
+
+    acceptQuestOffer: () =>
+      withGame((g) => {
+        const offer = get().questOffer
+        if (!offer) return
+        acceptQuest(g, offer)
+        set({ game: clone(g), questOffer: null })
+        void get().saveGame()
+      }),
+
+    declineQuestOffer: () => set({ questOffer: null })
   }
 })
 

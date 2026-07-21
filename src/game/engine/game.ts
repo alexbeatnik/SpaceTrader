@@ -14,7 +14,15 @@ import { generateGalaxy } from './galaxy'
 import { refreshMarket } from './market'
 import { SHIP_TYPES } from '../data/ships'
 import { GOOD_IDS } from '../data/goods'
-import { WEAPONS, SHIELDS, GADGETS, EXTRA_CARGO_BAYS, GADGET_SKILL_BONUS } from '../data/equipment'
+import {
+  WEAPONS,
+  SHIELDS,
+  GADGETS,
+  EXTRA_CARGO_BAYS,
+  EXTRA_FUEL_TANKS,
+  GADGET_SKILL_BONUS
+} from '../data/equipment'
+import { MERCENARIES } from '../data/mercenaries'
 
 export const GAME_VERSION = 1
 export const STARTING_CREDITS = 1000
@@ -53,11 +61,37 @@ export function shipValue(ship: Ship): number {
 /** Effective skill = best of commander and crew, plus gadget bonuses. */
 export function effectiveSkills(state: GameState): Skills {
   const s = { ...state.skills }
+  // Crew: take the best skill value available across commander + all crew.
+  for (const id of state.ship.crew) {
+    const merc = MERCENARIES[id]
+    if (!merc) continue
+    s.pilot = Math.max(s.pilot, merc.skills.pilot)
+    s.fighter = Math.max(s.fighter, merc.skills.fighter)
+    s.trader = Math.max(s.trader, merc.skills.trader)
+    s.engineer = Math.max(s.engineer, merc.skills.engineer)
+  }
   const g = state.ship.gadgets
   if (g.includes('navigation')) s.pilot += GADGET_SKILL_BONUS
   if (g.includes('targeting')) s.fighter += GADGET_SKILL_BONUS
   if (g.includes('autoRepair')) s.engineer += GADGET_SKILL_BONUS
   return s
+}
+
+/** Maximum fuel capacity including fuelCompactor gadgets. */
+export function maxFuel(ship: Ship): number {
+  const base = SHIP_TYPES[ship.type].fuelTanks
+  const extra = ship.gadgets.filter((g) => g === 'fuelCompactor').length * EXTRA_FUEL_TANKS
+  return base + extra
+}
+
+/** Total daily wages owed to hired crew. */
+export function crewWages(state: GameState): number {
+  return state.ship.crew.reduce((sum, id) => sum + (MERCENARIES[id]?.wage ?? 0), 0)
+}
+
+/** Free crew quarters (excluding the commander's own seat). */
+export function freeQuarters(ship: Ship): number {
+  return SHIP_TYPES[ship.type].crewQuarters - 1 - ship.crew.length
 }
 
 export function maxHull(ship: Ship): number {
@@ -125,6 +159,8 @@ export function newGame(opts: NewGameOptions): GameState {
     noClaim: 0,
     buyingPrice: emptyGoods(),
     log: [],
+    flags: {},
+    quests: [],
     version: GAME_VERSION
   }
 
@@ -209,7 +245,7 @@ export function dumpGood(state: GameState, good: GoodId, amount: number): Action
 // --- Shipyard actions --------------------------------------------------------
 export function refuel(state: GameState, parsecs: number): ActionResult {
   const type = SHIP_TYPES[state.ship.type]
-  const needed = Math.min(parsecs, type.fuelTanks - state.ship.fuel)
+  const needed = Math.min(parsecs, maxFuel(state.ship) - state.ship.fuel)
   if (needed <= 0) return fail('error.tankFull')
   const affordable = Math.floor(state.credits / type.fuelCostPerParsec)
   const buy = Math.min(needed, affordable)
@@ -220,7 +256,7 @@ export function refuel(state: GameState, parsecs: number): ActionResult {
 }
 
 export function refuelFull(state: GameState): ActionResult {
-  return refuel(state, SHIP_TYPES[state.ship.type].fuelTanks)
+  return refuel(state, maxFuel(state.ship))
 }
 
 export function repair(state: GameState, units: number): ActionResult {
@@ -311,6 +347,58 @@ export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
     escapePod: keepPod
   }
   return okInfo('info.shipBought', { ship: target })
+}
+
+// --- Equipment removal (sell back at 75%) ------------------------------------
+export function sellWeapon(state: GameState, index: number): ActionResult {
+  const id = state.ship.weapons[index]
+  if (!id) return fail('error.nothingToRemove')
+  state.ship.weapons.splice(index, 1)
+  state.credits += Math.round(WEAPONS[id].price * 0.75)
+  return okInfo('info.equipmentSold')
+}
+
+export function sellShield(state: GameState, index: number): ActionResult {
+  const id = state.ship.shields[index]
+  if (!id) return fail('error.nothingToRemove')
+  state.ship.shields.splice(index, 1)
+  state.ship.shieldPoints.splice(index, 1)
+  state.credits += Math.round(SHIELDS[id].price * 0.75)
+  return okInfo('info.equipmentSold')
+}
+
+export function sellGadget(state: GameState, index: number): ActionResult {
+  const id = state.ship.gadgets[index]
+  if (!id) return fail('error.nothingToRemove')
+  // Removing extra cargo bays is refused if the hold would overflow.
+  if (id === 'cargoBays' && usedCargoBays(state.ship) > totalCargoBays(state.ship) - EXTRA_CARGO_BAYS) {
+    return fail('error.cargoNotEmpty')
+  }
+  state.ship.gadgets.splice(index, 1)
+  state.credits += Math.round(GADGETS[id].price * 0.75)
+  return okInfo('info.equipmentSold')
+}
+
+// --- Crew / mercenaries ------------------------------------------------------
+export function hireMercenary(state: GameState, id: string): ActionResult {
+  const sys = currentSystem(state)
+  if (sys.mercenaryId !== id) return fail('error.mercNotHere')
+  if (!MERCENARIES[id]) return fail('error.mercNotHere')
+  if (freeQuarters(state.ship) <= 0) return fail('error.noQuarters')
+  if (state.ship.crew.includes(id)) return fail('error.alreadyHired')
+  state.ship.crew.push(id)
+  sys.mercenaryId = null
+  return okInfo('info.mercHired', { name: id })
+}
+
+export function fireMercenary(state: GameState, id: string): ActionResult {
+  const idx = state.ship.crew.indexOf(id)
+  if (idx < 0) return fail('error.notInCrew')
+  state.ship.crew.splice(idx, 1)
+  // Dropped-off mercenary waits in the current system (if a slot is free).
+  const sys = currentSystem(state)
+  if (sys.mercenaryId === null) sys.mercenaryId = id
+  return okInfo('info.mercFired', { name: id })
 }
 
 // --- Bank --------------------------------------------------------------------

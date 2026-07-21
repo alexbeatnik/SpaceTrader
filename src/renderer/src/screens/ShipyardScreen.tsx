@@ -16,6 +16,7 @@ import {
 } from '@game/index'
 import { weaponName, shieldName, gadgetName, shipName } from '@i18n/index'
 import { fmt } from '../util/format'
+import { ShipArt } from '../components/ShipArt'
 
 export function ShipyardScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
@@ -80,7 +81,7 @@ export function ShipyardScreen(): React.JSX.Element {
         {/* Equipment */}
         <div className="panel panel-pad">
           <div className="screen-sub" style={{ marginBottom: 8 }}>{t('shipyard.weapons')}</div>
-          {WEAPON_IDS.map((id) => (
+          {WEAPON_IDS.filter((id) => WEAPONS[id].minTechLevel <= sys.techLevel).map((id) => (
             <div className="kv" key={id}>
               <span className="k">{weaponName(id)} <span className="muted">· {WEAPONS[id].power}⚔</span></span>
               <button
@@ -93,7 +94,7 @@ export function ShipyardScreen(): React.JSX.Element {
             </div>
           ))}
           <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('shipyard.shields')}</div>
-          {SHIELD_IDS.map((id) => (
+          {SHIELD_IDS.filter((id) => SHIELDS[id].minTechLevel <= sys.techLevel).map((id) => (
             <div className="kv" key={id}>
               <span className="k">{shieldName(id)} <span className="muted">· {SHIELDS[id].power}🛡</span></span>
               <button
@@ -106,7 +107,7 @@ export function ShipyardScreen(): React.JSX.Element {
             </div>
           ))}
           <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('shipyard.gadgets')}</div>
-          {GADGET_IDS.map((id) => (
+          {GADGET_IDS.filter((id) => GADGETS[id].minTechLevel <= sys.techLevel).map((id) => (
             <div className="kv" key={id}>
               <span className="k">{gadgetName(id)}</span>
               <button
@@ -123,6 +124,51 @@ export function ShipyardScreen(): React.JSX.Element {
           ))}
         </div>
       </div>
+
+      {/* Installed modules */}
+      {(ship.weapons.length > 0 || ship.shields.length > 0 || ship.gadgets.length > 0) && (
+        <div className="panel panel-pad" style={{ marginTop: 16 }}>
+          <div className="screen-sub" style={{ marginBottom: 8 }}>{t('shipyard.installed')}</div>
+          <div className="grid grid-3">
+            <div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{t('shipyard.weapons')}</div>
+              {ship.weapons.length === 0 && <div className="muted">{t('ship.empty')}</div>}
+              {ship.weapons.map((id, i) => (
+                <div className="kv" key={i}>
+                  <span className="k">{weaponName(id)}</span>
+                  <button className="btn btn-sm btn-danger" onClick={() => s.sellWeapon(i)}>
+                    {t('common.sell')} {fmt(Math.round(WEAPONS[id].price * 0.75))}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{t('shipyard.shields')}</div>
+              {ship.shields.length === 0 && <div className="muted">{t('ship.empty')}</div>}
+              {ship.shields.map((id, i) => (
+                <div className="kv" key={i}>
+                  <span className="k">{shieldName(id)}</span>
+                  <button className="btn btn-sm btn-danger" onClick={() => s.sellShield(i)}>
+                    {t('common.sell')} {fmt(Math.round(SHIELDS[id].price * 0.75))}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{t('shipyard.gadgets')}</div>
+              {ship.gadgets.length === 0 && <div className="muted">{t('ship.empty')}</div>}
+              {ship.gadgets.map((id, i) => (
+                <div className="kv" key={i}>
+                  <span className="k">{gadgetName(id)}</span>
+                  <button className="btn btn-sm btn-danger" onClick={() => s.sellGadget(i)}>
+                    {t('common.sell')} {fmt(Math.round(GADGETS[id].price * 0.75))}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ships for sale */}
       <div className="panel panel-pad" style={{ marginTop: 16 }}>
@@ -150,7 +196,12 @@ export function ShipyardScreen(): React.JSX.Element {
               const isCurrent = id === ship.type
               return (
                 <tr key={id} className="row-hover">
-                  <td>{shipName(id)}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <ShipArt type={id} size={30} />
+                      {shipName(id)}
+                    </div>
+                  </td>
                   <td className="num">{st.cargoBays}</td>
                   <td className="num">{st.hullStrength}</td>
                   <td className="num">{st.weaponSlots}</td>

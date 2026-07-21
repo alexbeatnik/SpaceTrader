@@ -6,6 +6,8 @@ export * from './engine/combat'
 export * from './engine/travel'
 export * from './engine/market'
 export * from './engine/galaxy'
+export * from './engine/events'
+export * from './engine/quests'
 export { Rng, randomSeed } from './engine/rng'
 
 export { TRADE_GOODS, GOOD_IDS } from './data/goods'
@@ -20,4 +22,5 @@ export {
   GADGET_IDS,
   EXTRA_CARGO_BAYS
 } from './data/equipment'
+export { MERCENARIES, MERCENARY_IDS, mercenaryWorth } from './data/mercenaries'
 export { TECH_LEVEL_IDS } from './engine/types'

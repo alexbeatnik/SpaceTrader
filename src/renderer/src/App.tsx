@@ -5,12 +5,16 @@ import { Hud } from './components/Hud'
 import { Nav } from './components/Nav'
 import { Toast } from './components/Toast'
 import { CombatModal } from './components/CombatModal'
+import { EventModal } from './components/EventModal'
+import { QuestOfferModal } from './components/QuestOfferModal'
 import { GameOverModal } from './components/GameOverModal'
 import { MenuScreen } from './screens/MenuScreen'
 import { SystemScreen } from './screens/SystemScreen'
 import { MarketScreen } from './screens/MarketScreen'
 import { ShipyardScreen } from './screens/ShipyardScreen'
 import { BankScreen } from './screens/BankScreen'
+import { PersonnelScreen } from './screens/PersonnelScreen'
+import { QuestsScreen } from './screens/QuestsScreen'
 import { ChartScreen } from './screens/ChartScreen'
 import { ShipScreen } from './screens/ShipScreen'
 import { LogScreen } from './screens/LogScreen'
@@ -47,12 +51,16 @@ export function App(): React.JSX.Element {
           {screen === 'market' && <MarketScreen />}
           {screen === 'shipyard' && <ShipyardScreen />}
           {screen === 'bank' && <BankScreen />}
+          {screen === 'crew' && <PersonnelScreen />}
+          {screen === 'quests' && <QuestsScreen />}
           {screen === 'chart' && <ChartScreen />}
           {screen === 'ship' && <ShipScreen />}
           {screen === 'log' && <LogScreen />}
         </div>
       </div>
       {encounter && !gameOver && <CombatModal />}
+      {!encounter && !gameOver && <EventModal />}
+      {!encounter && !gameOver && <QuestOfferModal />}
       {gameOver && <GameOverModal />}
       <Toast />
     </div>

@@ -1,10 +1,26 @@
 import { describe, it, expect } from 'vitest'
-import { newGame, buyGood, sellGood, usedCargoBays, freeCargoBays, refuelFull } from './game'
+import {
+  newGame,
+  buyGood,
+  sellGood,
+  usedCargoBays,
+  freeCargoBays,
+  refuelFull,
+  hireMercenary,
+  fireMercenary,
+  effectiveSkills,
+  crewWages,
+  maxFuel,
+  buyWeapon,
+  sellWeapon
+} from './game'
 import { warp } from './warp'
 import { generateGalaxy, SYSTEM_COUNT } from './galaxy'
 import { standardPrice } from './market'
 import { TRADE_GOODS } from '../data/goods'
 import { reachableSystems } from './travel'
+import { acceptQuest, checkQuestArrival, completeBounty } from './quests'
+import type { Quest } from './types'
 
 describe('galaxy generation', () => {
   it('is deterministic for a given seed', () => {
@@ -75,6 +91,122 @@ describe('pricing', () => {
     expect(standardPrice(TRADE_GOODS.water, high)).toBeGreaterThan(
       standardPrice(TRADE_GOODS.water, lowFixed)
     )
+  })
+})
+
+describe('crew / mercenaries', () => {
+  it('hiring a mercenary raises effective skills and daily wages', () => {
+    const g = newGame({ commanderName: 'Test', seed: 21 })
+    g.skills = { pilot: 5, fighter: 5, trader: 5, engineer: 5 }
+    g.ship.type = 'bumblebee' // has spare crew quarters
+    g.systems[g.currentSystem].mercenaryId = 'nox' // fighter 10
+    const hired = hireMercenary(g, 'nox')
+    expect(hired.ok).toBe(true)
+    expect(g.ship.crew).toContain('nox')
+    expect(effectiveSkills(g).fighter).toBe(10)
+    expect(crewWages(g)).toBeGreaterThan(0)
+
+    const fired = fireMercenary(g, 'nox')
+    expect(fired.ok).toBe(true)
+    expect(g.ship.crew).not.toContain('nox')
+    expect(crewWages(g)).toBe(0)
+  })
+
+  it('cannot hire without free quarters (Gnat has none)', () => {
+    const g = newGame({ commanderName: 'Test', seed: 22 })
+    g.systems[g.currentSystem].mercenaryId = 'pax'
+    // Gnat has 1 crew quarter = commander only, so no room.
+    const res = hireMercenary(g, 'pax')
+    expect(res.ok).toBe(false)
+  })
+})
+
+describe('equipment', () => {
+  it('fuelCompactor increases max fuel; selling a weapon refunds credits', () => {
+    const g = newGame({ commanderName: 'Test', seed: 31 })
+    const baseFuel = maxFuel(g.ship)
+    g.ship.gadgets.push('fuelCompactor')
+    expect(maxFuel(g.ship)).toBeGreaterThan(baseFuel)
+
+    // Buy then sell a weapon (Gnat has one weapon slot, starts with a pulse).
+    g.ship.weapons = []
+    g.credits = 100000
+    expect(buyWeapon(g, 'beam').ok).toBe(true)
+    const before = g.credits
+    expect(sellWeapon(g, 0).ok).toBe(true)
+    expect(g.credits).toBeGreaterThan(before)
+    expect(g.ship.weapons.length).toBe(0)
+  })
+})
+
+describe('quests', () => {
+  it('delivery quest completes on arrival at the target and pays the reward', () => {
+    const g = newGame({ commanderName: 'Test', seed: 41 })
+    const target = g.systems.find((s) => s.id !== g.currentSystem)!
+    const quest: Quest = {
+      id: 'test-delivery',
+      type: 'delivery',
+      giverSystem: g.currentSystem,
+      targetSystem: target.id,
+      reward: 1500,
+      status: 'offered'
+    }
+    acceptQuest(g, quest)
+    const before = g.credits
+    // Simulate arrival at the target.
+    g.currentSystem = target.id
+    const done = checkQuestArrival(g)
+    expect(done.map((q) => q.id)).toContain('test-delivery')
+    expect(g.credits).toBe(before + 1500)
+    expect(g.quests.find((q) => q.id === 'test-delivery')?.status).toBe('completed')
+  })
+
+  it('relief quest requires the goods in the hold to complete', () => {
+    const g = newGame({ commanderName: 'Test', seed: 42 })
+    const target = g.systems.find((s) => s.id !== g.currentSystem)!
+    const quest: Quest = {
+      id: 'test-relief',
+      type: 'relief',
+      giverSystem: g.currentSystem,
+      targetSystem: target.id,
+      reward: 3000,
+      status: 'offered',
+      good: 'medicine',
+      amount: 3
+    }
+    acceptQuest(g, quest)
+    g.currentSystem = target.id
+
+    // Without the goods, it stays active.
+    expect(checkQuestArrival(g).length).toBe(0)
+    expect(g.quests[0].status).toBe('active')
+
+    // With the goods, it completes and consumes them.
+    g.ship.cargo.medicine = 5
+    const before = g.credits
+    expect(checkQuestArrival(g).length).toBe(1)
+    expect(g.credits).toBe(before + 3000)
+    expect(g.ship.cargo.medicine).toBe(2)
+  })
+
+  it('bounty completion pays reward and raises reputation', () => {
+    const g = newGame({ commanderName: 'Test', seed: 43 })
+    const quest: Quest = {
+      id: 'test-bounty',
+      type: 'bounty',
+      giverSystem: g.currentSystem,
+      targetSystem: g.systems[1].id,
+      reward: 4000,
+      status: 'offered',
+      bountyName: 'Vex'
+    }
+    acceptQuest(g, quest)
+    const before = g.credits
+    const rep = g.record.reputation
+    const q = completeBounty(g, 'test-bounty')
+    expect(q).not.toBeNull()
+    expect(g.credits).toBe(before + 4000)
+    expect(g.record.reputation).toBeGreaterThan(rep)
   })
 })
 

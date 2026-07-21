@@ -11,11 +11,7 @@ import {
   weaponPower
 } from '@game/index'
 import { shipName, weaponName, shieldName, gadgetName, goodName } from '@i18n/index'
-
-const SHIP_EMOJI: Record<string, string> = {
-  flea: '🛰️', gnat: '🚀', firefly: '🛸', mosquito: '🚀', bumblebee: '🛸',
-  beetle: '🚚', hornet: '⚔️', grasshopper: '🛸', termite: '🚛', wasp: '🗡️'
-}
+import { ShipArt } from '../components/ShipArt'
 
 export function ShipScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
@@ -32,7 +28,7 @@ export function ShipScreen(): React.JSX.Element {
       </div>
 
       <div className="ship-visual" style={{ marginBottom: 16 }}>
-        <span className="ship-emoji">{SHIP_EMOJI[ship.type] ?? '🚀'}</span>
+        <ShipArt type={ship.type} size={84} />
         <div style={{ flex: 1 }}>
           <div className="kv">
             <span className="k">{t('ship.hull')}</span>

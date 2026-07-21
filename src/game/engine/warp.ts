@@ -1,16 +1,21 @@
-import type { GameState } from './types'
+import type { GameState, Quest } from './types'
 import { Rng } from './rng'
 import { SHIP_TYPES } from '../data/ships'
 import { SHIELDS } from '../data/equipment'
 import { refreshMarket } from './market'
 import { fuelCost, systemDistance } from './travel'
-import { pushLog } from './game'
-import { rollEncounter, type Encounter } from './combat'
+import { pushLog, crewWages } from './game'
+import { rollEncounter, createBountyEncounter, type Encounter } from './combat'
+import { maybeTriggerEvent, type GameEvent } from './events'
+import { checkQuestArrival, generateQuestOffer, hasActiveBounty } from './quests'
 
 export interface WarpResult {
   ok: boolean
   error?: string
   encounter?: Encounter | null
+  event?: GameEvent | null
+  questOffer?: Quest | null
+  questsCompleted?: Quest[]
 }
 
 /** Advance daily finances, economy and ship recharge. */
@@ -26,6 +31,17 @@ function advanceDay(state: GameState): void {
       // Overdue debt is not forgiven; it simply accrues.
       state.debt += -state.credits
       state.credits = 0
+    }
+  }
+
+  // Crew wages. If the player cannot pay, the crew leaves.
+  const wages = crewWages(state)
+  if (wages > 0) {
+    if (state.credits >= wages) {
+      state.credits -= wages
+    } else {
+      state.ship.crew = []
+      pushLog(state, 'log.crewLeft')
     }
   }
 
@@ -84,7 +100,19 @@ export function warp(state: GameState, targetId: number): WarpResult {
   state.currentSystem = targetId
   advanceDay(state)
 
-  const encounter = rollEncounter(state, rng)
+  let encounter = rollEncounter(state, rng)
+
+  // Bounty targets: tag a rolled pirate, or occasionally ambush on a quiet leg.
+  const bounty = hasActiveBounty(state)
+  if (bounty && bounty.bountyName) {
+    if (encounter && encounter.kind === 'pirate') {
+      encounter.bountyQuestId = bounty.id
+      encounter.bountyName = bounty.bountyName
+      encounter.messages = [{ key: 'encounter.bounty.appear', params: { name: bounty.bountyName } }]
+    } else if (!encounter && rng.chance(0.35)) {
+      encounter = createBountyEncounter(state, bounty.id, bounty.bountyName, rng)
+    }
+  }
 
   // If no encounter (or a benign one), finalise arrival immediately.
   onArrival(state, rng)
@@ -94,7 +122,14 @@ export function warp(state: GameState, targetId: number): WarpResult {
     distance: viaWormhole ? 0 : systemDistance(here, target)
   })
 
-  return { ok: true, encounter }
+  // Complete any delivery/relief quests satisfied by this arrival.
+  const questsCompleted = checkQuestArrival(state)
+
+  // Special events and new offers only occur on otherwise-quiet arrivals.
+  const event = encounter ? null : maybeTriggerEvent(state, rng)
+  const questOffer = !encounter && !event ? generateQuestOffer(state, rng) : null
+
+  return { ok: true, encounter, event, questOffer, questsCompleted }
 }
 
 export function wormholeTax(state: GameState): number {

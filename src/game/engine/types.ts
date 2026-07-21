@@ -149,14 +149,16 @@ export interface ShipType {
   minTechLevel: TechLevel
 }
 
-export type WeaponId = 'pulse' | 'beam' | 'military'
-export type ShieldId = 'energy' | 'reflective'
+export type WeaponId = 'pulse' | 'beam' | 'plasma' | 'military' | 'fusion'
+export type ShieldId = 'energy' | 'reflective' | 'deflector'
 export type GadgetId =
   | 'cargoBays'
   | 'autoRepair'
   | 'navigation'
   | 'targeting'
   | 'cloaking'
+  | 'fuelCompactor'
+  | 'hiddenCompartment'
 
 export interface Weapon {
   id: WeaponId
@@ -196,6 +198,8 @@ export interface SolarSystem {
   visited: boolean
   /** Optional wormhole destination system id. */
   wormholeTo: number | null
+  /** Mercenary currently available for hire here, if any. */
+  mercenaryId: string | null
 }
 
 export interface Ship {
@@ -216,6 +220,14 @@ export interface Skills {
   fighter: number
   trader: number
   engineer: number
+}
+
+/** A hireable crew member with fixed skills and a daily wage. */
+export interface Mercenary {
+  id: string
+  skills: Skills
+  /** Daily wage in credits. */
+  wage: number
 }
 
 export interface PlayerRecord {
@@ -241,6 +253,10 @@ export interface GameState {
   buyingPrice: Record<GoodId, number>
   /** Log of notable events, newest first (ids + params resolved in UI). */
   log: LogEntry[]
+  /** Quest / event progress flags keyed by id. */
+  flags: Record<string, number>
+  /** Accepted and completed quests. */
+  quests: Quest[]
   version: number
 }
 
@@ -248,4 +264,22 @@ export interface LogEntry {
   day: number
   key: string
   params?: Record<string, string | number>
+}
+
+// --- Quests ------------------------------------------------------------------
+export type QuestType = 'delivery' | 'relief' | 'bounty'
+export type QuestStatus = 'offered' | 'active' | 'completed'
+
+export interface Quest {
+  id: string
+  type: QuestType
+  giverSystem: number
+  targetSystem: number
+  reward: number
+  status: QuestStatus
+  /** relief: good and amount that must be delivered to the target. */
+  good?: GoodId
+  amount?: number
+  /** bounty: name of the wanted pirate to destroy. */
+  bountyName?: string
 }

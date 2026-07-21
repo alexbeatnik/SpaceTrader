@@ -24,11 +24,22 @@ Core systems implemented:
 - **Travel** — fuel-limited warp jumps across an interactive star chart, plus
   wormhole shortcuts.
 - **Encounters & combat** — turn-based fights with pirates, police inspections
-  (submit / bribe / flee / fight), traders, plunder, and escape pods.
+  (submit / bribe / flee / fight), traders, plunder, and escape pods. Opponents
+  scale with your wealth, combat reputation, and criminal record.
+- **Crew & mercenaries** — hire named mercenaries from system personnel rosters;
+  they take over duties in their best skill and draw a daily wage.
+- **Quests** — special assignments offered on arrival: courier deliveries, relief
+  missions to systems in crisis, and bounty hunts for named wanted pirates, with
+  a quest log tracking active and completed jobs.
+- **Special events** — one-off events on quiet arrivals (derelicts, fuel leaks,
+  micrometeorites, tolls, lotteries, news tips, wandering experts).
 - **Economy** — bank loans with daily interest, ship insurance with no-claim
   discount.
-- **Shipyard** — 10 ship types, three laser tiers, two shield tiers, five gadgets,
-  refuel/repair, and escape pods.
+- **Shipyard & modules** — 10 ship types, five laser tiers, three shield tiers,
+  seven gadgets (extra bays, fuel compactor, hidden compartment, cloaking, …),
+  refuel/repair, escape pods, and sell-back of installed equipment.
+- **Ship art** — every hull has its own hand-built SVG silhouette, shown in the
+  ship view, shipyard, and combat.
 - **Save/Load** — a single persistent save stored in the app's user-data folder.
 - **i18n** — English and Ukrainian, switchable at runtime.
 
