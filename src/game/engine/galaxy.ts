@@ -95,7 +95,8 @@ export function generateGalaxy(seed: number): SolarSystem[] {
       sellPrice: emptyGoodRecord() as SolarSystem['sellPrice'],
       visited: false,
       wormholeTo: null,
-      mercenaryId: null
+      mercenaryId: null,
+      questBoard: []
     })
   }
 

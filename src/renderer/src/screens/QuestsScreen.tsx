@@ -1,5 +1,7 @@
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
+import { currentSystem, canTurnIn, questSupply, type Quest } from '@game/index'
+import { goodName } from '@i18n/index'
 import { questDescription, questTypeLabel } from '../util/questText'
 import { fmt } from '../util/format'
 
@@ -14,9 +16,27 @@ const ICON: Record<string, string> = {
 
 export function QuestsScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
+  const acceptBoard = useGameStore((s) => s.acceptBoardQuest)
+  const turnIn = useGameStore((s) => s.turnInQuest)
   const { t } = useI18n()
+
+  const here = currentSystem(game)
+  const board = here.questBoard ?? []
   const active = game.quests.filter((q) => q.status === 'active')
   const completed = game.quests.filter((q) => q.status === 'completed')
+
+  // Coloured "have / need" progress line for cargo-backed quests.
+  const Progress = ({ q }: { q: Quest }): React.JSX.Element | null => {
+    const need = questSupply(q)
+    if (!need) return null
+    const have = game.ship.cargo[need.good]
+    const ok = have >= need.amount
+    return (
+      <span className={ok ? 'pos' : 'neg'} style={{ fontWeight: 600 }}>
+        {goodName(need.good)} {have}/{need.amount}
+      </span>
+    )
+  }
 
   return (
     <div>
@@ -25,45 +45,110 @@ export function QuestsScreen(): React.JSX.Element {
         {t('quest.active')}: {active.length} · {t('quest.done')}: {completed.length}
       </div>
 
-      {active.length === 0 && completed.length === 0 ? (
+      {/* Job board at the current planet */}
+      <div className="screen-sub" style={{ marginBottom: 8, marginTop: 4 }}>
+        🪧 {t('quest.board')} · {here.nameId}
+      </div>
+      {board.length === 0 ? (
+        <div className="panel panel-pad muted">{t('quest.boardEmpty')}</div>
+      ) : (
+        <div className="grid" style={{ gap: 10 }}>
+          {board.map((q) => {
+            const need = questSupply(q)
+            return (
+              <div className="panel panel-pad" key={q.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 24 }}>{ICON[q.type]}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>
+                      {questTypeLabel(q)}
+                      {need && (
+                        <span className="badge" style={{ marginLeft: 8 }}>
+                          {need.amount} × {goodName(need.good)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      style={{ marginTop: 6 }}
+                      onClick={() => acceptBoard(q.id)}
+                    >
+                      {t('quest.accept')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Active assignments */}
+      <div className="screen-sub" style={{ margin: '20px 0 8px' }}>▶ {t('quest.active')}</div>
+      {active.length === 0 ? (
         <div className="panel panel-pad muted">{t('quest.none')}</div>
       ) : (
         <div className="grid" style={{ gap: 12 }}>
-          {active.map((q) => (
-            <div className="panel panel-pad" key={q.id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 26 }}>{ICON[q.type]}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
-                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                    📍 {t('quest.takenAt', { system: game.systems[q.giverSystem]?.nameId ?? '—' })}
-                    {' · '}🎯 {t('quest.destination')}:{' '}
-                    {game.systems[q.targetSystem]?.nameId ?? '—'}
+          {active.map((q) => {
+            const ready = canTurnIn(game, q)
+            return (
+              <div className="panel panel-pad" key={q.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 26 }}>{ICON[q.type]}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
+                    <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      📍 {t('quest.takenAt', { system: game.systems[q.giverSystem]?.nameId ?? '—' })}
+                      {' · '}🎯 {game.systems[q.targetSystem]?.nameId ?? '—'}
+                      {questSupply(q) && <> · <Progress q={q} /></>}
+                    </div>
                   </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="badge">{t('quest.reward')}</div>
-                  <div className="pos" style={{ fontWeight: 600, marginTop: 4 }}>
-                    {fmt(q.reward)} {t('common.cr')}
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
+                    {q.type === 'bounty' ? (
+                      <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>{t('quest.viaCombat')}</div>
+                    ) : (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ marginTop: 6 }}
+                        disabled={!ready}
+                        onClick={() => turnIn(q.id)}
+                      >
+                        {t('quest.turnIn')}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {completed.map((q) => (
-            <div className="panel panel-pad" key={q.id} style={{ opacity: 0.55 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 22 }}>✅</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
-                </div>
-                <div className="pos" style={{ fontWeight: 600 }}>+{fmt(q.reward)}</div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
+      )}
+
+      {/* Completed */}
+      {completed.length > 0 && (
+        <>
+          <div className="screen-sub" style={{ margin: '20px 0 8px' }}>✅ {t('quest.done')}</div>
+          <div className="grid" style={{ gap: 12 }}>
+            {completed.map((q, i) => (
+              <div className="panel panel-pad" key={`${q.id}-${i}`} style={{ opacity: 0.55 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 22 }}>✅</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
+                    <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
+                  </div>
+                  <div className="pos" style={{ fontWeight: 600 }}>+{fmt(q.reward)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

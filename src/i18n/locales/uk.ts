@@ -48,6 +48,12 @@ export const uk = {
     acceptAndBuy: 'Прийняти й купити припаси',
     supplies: 'Потрібні припаси',
     reward: 'Винагорода',
+    board: 'Дошка завдань',
+    boardEmpty: 'Наразі тут немає оголошень.',
+    turnIn: 'Здати',
+    rewardTitle: 'Завдання виконано!',
+    readyToast: 'Тут можна здати завдань: {count} — відкрийте «Завдання».',
+    viaCombat: 'знищити в бою',
     type: {
       delivery: 'Кур’єрська доставка',
       relief: 'Гуманітарна місія',
@@ -451,7 +457,10 @@ export const uk = {
     mercNotHere: 'Цього найманця тут немає.',
     noQuarters: 'Немає вільних місць для екіпажу.',
     alreadyHired: 'Уже у вашому екіпажі.',
-    notInCrew: 'Його немає у вашому екіпажі.'
+    notInCrew: 'Його немає у вашому екіпажі.',
+    cannotTurnIn: 'Це завдання не можна здати тут.',
+    tooManyQuests: 'У вас і так забагато активних завдань.',
+    questGone: 'Це оголошення вже недоступне.'
   },
   tech: {
     preAgricultural: 'Доаграрний',

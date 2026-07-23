@@ -29,7 +29,10 @@ import {
   tradeBuy,
   tradeSell,
   acceptQuest,
+  acceptBoardQuest,
   buyQuestSupplies,
+  turnInQuest,
+  generateQuestBoard,
   pushLog,
   systemDistance,
   Rng,
@@ -86,6 +89,8 @@ interface GameStore {
   encounter: Encounter | null
   event: GameEvent | null
   questOffer: Quest | null
+  /** A just-handed-in quest, shown in the reward modal until dismissed. */
+  questReward: Quest | null
   screen: Screen
   toast: Toast | null
   gameOver: boolean
@@ -142,6 +147,9 @@ interface GameStore {
   acceptQuestOffer: () => void
   acceptQuestOfferBuying: () => void
   declineQuestOffer: () => void
+  acceptBoardQuest: (questId: string) => void
+  turnInQuest: (questId: string) => void
+  dismissQuestReward: () => void
 }
 
 let toastCounter = 0
@@ -152,6 +160,14 @@ let pendingWarp: WarpResult | null = null
 
 function clone<T>(v: T): T {
   return structuredClone(v)
+}
+
+/** Ensure the current system has a job board (fresh game / legacy save). */
+function ensureBoard(game: GameState): void {
+  const sys = game.systems[game.currentSystem]
+  if (!sys.questBoard || sys.questBoard.length === 0) {
+    sys.questBoard = generateQuestBoard(game, new Rng((game.seed ^ (game.day * 2654435761)) >>> 0))
+  }
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
@@ -186,6 +202,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     encounter: null,
     event: null,
     questOffer: null,
+    questReward: null,
     screen: 'menu',
     toast: null,
     gameOver: false,
@@ -193,6 +210,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     startNewGame: (opts) => {
       const game = newGame(opts)
+      ensureBoard(game)
       pendingWarp = null
       set({
         game,
@@ -200,6 +218,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         encounter: null,
         event: null,
         questOffer: null,
+        questReward: null,
         gameOver: false,
         toast: null,
         travel: null
@@ -213,8 +232,9 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (!data) return false
       try {
         const game = JSON.parse(data) as GameState
+        ensureBoard(game)
         pendingWarp = null
-        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, gameOver: false, travel: null })
+        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, gameOver: false, travel: null })
         return true
       } catch {
         return false
@@ -231,7 +251,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     quitToMenu: () => {
       pendingWarp = null
-      set({ screen: 'menu', encounter: null, event: null, questOffer: null, travel: null })
+      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, travel: null })
     },
 
     buy: (good, amount) => withGame((g) => applyResult(g, buyGood(g, good, amount))),
@@ -303,17 +323,18 @@ export const useGameStore = create<GameStore>((set, get) => {
     finishTravel: () => {
       const result = pendingWarp
       pendingWarp = null
-      const done = result?.questsCompleted ?? []
+      const ready = result?.questsReady ?? []
       set({
         travel: null,
         encounter: result?.encounter ? clone(result.encounter) : null,
         event: result?.event ? clone(result.event) : null,
         questOffer: result?.questOffer ? clone(result.questOffer) : null,
-        toast: done.length
+        // Prompt the player to hand in any quest that's ready here.
+        toast: ready.length
           ? {
               id: ++toastCounter,
               type: 'info',
-              text: renderMessage('quest.completedToast', { reward: done.reduce((s, q) => s + q.reward, 0) })
+              text: renderMessage('quest.readyToast', { count: ready.length })
             }
           : get().toast
       })
@@ -416,7 +437,27 @@ export const useGameStore = create<GameStore>((set, get) => {
         void get().saveGame()
       }),
 
-    declineQuestOffer: () => set({ questOffer: null })
+    declineQuestOffer: () => set({ questOffer: null }),
+
+    acceptBoardQuest: (questId) =>
+      withGame((g) => {
+        const res = acceptBoardQuest(g, questId)
+        applyResult(g, res)
+        if (res.ok) void get().saveGame()
+      }),
+
+    turnInQuest: (questId) =>
+      withGame((g) => {
+        const q = turnInQuest(g, questId)
+        if (!q) {
+          set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage('error.cannotTurnIn') } })
+          return
+        }
+        set({ game: clone(g), questReward: clone(q) })
+        void get().saveGame()
+      }),
+
+    dismissQuestReward: () => set({ questReward: null })
   }
 })
 

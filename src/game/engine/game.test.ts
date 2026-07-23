@@ -29,9 +29,12 @@ import { MERCENARIES, MERCENARY_IDS } from '../data/mercenaries'
 import { systemDistance } from './travel'
 import {
   acceptQuest,
-  checkQuestArrival,
+  canTurnIn,
+  turnInQuest,
   completeBounty,
   generateQuestOffer,
+  generateQuestBoard,
+  acceptBoardQuest,
   buyQuestSupplies,
   questSupplyMissing
 } from './quests'
@@ -238,28 +241,34 @@ describe('equipment', () => {
 })
 
 describe('quests', () => {
-  it('delivery quest completes on arrival at the target and pays the reward', () => {
+  it('delivery hands in at the target (never at the giver) and pays the reward', () => {
     const g = newGame({ commanderName: 'Test', seed: 41 })
-    const target = g.systems.find((s) => s.id !== g.currentSystem)!
+    const giver = g.currentSystem
+    const target = g.systems.find((s) => s.id !== giver)!
     const quest: Quest = {
       id: 'test-delivery',
       type: 'delivery',
-      giverSystem: g.currentSystem,
+      giverSystem: giver,
       targetSystem: target.id,
       reward: 1500,
       status: 'offered'
     }
     acceptQuest(g, quest)
     const before = g.credits
-    // Simulate arrival at the target.
+
+    // Cannot be handed in at the giver planet.
+    expect(canTurnIn(g, quest)).toBe(false)
+
+    // At the destination it can be handed in manually.
     g.currentSystem = target.id
-    const done = checkQuestArrival(g)
-    expect(done.map((q) => q.id)).toContain('test-delivery')
+    expect(canTurnIn(g, quest)).toBe(true)
+    const done = turnInQuest(g, 'test-delivery')
+    expect(done?.id).toBe('test-delivery')
     expect(g.credits).toBe(before + 1500)
     expect(g.quests.find((q) => q.id === 'test-delivery')?.status).toBe('completed')
   })
 
-  it('relief quest requires the goods in the hold to complete', () => {
+  it('relief requires the goods in the hold before it can be handed in', () => {
     const g = newGame({ commanderName: 'Test', seed: 42 })
     const target = g.systems.find((s) => s.id !== g.currentSystem)!
     const quest: Quest = {
@@ -275,19 +284,20 @@ describe('quests', () => {
     acceptQuest(g, quest)
     g.currentSystem = target.id
 
-    // Without the goods, it stays active.
-    expect(checkQuestArrival(g).length).toBe(0)
-    expect(g.quests[0].status).toBe('active')
+    // At the target but without the goods: cannot hand in.
+    expect(canTurnIn(g, quest)).toBe(false)
+    expect(turnInQuest(g, 'test-relief')).toBeNull()
 
     // With the goods, it completes and consumes them.
     g.ship.cargo.medicine = 5
     const before = g.credits
-    expect(checkQuestArrival(g).length).toBe(1)
+    expect(canTurnIn(g, quest)).toBe(true)
+    expect(turnInQuest(g, 'test-relief')).not.toBeNull()
     expect(g.credits).toBe(before + 3000)
     expect(g.ship.cargo.medicine).toBe(2)
   })
 
-  it('passenger quest completes on arrival at the destination', () => {
+  it('passenger hands in at the destination', () => {
     const g = newGame({ commanderName: 'Test', seed: 44 })
     const target = g.systems.find((s) => s.id !== g.currentSystem)!
     const quest: Quest = {
@@ -302,12 +312,12 @@ describe('quests', () => {
     acceptQuest(g, quest)
     const before = g.credits
     g.currentSystem = target.id
-    const done = checkQuestArrival(g)
-    expect(done.map((q) => q.id)).toContain('test-passenger')
+    expect(canTurnIn(g, quest)).toBe(true)
+    expect(turnInQuest(g, 'test-passenger')?.id).toBe('test-passenger')
     expect(g.credits).toBe(before + 2000)
   })
 
-  it('smuggle quest requires the contraband in the hold and consumes it', () => {
+  it('smuggle requires the contraband in the hold and consumes it', () => {
     const g = newGame({ commanderName: 'Test', seed: 45 })
     const target = g.systems.find((s) => s.id !== g.currentSystem)!
     const quest: Quest = {
@@ -322,15 +332,15 @@ describe('quests', () => {
     }
     acceptQuest(g, quest)
     g.currentSystem = target.id
-    expect(checkQuestArrival(g).length).toBe(0)
+    expect(canTurnIn(g, quest)).toBe(false)
     g.ship.cargo.firearms = 4
     const before = g.credits
-    expect(checkQuestArrival(g).length).toBe(1)
+    expect(turnInQuest(g, 'test-smuggle')).not.toBeNull()
     expect(g.credits).toBe(before + 5000)
     expect(g.ship.cargo.firearms).toBe(1)
   })
 
-  it('fetch quest completes when the goods are returned to the giver system', () => {
+  it('fetch hands in when the goods are returned to the giver system', () => {
     const g = newGame({ commanderName: 'Test', seed: 46 })
     const giver = g.currentSystem
     const quest: Quest = {
@@ -344,17 +354,30 @@ describe('quests', () => {
       amount: 4
     }
     acceptQuest(g, quest)
-    // Fly away — no completion elsewhere.
+    // Away from the giver: cannot hand in.
     const elsewhere = g.systems.find((s) => s.id !== giver)!
     g.currentSystem = elsewhere.id
-    expect(checkQuestArrival(g).length).toBe(0)
+    expect(canTurnIn(g, quest)).toBe(false)
     // Return with the goods.
     g.currentSystem = giver
     g.ship.cargo.ore = 4
     const before = g.credits
-    expect(checkQuestArrival(g).length).toBe(1)
+    expect(turnInQuest(g, 'test-fetch')).not.toBeNull()
     expect(g.credits).toBe(before + 1800)
     expect(g.ship.cargo.ore).toBe(0)
+  })
+
+  it('job board postings can be accepted and move into active quests', () => {
+    const g = newGame({ commanderName: 'Test', seed: 48 })
+    const board = generateQuestBoard(g, new Rng(123))
+    expect(board.length).toBeGreaterThan(0)
+    g.systems[g.currentSystem].questBoard = board
+    const posting = board[0]
+    const res = acceptBoardQuest(g, posting.id)
+    expect(res.ok).toBe(true)
+    expect(g.quests.some((q) => q.id === posting.id && q.status === 'active')).toBe(true)
+    // Removed from the board once taken.
+    expect(g.systems[g.currentSystem].questBoard.some((q) => q.id === posting.id)).toBe(false)
   })
 
   it('bounty completion pays reward and raises reputation', () => {

@@ -7,7 +7,7 @@ import { fuelCost, systemDistance } from './travel'
 import { pushLog, crewWages, refuelFull } from './game'
 import { rollEncounter, createBountyEncounter, type Encounter } from './combat'
 import { maybeTriggerEvent, type GameEvent } from './events'
-import { checkQuestArrival, generateQuestOffer, hasActiveBounty } from './quests'
+import { questsReadyToTurnIn, generateQuestOffer, generateQuestBoard, hasActiveBounty } from './quests'
 
 export interface WarpResult {
   ok: boolean
@@ -15,7 +15,8 @@ export interface WarpResult {
   encounter?: Encounter | null
   event?: GameEvent | null
   questOffer?: Quest | null
-  questsCompleted?: Quest[]
+  /** Active quests that can now be handed in at the destination. */
+  questsReady?: Quest[]
 }
 
 /** Advance daily finances, economy and ship recharge. */
@@ -73,6 +74,8 @@ function onArrival(state: GameState, rng: Rng): void {
     const res = refuelFull(state)
     if (res.ok && res.info) pushLog(state, 'log.autoRefuel', res.info.params)
   }
+  // Post a fresh set of jobs on this planet's board.
+  target.questBoard = generateQuestBoard(state, rng)
 }
 
 /**
@@ -127,14 +130,15 @@ export function warp(state: GameState, targetId: number): WarpResult {
     distance: viaWormhole ? 0 : systemDistance(here, target)
   })
 
-  // Complete any delivery/relief quests satisfied by this arrival.
-  const questsCompleted = checkQuestArrival(state)
+  // Quests are handed in manually from the Quests screen; just flag which are
+  // ready at this destination so the UI can prompt the player.
+  const questsReady = questsReadyToTurnIn(state)
 
   // Special events and new offers only occur on otherwise-quiet arrivals.
   const event = encounter ? null : maybeTriggerEvent(state, rng)
   const questOffer = !encounter && !event ? generateQuestOffer(state, rng) : null
 
-  return { ok: true, encounter, event, questOffer, questsCompleted }
+  return { ok: true, encounter, event, questOffer, questsReady }
 }
 
 export function wormholeTax(state: GameState): number {

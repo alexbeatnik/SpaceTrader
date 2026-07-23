@@ -48,6 +48,12 @@ export const en = {
     acceptAndBuy: 'Accept & buy supplies',
     supplies: 'Supplies needed',
     reward: 'Reward',
+    board: 'Job board',
+    boardEmpty: 'No postings here right now.',
+    turnIn: 'Hand in',
+    rewardTitle: 'Assignment complete!',
+    readyToast: 'You can hand in {count} assignment(s) here — open Quests.',
+    viaCombat: 'destroy in combat',
     type: {
       delivery: 'Courier delivery',
       relief: 'Relief mission',
@@ -451,7 +457,10 @@ export const en = {
     mercNotHere: 'That mercenary is not here.',
     noQuarters: 'No free crew quarters.',
     alreadyHired: 'Already in your crew.',
-    notInCrew: 'Not in your crew.'
+    notInCrew: 'Not in your crew.',
+    cannotTurnIn: 'This assignment cannot be handed in here.',
+    tooManyQuests: 'You are juggling too many assignments already.',
+    questGone: 'That posting is no longer available.'
   },
   tech: {
     preAgricultural: 'Pre-agricultural',

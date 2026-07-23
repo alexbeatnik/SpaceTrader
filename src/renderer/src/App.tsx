@@ -7,6 +7,7 @@ import { Toast } from './components/Toast'
 import { CombatModal } from './components/CombatModal'
 import { EventModal } from './components/EventModal'
 import { QuestOfferModal } from './components/QuestOfferModal'
+import { QuestCompleteModal } from './components/QuestCompleteModal'
 import { GameOverModal } from './components/GameOverModal'
 import { WarpTransition } from './components/WarpTransition'
 import { MenuScreen } from './screens/MenuScreen'
@@ -64,6 +65,7 @@ export function App(): React.JSX.Element {
       {!travel && encounter && !gameOver && <CombatModal />}
       {!travel && !encounter && !gameOver && <EventModal />}
       {!travel && !encounter && !gameOver && <QuestOfferModal />}
+      {!travel && !encounter && !gameOver && <QuestCompleteModal />}
       {gameOver && <GameOverModal />}
       <Toast />
     </div>

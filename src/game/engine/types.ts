@@ -219,6 +219,8 @@ export interface SolarSystem {
   wormholeTo: number | null
   /** Mercenary currently available for hire here, if any. */
   mercenaryId: string | null
+  /** Assignments posted on this planet's job board (refreshed on arrival). */
+  questBoard: Quest[]
 }
 
 export interface Ship {
