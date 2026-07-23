@@ -33,6 +33,8 @@ import {
   buyQuestSupplies,
   turnInQuest,
   generateQuestBoard,
+  mineOnce,
+  currentSystem,
   pushLog,
   systemDistance,
   Rng,
@@ -50,7 +52,8 @@ import {
   type ShieldId,
   type GadgetId,
   type NewGameOptions,
-  type WarpResult
+  type WarpResult,
+  type MineKind
 } from '@game/index'
 import { renderMessage } from '@i18n/index'
 
@@ -85,11 +88,21 @@ export interface TravelAnim {
   durationMs: number
 }
 
+/** Active real-time mining operation at the current system. */
+export interface MiningSession {
+  kind: MineKind
+  resource: GoodId | 'fuel'
+  /** Real-time milliseconds to extract one unit. */
+  unitMs: number
+}
+
 interface GameStore {
   game: GameState | null
   encounter: Encounter | null
   event: GameEvent | null
   questOffer: Quest | null
+  /** Active mining session; while set, the mining overlay runs. */
+  mining: MiningSession | null
   /** A just-handed-in quest, shown in the reward modal until dismissed. */
   questReward: Quest | null
   screen: Screen
@@ -139,6 +152,9 @@ interface GameStore {
   // travel & combat
   warpTo: (targetId: number) => void
   finishTravel: () => void
+  startMining: () => void
+  mineTick: () => void
+  stopMining: () => void
   combatAction: (action: CombatAction) => void
   plunderNow: () => void
   tradeBuyFromTrader: (good: GoodId, amount: number) => void
@@ -204,6 +220,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     event: null,
     questOffer: null,
     questReward: null,
+    mining: null,
     screen: 'menu',
     toast: null,
     gameOver: false,
@@ -220,6 +237,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         event: null,
         questOffer: null,
         questReward: null,
+        mining: null,
         gameOver: false,
         toast: null,
         travel: null
@@ -235,7 +253,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         const game = JSON.parse(data) as GameState
         ensureBoard(game)
         pendingWarp = null
-        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, gameOver: false, travel: null })
+        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, gameOver: false, travel: null })
         return true
       } catch {
         return false
@@ -252,7 +270,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     quitToMenu: () => {
       pendingWarp = null
-      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, travel: null })
+      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, travel: null })
     },
 
     buy: (good, amount) => withGame((g) => applyResult(g, buyGood(g, good, amount))),
@@ -306,9 +324,10 @@ export const useGameStore = create<GameStore>((set, get) => {
 
         // Defer surfacing encounter/event/offer until the travel animation ends.
         pendingWarp = result
+        // A long, skippable jump: ~10s (wormhole / short hop) up to ~30s far.
         const durationMs = viaWormhole
-          ? 1600
-          : Math.min(3400, Math.max(1500, distance * 130))
+          ? 10000
+          : Math.min(30000, Math.max(10000, distance * 900))
 
         set({
           game: clone(g),
@@ -340,6 +359,54 @@ export const useGameStore = create<GameStore>((set, get) => {
           : get().toast
       })
     },
+
+    startMining: () =>
+      withGame((g) => {
+        const site = currentSystem(g).mineSite
+        if (!site) {
+          set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage('error.noMineSite') } })
+          return
+        }
+        set({ mining: { kind: site.kind, resource: site.resource, unitMs: 30000 } })
+      }),
+
+    mineTick: () =>
+      withGame((g) => {
+        if (!get().mining) return
+        const rng = new Rng((g.seed ^ (g.day * 2654435761)) >>> 0)
+        const res = mineOnce(g, rng)
+        if (!res.ok) {
+          // No room (hold/tank full) — stop the operation.
+          set({ mining: null, toast: { id: ++toastCounter, type: 'error', text: renderMessage(res.error!) } })
+          void get().saveGame()
+          return
+        }
+        if (res.encounter) {
+          // Raiders! Break off mining and drop into combat.
+          set({
+            game: clone(g),
+            mining: null,
+            encounter: clone(res.encounter),
+            toast: { id: ++toastCounter, type: 'error', text: renderMessage('mining.raid') }
+          })
+          void get().saveGame()
+          return
+        }
+        set({
+          game: clone(g),
+          toast: {
+            id: ++toastCounter,
+            type: 'info',
+            text:
+              res.resource === 'fuel'
+                ? renderMessage('log.minedFuel')
+                : renderMessage('log.mined', { good: res.resource! })
+          }
+        })
+        void get().saveGame()
+      }),
+
+    stopMining: () => set({ mining: null }),
 
     combatAction: (action) =>
       withGame((g) => {

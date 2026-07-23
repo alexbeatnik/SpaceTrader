@@ -8,6 +8,7 @@ export * from './engine/market'
 export * from './engine/galaxy'
 export * from './engine/events'
 export * from './engine/quests'
+export * from './engine/mining'
 export { Rng, randomSeed } from './engine/rng'
 
 export { TRADE_GOODS, GOOD_IDS, SPECIAL_GOOD_IDS, isSpecialGood } from './data/goods'

@@ -24,25 +24,35 @@ Core systems implemented:
   agrarian worlds, machines dear), government preferences, special resources,
   events, and your Trader skill. Fuel price also varies by economy (cheap on
   energy worlds, expensive on resorts), with an optional auto-refuel-on-arrival.
+- **Exotic special-resource goods** — each rich resource yields a unique
+  commodity (rare gems, spring water, exotic pelts, artwork, war relics, …) that
+  can only be bought at its source planet and sells at a premium where it's in
+  demand (a complementary resource world, or hi-tech buyers).
+- **Mining** — asteroid fields, ice fields, and gas giants can be mined in a
+  timed operation (asteroids yield ore + rare gems, ice yields water, gas giants
+  scoop fuel straight into the tank) — but raiders may jump an exposed operation.
 - **Travel** — fuel-limited warp jumps across an interactive star chart, plus
   wormhole shortcuts. Each jump plays an animated, skippable **warp transition**
   (streaking stars, your ship, distance and day) so travel isn't instantaneous.
 - **Star chart** — interactive map with a fuel-range ring, wormhole links, and
   **pulsing markers on active quest destinations** (with where each job was taken
   and its reward).
-- **Encounters & combat** — turn-based fights with pirates, police inspections
-  (submit / bribe / flee / fight), traders, and two extra threats: **bounty
-  hunters** who come for wanted commanders (bribe or buy your freedom) and rare,
-  deadly **alien raiders**. Plunder, escape pods, and opponents that scale with
-  your wealth, combat reputation, and criminal record.
+- **Encounters & combat** — turn-based fights that can be a lone ship or a whole
+  group: **pirate ambushes** (up to 5 ships) and **trader caravans** you fight
+  through one ship at a time, each dropping loot when destroyed. Police
+  inspections (submit / bribe / flee / fight), a **trader marketplace** to buy and
+  sell with lone traders, plus **bounty hunters** who come for wanted commanders
+  and rare, deadly **alien raiders**. Plunder, escape pods, and opponents that
+  scale with your wealth, combat reputation, and criminal record.
 - **Crew & mercenaries** — hire from a roster of **26 named mercenaries** spread
   across system personnel offices; each takes over duties in their best skill and
   draws a daily wage.
-- **Quests** — special assignments offered on arrival across **six types**:
-  courier deliveries, relief missions to systems in crisis, bounty hunts for
-  named wanted pirates, VIP **passenger** transport, high-risk **smuggling** runs,
-  and **supply contracts** (fetch goods and bring them back), with a quest log
-  tracking active and completed jobs.
+- **Quests & job board** — every planet has a **job board** of assignments in
+  varied sizes (small runs to bulk freighter contracts) across **six types**:
+  courier deliveries, relief missions, bounty hunts, VIP **passenger** transport,
+  high-risk **smuggling** runs, and **supply contracts**. Buy the required goods
+  on the spot when accepting, track coloured have/need progress, then **hand jobs
+  in manually** at the destination for a reward that always beats plain trading.
 - **Special events** — one-off events on quiet arrivals: derelicts, fuel leaks,
   micrometeorites, ion storms, tolls, lotteries, news tips, veteran instructors,
   friendly convoys, refugees, colony rewards, and ancient alien probes.
@@ -51,7 +61,8 @@ Core systems implemented:
 - **Shipyard & modules** — **16 ship types** from the nimble Flea scout to the
   elite Widow flagship, five laser tiers, three shield tiers, seven gadgets
   (extra bays, fuel compactor, hidden compartment, cloaking, …), refuel/repair,
-  escape pods, and sell-back of installed equipment.
+  **hull-reinforcement upgrades** (+HP), escape pods, and sell-back of installed
+  equipment.
 - **Ship art** — every hull has its own hand-built SVG silhouette, shown in the
   ship view, shipyard, combat, and the warp animation.
 - **Save/Load** — a single persistent save stored in the app's user-data folder.
@@ -75,16 +86,18 @@ src/
   main/        Electron main process (window + save/load IPC)
   preload/     Context-bridge API exposed to the renderer
   game/        Pure game engine (no React/Electron imports)
-    data/      Static data: goods, ships, equipment, governments, names
-    engine/    Types, RNG, galaxy, market, travel, combat, warp, game actions
+    data/      Static data: goods, ships, equipment, governments, economies, names
+    engine/    Types, RNG, galaxy, market, travel, combat, warp, mining,
+               events, quests, game actions
   i18n/        Locale dictionaries (en, uk) + translation helpers
   renderer/    React app
     src/
-      components/  HUD, nav, toast, ship art, warp transition, modals
-                   (combat, event, quest offer, amount, game over)
+      components/  HUD, nav, toast, ship art, warp transition, mining overlay,
+                   modals (combat, event, quest offer/complete, amount, game over)
       screens/     Menu, System, Market, Shipyard, Bank, Crew, Quests,
                    Star Chart, Ship, Log
       store/       Zustand store wiring the engine to the UI
+build/         App icon (icon.png / icon.ico) for packaging
 ```
 
 The **engine is fully decoupled** from the UI: it takes and mutates a plain

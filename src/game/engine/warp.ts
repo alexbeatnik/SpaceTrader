@@ -4,7 +4,7 @@ import { SHIP_TYPES } from '../data/ships'
 import { SHIELDS } from '../data/equipment'
 import { refreshMarket } from './market'
 import { fuelCost, systemDistance } from './travel'
-import { pushLog, crewWages, refuelFull } from './game'
+import { pushLog, refuelFull, advanceDay } from './game'
 import { rollEncounter, createBountyEncounter, type Encounter } from './combat'
 import { maybeTriggerEvent, type GameEvent } from './events'
 import { questsReadyToTurnIn, generateQuestOffer, generateQuestBoard, hasActiveBounty } from './quests'
@@ -17,48 +17,6 @@ export interface WarpResult {
   questOffer?: Quest | null
   /** Active quests that can now be handed in at the destination. */
   questsReady?: Quest[]
-}
-
-/** Advance daily finances, economy and ship recharge. */
-function advanceDay(state: GameState): void {
-  state.day++
-
-  // Daily loan interest (10%).
-  if (state.debt > 0) {
-    const interest = Math.ceil(state.debt * 0.1)
-    state.debt += interest
-    state.credits -= interest
-    if (state.credits < 0) {
-      // Overdue debt is not forgiven; it simply accrues.
-      state.debt += -state.credits
-      state.credits = 0
-    }
-  }
-
-  // Crew wages. If the player cannot pay, the crew leaves.
-  const wages = crewWages(state)
-  if (wages > 0) {
-    if (state.credits >= wages) {
-      state.credits -= wages
-    } else {
-      state.ship.crew = []
-      pushLog(state, 'log.crewLeft')
-    }
-  }
-
-  // Insurance premium & no-claim accrual.
-  if (state.insurance) {
-    const premium = Math.ceil(shipInsuranceValue(state) * 0.005 * (1 - Math.min(0.9, state.noClaim * 0.01)))
-    state.credits = Math.max(0, state.credits - premium)
-    state.noClaim++
-  }
-
-  // Police record slowly normalises toward zero.
-  if (state.record.policeRecord < 0) state.record.policeRecord += 0
-}
-
-function shipInsuranceValue(state: GameState): number {
-  return SHIP_TYPES[state.ship.type].price
 }
 
 /** Recharge shields fully (as when docking) and top up hull slightly. */

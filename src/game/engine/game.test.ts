@@ -27,6 +27,7 @@ import { TRADE_GOODS, GOOD_IDS } from '../data/goods'
 import { SHIP_TYPES, SHIP_TYPE_IDS } from '../data/ships'
 import { MERCENARIES, MERCENARY_IDS } from '../data/mercenaries'
 import { systemDistance } from './travel'
+import { mineOnce } from './mining'
 import {
   acceptQuest,
   canTurnIn,
@@ -638,6 +639,34 @@ describe('quest generation', () => {
     for (const type of ['delivery', 'smuggle', 'passenger', 'bounty', 'fetch']) {
       expect(seen).toContain(type)
     }
+  })
+})
+
+describe('mining', () => {
+  it('extracts a unit of cargo and advances a day', () => {
+    const g = newGame({ commanderName: 'Test', seed: 82 })
+    g.systems[g.currentSystem].mineSite = { kind: 'asteroidField', resource: 'ore', richness: 10 }
+    const dayBefore = g.day
+    const oreBefore = g.ship.cargo.ore
+    const res = mineOnce(g, new Rng(1))
+    expect(res.ok).toBe(true)
+    expect(g.day).toBe(dayBefore + 1)
+    expect(g.ship.cargo.ore).toBe(oreBefore + 1)
+  })
+
+  it('scoops fuel at a gas giant when the tank has room', () => {
+    const g = newGame({ commanderName: 'Test', seed: 82 })
+    g.systems[g.currentSystem].mineSite = { kind: 'gasGiant', resource: 'fuel', richness: 10 }
+    g.ship.fuel = 0
+    const res = mineOnce(g, new Rng(1))
+    expect(res.ok).toBe(true)
+    expect(g.ship.fuel).toBe(1)
+  })
+
+  it('cannot mine where there is no site', () => {
+    const g = newGame({ commanderName: 'Test', seed: 83 })
+    g.systems[g.currentSystem].mineSite = null
+    expect(mineOnce(g, new Rng(1)).ok).toBe(false)
   })
 })
 

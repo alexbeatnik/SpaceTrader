@@ -7,6 +7,9 @@ const SAVE_DIR = () => join(app.getPath('userData'), 'saves')
 const SAVE_FILE = () => join(SAVE_DIR(), 'savegame.json')
 
 function createWindow(): void {
+  // In dev the icon lives in the project's build/ dir; packaged builds embed it
+  // into the exe (electron-builder), so a missing path here is harmless.
+  const iconPath = join(__dirname, '../../build/icon.png')
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -16,6 +19,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     backgroundColor: '#05060f',
     title: 'Star Trader',
+    icon: existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

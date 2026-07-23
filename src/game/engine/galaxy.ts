@@ -4,7 +4,8 @@ import type {
   SpecialResource,
   SystemStatus,
   PoliticsId,
-  EconomyType
+  EconomyType,
+  MineSite
 } from './types'
 import { Rng } from './rng'
 import { POLITICS, POLITICS_IDS } from '../data/politics'
@@ -44,6 +45,18 @@ function pickPolitics(rng: Rng, tech: TechLevel): PoliticsId {
   return valid.length ? rng.pick(valid) : 'anarchy'
 }
 
+/** Pick a mineable site for a system, themed by its special resource. */
+function pickMineSite(rng: Rng, resource: SpecialResource): MineSite | null {
+  // Mineral worlds are ringed by asteroids; watery worlds have ice fields.
+  if (resource === 'mineralRich') return { kind: 'asteroidField', resource: 'ore', richness: 12 }
+  if (resource === 'mineralPoor' || resource === 'lifeless')
+    return { kind: 'asteroidField', resource: 'ore', richness: 7 }
+  if (resource === 'sweetwater') return { kind: 'iceField', resource: 'water', richness: 12 }
+  // Otherwise, some systems host a gas giant you can scoop fuel from.
+  if (rng.chance(0.22)) return { kind: 'gasGiant', resource: 'fuel', richness: 10 }
+  return null
+}
+
 /** Pick a planet economy whose typical tech band contains `tech`. */
 function pickEconomy(rng: Rng, tech: TechLevel): EconomyType {
   const valid = ECONOMY_IDS.filter((id) => {
@@ -80,6 +93,7 @@ export function generateGalaxy(seed: number): SolarSystem[] {
     const tech = rng.int(0, 7) as TechLevel
     const politics = pickPolitics(rng, tech)
     const id = systems.length
+    const specialResource = rng.pick(SPECIAL_RESOURCES)
     systems.push({
       id,
       nameId: names[id % names.length],
@@ -87,8 +101,9 @@ export function generateGalaxy(seed: number): SolarSystem[] {
       y,
       techLevel: tech,
       politics,
-      specialResource: rng.pick(SPECIAL_RESOURCES),
+      specialResource,
       economyType: pickEconomy(rng, tech),
+      mineSite: pickMineSite(rng, specialResource),
       status: rng.pick(STATUSES),
       qty: emptyGoodRecord() as SolarSystem['qty'],
       buyPrice: emptyGoodRecord() as SolarSystem['buyPrice'],

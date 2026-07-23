@@ -147,6 +147,18 @@ export type EconomyType =
   | 'resort'
   | 'hiTech'
 
+// --- Mining ------------------------------------------------------------------
+export type MineKind = 'asteroidField' | 'gasGiant' | 'iceField'
+
+/** A mineable site near a planet (asteroids, a gas giant, an ice field). */
+export interface MineSite {
+  kind: MineKind
+  /** Extracted resource: a good id, or 'fuel' scooped straight into the tank. */
+  resource: GoodId | 'fuel'
+  /** Relative richness; scales the chance of a rare bonus while mining. */
+  richness: number
+}
+
 // --- Ships & equipment -------------------------------------------------------
 export type ShipTypeId =
   | 'flea'
@@ -237,6 +249,8 @@ export interface SolarSystem {
   mercenaryId: string | null
   /** Assignments posted on this planet's job board (refreshed on arrival). */
   questBoard: Quest[]
+  /** A mineable site in this system, if any. */
+  mineSite: MineSite | null
 }
 
 export interface Ship {

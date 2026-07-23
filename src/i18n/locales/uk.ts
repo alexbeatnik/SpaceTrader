@@ -276,6 +276,19 @@ export const uk = {
     jumping: 'Триває варп-стрибок',
     skip: 'Пропустити'
   },
+  mining: {
+    start: 'Майнити',
+    stop: 'Зупинити майнінг',
+    yields: 'Дає {resource}',
+    extracting: 'Видобуток: {resource}',
+    session: 'Видобуто',
+    raid: 'Рейдери напали на вашу видобувну операцію!',
+    kind: {
+      asteroidField: 'Пояс астероїдів',
+      gasGiant: 'Газовий гігант',
+      iceField: 'Крижане поле'
+    }
+  },
   ship: {
     title: 'Ваш корабель',
     type: 'Тип',
@@ -415,7 +428,10 @@ export const uk = {
     autoRefuel: 'Автозаправка: {parsecs} пс за {cost} кр.',
     wormhole: 'Стрибок через червоточину до {system} (податок {tax} кр).',
     plunderedTrader: 'Ви пограбували торговця ({qty} од.).',
-    crewLeft: 'Нічим платити екіпажу — команда покинула вас.'
+    crewLeft: 'Нічим платити екіпажу — команда покинула вас.',
+    mined: 'Видобуто 1 {good}.',
+    minedFuel: 'Зібрано 1 пс пального.',
+    minedBonus: 'Рідкісна знахідка: {good}!'
   },
   info: {
     bought: 'Куплено {qty} × {good} за {cost} кр.',
@@ -468,7 +484,9 @@ export const uk = {
     notInCrew: 'Його немає у вашому екіпажі.',
     cannotTurnIn: 'Це завдання не можна здати тут.',
     tooManyQuests: 'У вас і так забагато активних завдань.',
-    questGone: 'Це оголошення вже недоступне.'
+    questGone: 'Це оголошення вже недоступне.',
+    noMineSite: 'Тут немає що видобувати.',
+    holdFull: 'Вантажний трюм повний.'
   },
   tech: {
     preAgricultural: 'Доаграрний',

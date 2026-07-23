@@ -40,9 +40,11 @@ function StrengthBar({ value }: { value: number }): React.JSX.Element {
 export function SystemScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
   const setScreen = useGameStore((s) => s.setScreen)
+  const startMining = useGameStore((s) => s.startMining)
   const { t } = useI18n()
   const sys = currentSystem(game)
   const gov = POLITICS[sys.politics]
+  const mine = sys.mineSite
 
   return (
     <div>
@@ -116,6 +118,27 @@ export function SystemScreen(): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {mine && (
+        <div className="panel panel-pad" style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 30 }}>
+              {mine.kind === 'asteroidField' ? '☄️' : mine.kind === 'gasGiant' ? '🪐' : '🧊'}
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600 }}>{t(`mining.kind.${mine.kind}`)}</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                {t('mining.yields', {
+                  resource: mine.resource === 'fuel' ? t('hud.fuel') : goodName(mine.resource)
+                })}
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={() => startMining()}>
+              ⛏️ {t('mining.start')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="panel panel-pad" style={{ marginTop: 16 }}>
         <div className="screen-sub" style={{ marginBottom: 10 }}>{t('market.avgPrice')}</div>

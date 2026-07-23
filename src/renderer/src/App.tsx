@@ -10,6 +10,7 @@ import { QuestOfferModal } from './components/QuestOfferModal'
 import { QuestCompleteModal } from './components/QuestCompleteModal'
 import { GameOverModal } from './components/GameOverModal'
 import { WarpTransition } from './components/WarpTransition'
+import { MiningOverlay } from './components/MiningOverlay'
 import { MenuScreen } from './screens/MenuScreen'
 import { SystemScreen } from './screens/SystemScreen'
 import { MarketScreen } from './screens/MarketScreen'
@@ -27,6 +28,7 @@ export function App(): React.JSX.Element {
   const encounter = useGameStore((s) => s.encounter)
   const gameOver = useGameStore((s) => s.gameOver)
   const travel = useGameStore((s) => s.travel)
+  const mining = useGameStore((s) => s.mining)
   useI18n() // subscribe to locale changes for the whole tree
 
   useEffect(() => {
@@ -62,10 +64,11 @@ export function App(): React.JSX.Element {
         </div>
       </div>
       {travel && <WarpTransition />}
-      {!travel && encounter && !gameOver && <CombatModal />}
-      {!travel && !encounter && !gameOver && <EventModal />}
-      {!travel && !encounter && !gameOver && <QuestOfferModal />}
-      {!travel && !encounter && !gameOver && <QuestCompleteModal />}
+      {mining && !encounter && <MiningOverlay />}
+      {!travel && !mining && encounter && !gameOver && <CombatModal />}
+      {!travel && !mining && !encounter && !gameOver && <EventModal />}
+      {!travel && !mining && !encounter && !gameOver && <QuestOfferModal />}
+      {!travel && !mining && !encounter && !gameOver && <QuestCompleteModal />}
       {gameOver && <GameOverModal />}
       <Toast />
     </div>

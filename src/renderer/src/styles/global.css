@@ -599,6 +599,17 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
 }
 .warp-sub { color: var(--text-dim); font-size: 13px; }
 
+/* Mining overlay: a slowly spinning rock/planet. */
+.mining-rock {
+  font-size: 96px;
+  filter: drop-shadow(0 0 26px rgba(255, 192, 74, 0.5));
+  animation: mining-spin 6s linear infinite;
+}
+@keyframes mining-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .warp-progress {
   width: 340px;
   max-width: 70vw;

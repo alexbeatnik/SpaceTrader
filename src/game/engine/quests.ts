@@ -35,6 +35,17 @@ function nextQuestId(): string {
 }
 
 /**
+ * Reward for a cargo-backed quest. Anchored to what the goods cost to acquire
+ * (the same price the giver charges for supplies), times a healthy margin, so a
+ * contract is always more profitable than plain trading — plus travel pay.
+ */
+function cargoReward(state: GameState, good: GoodId, amount: number, dist: number, rng: Rng): number {
+  const unit = questSupplyUnitPrice(state, good)
+  const margin = 2.1 + rng.next() * 0.8 // 2.1–2.9× the cost of the goods
+  return Math.round(amount * unit * margin) + dist * 30 + rng.int(400, 1200)
+}
+
+/**
  * Roll for a special-assignment offer at the current system. Returns an
  * `offered` quest to present to the player, or null.
  */
@@ -56,7 +67,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
       const good: GoodId =
         crisis.status === 'plague' ? 'medicine' : crisis.status === 'drought' ? 'water' : 'food'
       const amount = rng.int(3, 8)
-      const reward = amount * (good === 'medicine' ? 900 : 300) + rng.int(500, 1500)
+      const reward = cargoReward(state, good, amount, systemDistance(here, crisis), rng)
       return {
         id: nextQuestId(),
         type: 'relief',
@@ -75,7 +86,8 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
     const target = rng.pick(others)
     const good: GoodId = rng.chance(0.5) ? 'firearms' : 'narcotics'
     const amount = rng.int(2, 6)
-    const reward = amount * 700 + systemDistance(here, target) * 40 + rng.int(500, 2000)
+    // Smuggling is high-risk: extra margin on top of the standard cargo reward.
+    const reward = Math.round(cargoReward(state, good, amount, systemDistance(here, target), rng) * 1.2)
     return {
       id: nextQuestId(),
       type: 'smuggle',
@@ -121,7 +133,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
   if (roll < 0.85) {
     const good = rng.pick(FETCH_GOODS)
     const amount = rng.int(3, 8)
-    const reward = amount * 250 + rng.int(400, 1200)
+    const reward = cargoReward(state, good, amount, 0, rng)
     return {
       id: nextQuestId(),
       type: 'fetch',
@@ -163,21 +175,22 @@ function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
   const others = state.systems.filter((s) => s.id !== here.id)
   if (others.length === 0) return null
 
+  // Sizes: small runs up to bulk contracts a large freighter can just carry.
   const t = rng.next()
-  const amount = t < 0.55 ? rng.int(2, 8) : t < 0.85 ? rng.int(12, 40) : rng.int(60, 200)
+  const amount = t < 0.55 ? rng.int(2, 8) : t < 0.85 ? rng.int(12, 35) : rng.int(40, 70)
   const roll = rng.next()
 
   if (roll < 0.24) {
     // Fetch: source a commodity elsewhere and bring it back here.
     const good = rng.pick(FETCH_GOODS)
-    const reward = amount * rng.int(120, 260) + rng.int(300, 1200)
+    const reward = cargoReward(state, good, amount, 0, rng)
     return { id: nextQuestId(), type: 'fetch', giverSystem: here.id, targetSystem: here.id, reward, status: 'offered', good, amount }
   }
   if (roll < 0.42) {
     // Smuggle contraband to a distant buyer.
     const target = rng.pick(others)
     const good: GoodId = rng.chance(0.5) ? 'firearms' : 'narcotics'
-    const reward = amount * rng.int(500, 900) + systemDistance(here, target) * 40 + rng.int(600, 2200)
+    const reward = Math.round(cargoReward(state, good, amount, systemDistance(here, target), rng) * 1.2)
     return { id: nextQuestId(), type: 'smuggle', giverSystem: here.id, targetSystem: target.id, reward, status: 'offered', good, amount }
   }
   if (roll < 0.6) {
@@ -186,7 +199,7 @@ function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
       others.find((s) => s.status === 'plague' || s.status === 'drought' || s.status === 'cropFailure') ??
       rng.pick(others)
     const good: GoodId = crisis.status === 'plague' ? 'medicine' : crisis.status === 'drought' ? 'water' : 'food'
-    const reward = amount * (good === 'medicine' ? 400 : 180) + rng.int(500, 1600)
+    const reward = cargoReward(state, good, amount, systemDistance(here, crisis), rng)
     return { id: nextQuestId(), type: 'relief', giverSystem: here.id, targetSystem: crisis.id, reward, status: 'offered', good, amount }
   }
   if (roll < 0.74 && freeQuarters(state.ship) > 0) {

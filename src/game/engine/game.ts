@@ -483,6 +483,46 @@ export function cancelInsurance(state: GameState): ActionResult {
   return okInfo('info.insuranceCancelled')
 }
 
+// --- Daily tick --------------------------------------------------------------
+function shipInsuranceValue(state: GameState): number {
+  return SHIP_TYPES[state.ship.type].price
+}
+
+/** Advance the calendar one day and apply daily finances (debt, wages, insurance). */
+export function advanceDay(state: GameState): void {
+  state.day++
+
+  // Daily loan interest (10%).
+  if (state.debt > 0) {
+    const interest = Math.ceil(state.debt * 0.1)
+    state.debt += interest
+    state.credits -= interest
+    if (state.credits < 0) {
+      // Overdue debt is not forgiven; it simply accrues.
+      state.debt += -state.credits
+      state.credits = 0
+    }
+  }
+
+  // Crew wages. If the player cannot pay, the crew leaves.
+  const wages = crewWages(state)
+  if (wages > 0) {
+    if (state.credits >= wages) {
+      state.credits -= wages
+    } else {
+      state.ship.crew = []
+      pushLog(state, 'log.crewLeft')
+    }
+  }
+
+  // Insurance premium & no-claim accrual.
+  if (state.insurance) {
+    const premium = Math.ceil(shipInsuranceValue(state) * 0.005 * (1 - Math.min(0.9, state.noClaim * 0.01)))
+    state.credits = Math.max(0, state.credits - premium)
+    state.noClaim++
+  }
+}
+
 // --- Result helpers ----------------------------------------------------------
 function fail(error: string): ActionResult {
   return { ok: false, error }

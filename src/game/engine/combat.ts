@@ -363,6 +363,11 @@ export function tradeSell(
   return { ok: true, info: { key: 'info.sold', params: { qty, good, revenue } } }
 }
 
+/** Spawn a pirate encounter (e.g. raiders that jump a mining operation). */
+export function spawnPirates(state: GameState, rng: Rng): Encounter {
+  return makeEncounter('pirate', state, rng)
+}
+
 /** Build a tough pirate encounter for a bounty quest target. */
 export function createBountyEncounter(
   state: GameState,

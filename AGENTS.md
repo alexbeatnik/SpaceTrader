@@ -30,11 +30,13 @@ A modern desktop remake of the classic *Space Trader* game, built with
 
 ## Architecture
 
-- `src/game/data/` — static tables (goods, ships, equipment, governments, names).
-  Pure data, no logic.
-- `src/game/engine/` — types, RNG, galaxy, market, travel, combat, warp, and the
-  `game.ts` action layer. `src/game/index.ts` is the public barrel; import engine
-  symbols through `@game/index`, not deep paths.
+- `src/game/data/` — static tables (goods, ships, equipment, governments,
+  economies, mercenaries, names). Pure data, no logic.
+- `src/game/engine/` — types, RNG, galaxy, market, travel, combat, warp, mining,
+  events, quests, and the `game.ts` action layer. `src/game/index.ts` is the
+  public barrel; import engine symbols through `@game/index`, not deep paths.
+  `advanceDay(state)` (in `game.ts`) is the shared daily tick used by both `warp`
+  and `mine` — reuse it rather than re-implementing wages/interest/insurance.
 - `src/i18n/` — locale dictionaries and helpers. `en` is the default locale.
 - `src/renderer/src/store/gameStore.ts` — the **only** bridge between UI and
   engine. Components call store actions; the store calls engine functions,
@@ -62,6 +64,34 @@ flow that runs on arrival, thread it through `WarpResult` → `pendingWarp` →
 `finishTravel`, not directly out of `warpTo`. Note: `pendingWarp` lives outside
 reactive state and is not persisted, so a hard close mid-animation drops that
 one pending encounter (acceptable).
+
+### Timed overlays (warp, mining)
+
+Long real-time activities are driven by a `requestAnimationFrame` loop in an
+overlay component, not by the engine. `<WarpTransition>` runs once per jump
+(~10–30 s, skippable). `<MiningOverlay>` loops: every ~30 s it calls
+`mineTick()`, which extracts one unit via the pure `mineOnce(state, rng)` and may
+surface a pirate `Encounter` (which clears `mining` and mounts `<CombatModal>`).
+Keep the extraction/economy logic in the engine (`mining.ts`); the overlay only
+owns the timer, progress bar, and stop button.
+
+### Quests: job board + manual turn-in
+
+Each `SolarSystem` carries a `questBoard: Quest[]`, regenerated on arrival
+(`generateQuestBoard`) and seeded lazily for the start system in the store's
+`ensureBoard`. The player accepts postings from the board (`acceptBoardQuest`)
+and **hands quests in manually** at the destination — `warp` no longer completes
+them. Use `canTurnIn(state, quest)` / `turnInQuest(state, id)` (bounties still
+resolve via combat). Cargo-quest rewards go through `cargoReward`, which anchors
+the payout to the goods' acquisition cost so a contract always beats trading.
+
+### Exotic (resource-gated) goods
+
+Goods whose `TradeGood.producedByResource` is set are bought only on the matching
+special-resource planet and sold where wanted (complementary resource or hi-tech)
+— see `standardPrice`/`sellablePrice` in `market.ts` and `isSpecialGood`. UI lists
+filter them so they only show where tradeable. Any code that builds a goods
+record must iterate `GOOD_IDS`, never hard-code the good keys.
 
 ### Adding a game mechanic (typical flow)
 

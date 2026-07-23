@@ -276,6 +276,19 @@ export const en = {
     jumping: 'Warp jump in progress',
     skip: 'Skip'
   },
+  mining: {
+    start: 'Mine',
+    stop: 'Stop mining',
+    yields: 'Yields {resource}',
+    extracting: 'Extracting {resource}',
+    session: 'Extracted',
+    raid: 'Raiders jumped your mining operation!',
+    kind: {
+      asteroidField: 'Asteroid field',
+      gasGiant: 'Gas giant',
+      iceField: 'Ice field'
+    }
+  },
   ship: {
     title: 'Your ship',
     type: 'Type',
@@ -415,7 +428,10 @@ export const en = {
     autoRefuel: 'Auto-refuelled {parsecs} pc for {cost} cr.',
     wormhole: 'Wormhole jump to {system} (tax {tax} cr).',
     plunderedTrader: 'You plundered a trader ({qty} units).',
-    crewLeft: 'You could not pay your crew — they left you.'
+    crewLeft: 'You could not pay your crew — they left you.',
+    mined: 'Mined 1 {good}.',
+    minedFuel: 'Scooped 1 pc of fuel.',
+    minedBonus: 'Struck a rare find: {good}!'
   },
   info: {
     bought: 'Bought {qty} × {good} for {cost} cr.',
@@ -468,7 +484,9 @@ export const en = {
     notInCrew: 'Not in your crew.',
     cannotTurnIn: 'This assignment cannot be handed in here.',
     tooManyQuests: 'You are juggling too many assignments already.',
-    questGone: 'That posting is no longer available.'
+    questGone: 'That posting is no longer available.',
+    noMineSite: 'There is nothing to mine here.',
+    holdFull: 'The cargo hold is full.'
   },
   tech: {
     preAgricultural: 'Pre-agricultural',
