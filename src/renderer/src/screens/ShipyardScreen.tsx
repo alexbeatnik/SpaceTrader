@@ -13,6 +13,9 @@ import {
   maxHull,
   shipValue,
   fuelPricePerParsec,
+  hullUpgradePrice,
+  HULL_UPGRADE_AMOUNT,
+  MAX_HULL_UPGRADES,
   type ShipTypeId
 } from '@game/index'
 import { weaponName, shieldName, gadgetName, shipName, economyName } from '@i18n/index'
@@ -86,6 +89,23 @@ export function ShipyardScreen(): React.JSX.Element {
           >
             {t('shipyard.repairFull')} · {fmt(hullMissing * type.repairCostPerUnit)} {t('common.cr')}
           </button>
+
+          <div className="kv" style={{ marginTop: 12 }}>
+            <span className="k">{t('shipyard.hullUpgrade')}</span>
+            <span className="v">{(ship.hullUpgrades ?? 0)}/{MAX_HULL_UPGRADES}</span>
+          </div>
+          {(ship.hullUpgrades ?? 0) >= MAX_HULL_UPGRADES ? (
+            <div className="badge">{t('shipyard.hullUpgradeMax')}</div>
+          ) : (
+            <button
+              className="btn btn-block"
+              disabled={game.credits < hullUpgradePrice(ship)}
+              onClick={() => s.buyHullUpgrade()}
+            >
+              {t('shipyard.buyHullUpgrade', { amount: HULL_UPGRADE_AMOUNT })} ·{' '}
+              {fmt(hullUpgradePrice(ship))} {t('common.cr')}
+            </button>
+          )}
 
           <div style={{ marginTop: 18 }}>
             {ship.escapePod ? (

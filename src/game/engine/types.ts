@@ -224,6 +224,8 @@ export interface SolarSystem {
 export interface Ship {
   type: ShipTypeId
   hull: number // current hull points
+  /** Reinforced-hull upgrades installed; each raises max hull. */
+  hullUpgrades: number
   fuel: number // current fuel (parsecs)
   cargo: Record<GoodId, number>
   weapons: WeaponId[]

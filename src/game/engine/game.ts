@@ -28,6 +28,10 @@ import { economyOf } from '../data/economies'
 export const GAME_VERSION = 1
 export const STARTING_CREDITS = 1000
 export const MAX_SKILL = 10
+/** Extra max-hull points granted per reinforced-hull upgrade. */
+export const HULL_UPGRADE_AMOUNT = 25
+/** Maximum reinforced-hull upgrades a ship may carry. */
+export const MAX_HULL_UPGRADES = 5
 
 function emptyGoods(): Record<GoodId, number> {
   const rec = {} as Record<GoodId, number>
@@ -56,6 +60,7 @@ export function shipValue(ship: Ship): number {
   for (const w of ship.weapons) value += Math.round(WEAPONS[w].price * 0.75)
   for (const s of ship.shields) value += Math.round(SHIELDS[s].price * 0.75)
   for (const g of ship.gadgets) value += Math.round(GADGETS[g].price * 0.75)
+  value += (ship.hullUpgrades ?? 0) * 1000 // partial resale of hull reinforcement
   return value
 }
 
@@ -106,7 +111,12 @@ export function freeQuarters(ship: Ship): number {
 }
 
 export function maxHull(ship: Ship): number {
-  return SHIP_TYPES[ship.type].hullStrength
+  return SHIP_TYPES[ship.type].hullStrength + (ship.hullUpgrades ?? 0) * HULL_UPGRADE_AMOUNT
+}
+
+/** Price of the next reinforced-hull upgrade (escalates with each one). */
+export function hullUpgradePrice(ship: Ship): number {
+  return 2500 * ((ship.hullUpgrades ?? 0) + 1)
 }
 
 export function totalShieldPower(ship: Ship): number {
@@ -150,6 +160,7 @@ export function newGame(opts: NewGameOptions): GameState {
   const ship: Ship = {
     type: 'gnat',
     hull: SHIP_TYPES.gnat.hullStrength,
+    hullUpgrades: 0,
     fuel: SHIP_TYPES.gnat.fuelTanks,
     cargo: emptyGoods(),
     weapons: ['pulse'],
@@ -294,6 +305,19 @@ export function repairFull(state: GameState): ActionResult {
   return repair(state, maxHull(state.ship))
 }
 
+/** Install a reinforced-hull upgrade: raises max hull and current hull. */
+export function buyHullUpgrade(state: GameState): ActionResult {
+  const ship = state.ship
+  const current = ship.hullUpgrades ?? 0
+  if (current >= MAX_HULL_UPGRADES) return fail('error.maxHullUpgrades')
+  const price = hullUpgradePrice(ship)
+  if (state.credits < price) return fail('error.notEnoughCredits')
+  state.credits -= price
+  ship.hullUpgrades = current + 1
+  ship.hull += HULL_UPGRADE_AMOUNT
+  return okInfo('info.hullUpgraded', { amount: HULL_UPGRADE_AMOUNT, cost: price })
+}
+
 // --- Equipment purchases -----------------------------------------------------
 function traderPrice(state: GameState, base: number): number {
   const bonus = Math.min(0.1, effectiveSkills(state).trader * 0.01)
@@ -356,6 +380,7 @@ export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
   state.ship = {
     type: target,
     hull: SHIP_TYPES[target].hullStrength,
+    hullUpgrades: 0,
     fuel: SHIP_TYPES[target].fuelTanks,
     cargo: emptyGoods(),
     weapons: [],

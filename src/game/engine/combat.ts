@@ -45,7 +45,14 @@ export interface TradeOffer {
 
 export interface Encounter {
   kind: EncounterKind
+  /** The ship currently engaged. */
   opponent: Opponent
+  /** Other ships in the group waiting to engage after the current one. */
+  reserves: Opponent[]
+  /** Total ships in the encounter (1 = a lone ship). */
+  fleetSize: number
+  /** How many ships have been destroyed / dealt with so far. */
+  defeated: number
   status: EncounterStatus
   round: number
   bribeCost: number
@@ -119,8 +126,8 @@ function shipForThreat(threat: number): ShipTypeId {
   return (['gnat', 'firefly', 'mantis', 'hornet', 'scorpion', 'widow'] as ShipTypeId[])[threat]
 }
 
-function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encounter {
-  const threat = threatLevel(kind, state)
+/** Build a single opponent ship of the given kind and threat level. */
+function makeOpponent(kind: EncounterKind, rng: Rng, threat: number): Opponent {
   const shipType =
     kind === 'trader'
       ? rng.pick(['flea', 'gnat', 'locust', 'firefly', 'beetle', 'centipede'] as ShipTypeId[])
@@ -139,25 +146,25 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
   const oppWeapon =
     type.weaponSlots > 0 ? WEAPONS[weaponTier].power * Math.min(type.weaponSlots, 2) : 0
 
+  // Loot carried (stolen goods / wares), dropped when the ship is destroyed.
   const cargo = {} as Record<GoodId, number>
   for (const g of GOOD_IDS) cargo[g] = 0
-  let trade: TradeOffer | undefined
-  if (kind === 'trader') {
-    // Traders carry random wares to sell and a wishlist to buy from the player.
-    trade = makeTradeOffer(rng)
-    // The hold mirrors what's on offer (keeps plunder consistent with trade).
-    for (const g of GOOD_IDS) {
-      const s = trade.sells[g]
-      if (s) cargo[g] = s.qty
-    }
-  }
+  const lootCount =
+    kind === 'trader'
+      ? rng.int(2, Math.min(10, type.cargoBays))
+      : kind === 'pirate'
+        ? rng.int(1, 6)
+        : kind === 'alien'
+          ? rng.int(0, 3)
+          : 0 // police & bounty hunters carry nothing worth taking
+  for (let i = 0; i < lootCount; i++) cargo[rng.pick(GOOD_IDS)]++
 
   // Aliens and bounty hunters are hardened: extra hull and sharper crews.
   const hullMul = kind === 'alien' ? 1.5 : kind === 'bountyHunter' ? 1.2 : 1
   const baseHull = Math.round(type.hullStrength * hullMul)
   const skillBonus = kind === 'alien' ? 4 : kind === 'bountyHunter' ? 2 : 0
 
-  const opponent: Opponent = {
+  return {
     kind,
     shipType,
     hull: baseHull,
@@ -173,6 +180,30 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
     cargo,
     fleeing: false
   }
+}
+
+function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encounter {
+  const threat = threatLevel(kind, state)
+
+  // Some encounters arrive as a group: a pirate ambush or a trader caravan.
+  let fleetSize = 1
+  if (kind === 'pirate' && rng.chance(0.35)) fleetSize = rng.int(2, 5)
+  else if (kind === 'trader' && rng.chance(0.3)) fleetSize = rng.int(2, 4)
+
+  const opponent = makeOpponent(kind, rng, threat)
+  const reserves: Opponent[] = []
+  for (let i = 1; i < fleetSize; i++) reserves.push(makeOpponent(kind, rng, threat))
+
+  // A lone trader will deal; a caravan just passes (loot only if attacked).
+  let trade: TradeOffer | undefined
+  if (kind === 'trader' && fleetSize === 1) {
+    trade = makeTradeOffer(rng)
+    // The hold mirrors what's on offer (keeps plunder consistent with trade).
+    for (const g of GOOD_IDS) {
+      const s = trade.sells[g]
+      if (s) opponent.cargo[g] = s.qty
+    }
+  }
 
   // Both police and bounty hunters can be bought off where officials are corruptible.
   const canBribe = kind === 'police' || kind === 'bountyHunter'
@@ -181,14 +212,60 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
       ? rng.int(100, 100 + Math.round(state.credits * 0.05))
       : 0
 
+  const appear: { key: string; params?: Record<string, string | number> } =
+    fleetSize > 1
+      ? kind === 'pirate'
+        ? { key: 'encounter.pirate.ambush', params: { count: fleetSize } }
+        : { key: 'encounter.trader.caravan', params: { count: fleetSize } }
+      : { key: `encounter.${kind}.appear`, params: { ship: opponent.shipType } }
+
   return {
     kind,
     opponent,
+    reserves,
+    fleetSize,
+    defeated: 0,
     status: 'ongoing',
     round: 0,
     bribeCost,
     trade,
-    messages: [{ key: `encounter.${kind}.appear`, params: { ship: shipType } }]
+    messages: [appear]
+  }
+}
+
+/** Promote the next reserve ship to active; returns false if the group is spent. */
+function engageNext(enc: Encounter): boolean {
+  const next = enc.reserves.shift()
+  if (!next) return false
+  enc.opponent = next
+  enc.status = 'ongoing'
+  enc.messages.push({ key: 'encounter.fleetNext', params: { remaining: enc.reserves.length + 1 } })
+  return true
+}
+
+/** Spill a destroyed ship's cargo into the player's free bays. */
+function dropLoot(
+  state: GameState,
+  opp: Opponent,
+  rng: Rng,
+  msg: (k: string, p?: Record<string, string | number>) => void
+): void {
+  let taken = 0
+  for (const g of GOOD_IDS) {
+    while (opp.cargo[g] > 0 && freeCargoBays(state.ship) > 0) {
+      opp.cargo[g]--
+      state.ship.cargo[g]++
+      taken++
+    }
+  }
+  if (taken > 0) {
+    msg('encounter.lootDropped', { qty: taken })
+  } else if (rng.chance(0.4) && freeCargoBays(state.ship) > 0) {
+    const g = pickLoot(opp, rng)
+    if (g) {
+      state.ship.cargo[g]++
+      msg('encounter.salvage', { good: g })
+    }
   }
 }
 
@@ -295,7 +372,9 @@ export function createBountyEncounter(
 ): Encounter {
   const enc = makeEncounter('pirate', state, rng)
   const type = SHIP_TYPES[enc.opponent.shipType]
-  // Bounty targets are notably tougher than the usual rabble.
+  // Bounty targets are a single, notably tougher ship — not a rabble.
+  enc.reserves = []
+  enc.fleetSize = 1
   enc.opponent.hull = Math.round(type.hullStrength * 1.3)
   enc.opponent.maxHull = enc.opponent.hull
   enc.opponent.fighter = Math.min(12, enc.opponent.fighter + 2)
@@ -462,16 +541,7 @@ export function resolveRound(
     }
 
     if (opp.hull <= 0) {
-      enc.status = 'oppDestroyed'
       state.record.reputation += 1
-      // Chance to salvage a cargo canister.
-      if (rng.chance(0.5) && freeCargoBays(state.ship) > 0) {
-        const g = pickLoot(opp, rng)
-        if (g) {
-          state.ship.cargo[g]++
-          msg('encounter.salvage', { good: g })
-        }
-      }
       if (enc.kind === 'pirate') state.record.policeRecord += 1
       if (enc.kind === 'police') state.record.policeRecord -= 5
       if (enc.kind === 'bountyHunter') state.record.reputation += 2
@@ -481,7 +551,12 @@ export function resolveRound(
         const q = completeBounty(state, enc.bountyQuestId)
         if (q) msg('encounter.bounty.done', { name: enc.bountyName ?? '', reward: q.reward })
       }
+      // The wreck spills its cargo into your hold.
+      dropLoot(state, opp, rng, msg)
+      enc.defeated++
       msg('encounter.oppDestroyed')
+      // Another ship in the group steps up, if any remain.
+      if (!engageNext(enc)) enc.status = 'oppDestroyed'
       return
     }
 
@@ -571,7 +646,9 @@ export function plunder(state: GameState, enc: Encounter): number {
     state.record.policeRecord -= 2
     pushLog(state, 'log.plunderedTrader', { qty: taken })
   }
-  enc.status = 'ignored'
+  enc.defeated++
+  // A surrendered ship dealt with — the next of the group engages, if any.
+  if (!engageNext(enc)) enc.status = 'ignored'
   return taken
 }
 

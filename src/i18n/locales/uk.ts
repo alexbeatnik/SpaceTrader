@@ -212,6 +212,9 @@ export const uk = {
     repair: 'Ремонт корпусу',
     refuelFull: 'Заправити повний бак',
     autoRefuel: 'Автозаправка при прибутті',
+    hullUpgrade: 'Підсилення корпусу',
+    buyHullUpgrade: 'Підсилити корпус (+{amount} HP)',
+    hullUpgradeMax: 'Корпус повністю підсилено',
     repairFull: 'Полагодити повністю',
     buyFuel: 'Купити паливо',
     weapons: 'Зброя',
@@ -328,8 +331,11 @@ export const uk = {
     },
     trader: {
       appear: 'Ви зустріли торговця на кораблі {ship}.',
+      caravan: 'Караван торговців із {count} кораблів перетинає ваш шлях.',
       ignore: 'Торговець прямує своїм курсом.'
     },
+    fleetNext: 'Наближається ще один корабель — {remaining} лишилось у бою!',
+    lootDropped: 'Ви підібрали {qty} од. здобичі з уламків.',
     trade: {
       title: 'Торгівля з торговцем',
       onOffer: 'На продаж',
@@ -338,6 +344,7 @@ export const uk = {
     },
     pirate: {
       appear: 'Пірат на {ship} атакує!',
+      ambush: 'Піратська засідка — {count} кораблів накидаються на вас!',
       plundered: 'Пірати пограбували ваш трюм ({qty} од.).',
       extort: 'Пірати вимагали викуп: {amount} кр.'
     },
@@ -402,6 +409,7 @@ export const uk = {
     dumped: 'Викинуто {qty} × {good} у космос.',
     refuelled: 'Заправлено {parsecs} пс за {cost} кр.',
     repaired: 'Відремонтовано {units} од. корпусу за {cost} кр.',
+    hullUpgraded: 'Корпус підсилено: +{amount} до макс. HP за {cost} кр.',
     equipmentBought: 'Спорядження придбано.',
     equipmentSold: 'Спорядження продано.',
     escapePodBought: 'Рятувальну капсулу встановлено.',
@@ -423,6 +431,7 @@ export const uk = {
     noCreditsFuel: 'Недостатньо кредитів на паливо.',
     hullFull: 'Корпус у ідеальному стані.',
     noCreditsRepair: 'Недостатньо кредитів на ремонт.',
+    maxHullUpgrades: 'Корпус уже повністю підсилено.',
     noWeaponSlot: 'Немає вільних слотів для зброї.',
     noShieldSlot: 'Немає вільних слотів для щитів.',
     noGadgetSlot: 'Немає вільних слотів для гаджетів.',

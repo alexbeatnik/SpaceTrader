@@ -67,7 +67,23 @@ export function CombatModal(): React.JSX.Element | null {
           <span className={`badge ${kindColor}`} style={{ marginLeft: 8 }}>
             {t(`encounter.kind.${enc.kind}`)}
           </span>
+          {enc.fleetSize > 1 && (
+            <span className={`badge ${kindColor}`} style={{ marginLeft: 6 }}>
+              🚀 {Math.max(0, enc.fleetSize - enc.defeated)}/{enc.fleetSize}
+            </span>
+          )}
         </h2>
+
+        {enc.fleetSize > 1 && (
+          <div className="fleet-dots" style={{ marginBottom: 12 }}>
+            {Array.from({ length: enc.fleetSize }).map((_, i) => (
+              <span
+                key={i}
+                className={`fleet-dot ${i < enc.defeated ? 'down' : i === enc.defeated ? 'active' : ''}`}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Opponent status */}
         <div className="ship-visual" style={{ marginBottom: 12 }}>

@@ -8,7 +8,8 @@ import {
   usedCargoBays,
   totalShieldPower,
   currentShieldCharge,
-  weaponPower
+  weaponPower,
+  HULL_UPGRADE_AMOUNT
 } from '@game/index'
 import { shipName, weaponName, shieldName, gadgetName, goodName } from '@i18n/index'
 import { ShipArt } from '../components/ShipArt'
@@ -47,6 +48,12 @@ export function ShipScreen(): React.JSX.Element {
       <div className="grid grid-2">
         <div className="panel panel-pad">
           <div className="kv"><span className="k">{t('ship.type')}</span><span className="v">{shipName(ship.type)}</span></div>
+          {(ship.hullUpgrades ?? 0) > 0 && (
+            <div className="kv">
+              <span className="k">{t('shipyard.hullUpgrade')}</span>
+              <span className="v pos">+{(ship.hullUpgrades ?? 0) * HULL_UPGRADE_AMOUNT} ({ship.hullUpgrades})</span>
+            </div>
+          )}
           <div className="kv"><span className="k">{t('ship.cargoBays')}</span><span className="v">{usedCargoBays(ship)}/{totalCargoBays(ship)}</span></div>
           <div className="kv"><span className="k">{t('ship.fuelTank')}</span><span className="v">{ship.fuel}/{type.fuelTanks} {t('common.pc')}</span></div>
           <div className="kv"><span className="k">{t('shipyard.weapons')}</span><span className="v">{ship.weapons.length ? ship.weapons.map(weaponName).join(', ') : t('ship.empty')} ({weaponPower(ship)}⚔)</span></div>

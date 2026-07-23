@@ -212,6 +212,9 @@ export const en = {
     repair: 'Hull repair',
     refuelFull: 'Fill the tank',
     autoRefuel: 'Auto-refuel on arrival',
+    hullUpgrade: 'Hull reinforcement',
+    buyHullUpgrade: 'Reinforce hull (+{amount} HP)',
+    hullUpgradeMax: 'Hull fully reinforced',
     repairFull: 'Full repair',
     buyFuel: 'Buy fuel',
     weapons: 'Weapons',
@@ -328,8 +331,11 @@ export const en = {
     },
     trader: {
       appear: 'You meet a trader flying a {ship}.',
+      caravan: 'A trader caravan of {count} ships crosses your path.',
       ignore: 'The trader goes on its way.'
     },
+    fleetNext: 'Another ship closes in — {remaining} still in the fight!',
+    lootDropped: 'You scooped {qty} units of loot from the wreck.',
     trade: {
       title: 'Trade with the trader',
       onOffer: 'For sale',
@@ -338,6 +344,7 @@ export const en = {
     },
     pirate: {
       appear: 'A pirate in a {ship} attacks!',
+      ambush: 'A pirate ambush — {count} ships swarm you!',
       plundered: 'Pirates plundered your hold ({qty} units).',
       extort: 'Pirates extorted a ransom: {amount} cr.'
     },
@@ -402,6 +409,7 @@ export const en = {
     dumped: 'Dumped {qty} × {good} into space.',
     refuelled: 'Refuelled {parsecs} pc for {cost} cr.',
     repaired: 'Repaired {units} hull for {cost} cr.',
+    hullUpgraded: 'Hull reinforced: +{amount} max HP for {cost} cr.',
     equipmentBought: 'Equipment purchased.',
     equipmentSold: 'Equipment sold.',
     escapePodBought: 'Escape pod installed.',
@@ -423,6 +431,7 @@ export const en = {
     noCreditsFuel: 'Not enough credits for fuel.',
     hullFull: 'The hull is in perfect condition.',
     noCreditsRepair: 'Not enough credits for repairs.',
+    maxHullUpgrades: 'The hull is already fully reinforced.',
     noWeaponSlot: 'No free weapon slots.',
     noShieldSlot: 'No free shield slots.',
     noGadgetSlot: 'No free gadget slots.',

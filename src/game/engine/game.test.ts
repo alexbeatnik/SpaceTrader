@@ -12,7 +12,11 @@ import {
   maxFuel,
   buyWeapon,
   sellWeapon,
-  fuelPricePerParsec
+  fuelPricePerParsec,
+  maxHull,
+  buyHullUpgrade,
+  HULL_UPGRADE_AMOUNT,
+  MAX_HULL_UPGRADES
 } from './game'
 import { warp } from './warp'
 import { resolveRound, tradeBuy, tradeSell } from './combat'
@@ -57,7 +61,17 @@ function testEncounter(kind: EncounterKind, opp: Partial<Opponent> = {}): Encoun
     fleeing: false,
     ...opp
   }
-  return { kind, opponent, status: 'ongoing', round: 0, bribeCost: 0, messages: [] }
+  return {
+    kind,
+    opponent,
+    reserves: [],
+    fleetSize: 1,
+    defeated: 0,
+    status: 'ongoing',
+    round: 0,
+    bribeCost: 0,
+    messages: []
+  }
 }
 
 describe('galaxy generation', () => {
@@ -190,6 +204,22 @@ describe('crew / mercenaries', () => {
 })
 
 describe('equipment', () => {
+  it('a hull upgrade raises max and current hull, and is capped', () => {
+    const g = newGame({ commanderName: 'Test', seed: 81 })
+    g.credits = 200000
+    const baseMax = maxHull(g.ship)
+    const hp0 = g.ship.hull
+    const res = buyHullUpgrade(g)
+    expect(res.ok).toBe(true)
+    expect(maxHull(g.ship)).toBe(baseMax + HULL_UPGRADE_AMOUNT)
+    expect(g.ship.hull).toBe(hp0 + HULL_UPGRADE_AMOUNT)
+    expect(g.ship.hullUpgrades).toBe(1)
+
+    for (let i = 0; i < MAX_HULL_UPGRADES + 3; i++) buyHullUpgrade(g)
+    expect(g.ship.hullUpgrades).toBe(MAX_HULL_UPGRADES)
+    expect(buyHullUpgrade(g).ok).toBe(false) // capped
+  })
+
   it('fuelCompactor increases max fuel; selling a weapon refunds credits', () => {
     const g = newGame({ commanderName: 'Test', seed: 31 })
     const baseFuel = maxFuel(g.ship)
@@ -434,6 +464,40 @@ describe('encounter kinds', () => {
     while (enc.status === 'ongoing' && guard++ < 100) resolveRound(g, enc, 'attack', rng)
     expect(enc.status).toBe('oppDestroyed')
     expect(g.record.reputation).toBeGreaterThan(repBefore)
+  })
+
+  it('a fleet advances ship-by-ship and drops loot on each kill', () => {
+    const g = newGame({ commanderName: 'Test', seed: 80 })
+    g.skills.fighter = 13 // near-certain hits
+    g.ship.hull = 500 // survive comfortably
+    const reserve = testEncounter('pirate', {
+      hull: 1,
+      maxHull: 1,
+      weaponPower: 0,
+      pilot: 0
+    }).opponent
+    const enc = testEncounter('pirate', {
+      hull: 1,
+      maxHull: 1,
+      weaponPower: 0,
+      pilot: 0,
+      cargo: { ...emptyCargo(), water: 2 }
+    })
+    enc.reserves = [reserve]
+    enc.fleetSize = 2
+
+    const rng = new Rng(9)
+    let guard = 0
+    while (enc.defeated < 1 && guard++ < 100) resolveRound(g, enc, 'attack', rng)
+    // First ship down: the reserve steps up and the fight continues.
+    expect(enc.defeated).toBe(1)
+    expect(enc.status).toBe('ongoing')
+    expect(g.ship.cargo.water).toBe(2) // loot from the first wreck
+
+    guard = 0
+    while (enc.status === 'ongoing' && guard++ < 100) resolveRound(g, enc, 'attack', rng)
+    expect(enc.status).toBe('oppDestroyed')
+    expect(enc.defeated).toBe(2)
   })
 
   it('a fatal blow with an escape pod flags survival, not permanent death', () => {

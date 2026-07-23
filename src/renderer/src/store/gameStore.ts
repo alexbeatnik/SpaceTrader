@@ -8,6 +8,7 @@ import {
   refuelFull,
   repair,
   repairFull,
+  buyHullUpgrade,
   buyWeapon,
   buyShield,
   buyGadget,
@@ -109,6 +110,7 @@ interface GameStore {
   setAutoRefuel: (enabled: boolean) => void
   repair: (units: number) => void
   repairFull: () => void
+  buyHullUpgrade: () => void
   buyWeapon: (id: WeaponId) => void
   buyShield: (id: ShieldId) => void
   buyGadget: (id: GadgetId) => void
@@ -246,6 +248,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       }),
     repair: (units) => withGame((g) => applyResult(g, repair(g, units))),
     repairFull: () => withGame((g) => applyResult(g, repairFull(g))),
+    buyHullUpgrade: () => withGame((g) => applyResult(g, buyHullUpgrade(g))),
     buyWeapon: (id) => withGame((g) => applyResult(g, buyWeapon(g, id))),
     buyShield: (id) => withGame((g) => applyResult(g, buyShield(g, id))),
     buyGadget: (id) => withGame((g) => applyResult(g, buyGadget(g, id))),
@@ -424,6 +427,7 @@ function handleDestruction(g: GameState): void {
   g.ship = {
     type: 'flea',
     hull: flea.hullStrength,
+    hullUpgrades: 0,
     fuel: flea.fuelTanks,
     cargo: emptyCargo(),
     weapons: [],
