@@ -36,6 +36,19 @@ const HULLS: Record<
       </>
     )
   },
+  ant: {
+    accent: '#d98c5f',
+    body: (
+      <>
+        <circle cx="28" cy="50" r="11" fill="#3a2415" stroke="#d98c5f" />
+        <circle cx="48" cy="50" r="9" fill="#2e1c10" stroke="#d98c5f" />
+        <circle cx="66" cy="50" r="8" fill="#3a2415" stroke="#d98c5f" />
+        <polygon points="80,50 72,45 72,55" fill="#d98c5f" />
+        <line x1="30" y1="40" x2="24" y2="30" stroke="#d98c5f" strokeWidth="2" />
+        <line x1="30" y1="60" x2="24" y2="70" stroke="#d98c5f" strokeWidth="2" />
+      </>
+    )
+  },
   dragonfly: {
     accent: '#3fe0d0',
     body: (
@@ -46,6 +59,19 @@ const HULLS: Record<
         <polygon points="46,46 34,32 58,44" fill="#0c2b28" stroke="#3fe0d0" />
         <polygon points="46,54 34,68 58,56" fill="#0c2b28" stroke="#3fe0d0" />
         <circle cx="66" cy="50" r="4" fill="#3fe0d0" />
+      </>
+    )
+  },
+  ladybird: {
+    accent: '#ff6b6b',
+    body: (
+      <>
+        <ellipse cx="48" cy="50" rx="28" ry="18" fill="#3a1212" stroke="#ff6b6b" />
+        <line x1="48" y1="32" x2="48" y2="68" stroke="#ff6b6b" strokeWidth="2" />
+        <circle cx="36" cy="44" r="3" fill="#ff6b6b" />
+        <circle cx="60" cy="44" r="3" fill="#ff6b6b" />
+        <circle cx="38" cy="58" r="3" fill="#ff6b6b" />
+        <polygon points="82,50 70,44 70,56" fill="#ff6b6b" />
       </>
     )
   },
@@ -70,6 +96,19 @@ const HULLS: Record<
       </>
     )
   },
+  weevil: {
+    accent: '#c9b06a',
+    body: (
+      <>
+        <rect x="20" y="38" width="40" height="24" rx="8" fill="#332a10" stroke="#c9b06a" />
+        <polygon points="60,44 84,48 84,52 60,56" fill="#40350f" stroke="#c9b06a" />
+        <rect x="26" y="43" width="10" height="14" fill="#1a1505" stroke="#c9b06a" />
+        <rect x="42" y="43" width="10" height="14" fill="#1a1505" stroke="#c9b06a" />
+        <line x1="26" y1="38" x2="20" y2="28" stroke="#c9b06a" strokeWidth="2" />
+        <line x1="26" y1="62" x2="20" y2="72" stroke="#c9b06a" strokeWidth="2" />
+      </>
+    )
+  },
   locust: {
     accent: '#9fd94a',
     body: (
@@ -81,6 +120,20 @@ const HULLS: Record<
         <rect x="28" y="43" width="8" height="14" fill="#161f08" stroke="#9fd94a" />
         <rect x="40" y="43" width="8" height="14" fill="#161f08" stroke="#9fd94a" />
         <rect x="52" y="43" width="8" height="14" fill="#161f08" stroke="#9fd94a" />
+      </>
+    )
+  },
+  moth: {
+    accent: '#d9c9ff',
+    body: (
+      <>
+        <polygon points="24,50 72,46 84,50 72,54" fill="#241f3a" stroke="#d9c9ff" />
+        <polygon points="34,46 12,26 58,44" fill="#2e2749" stroke="#d9c9ff" />
+        <polygon points="34,54 12,74 58,56" fill="#2e2749" stroke="#d9c9ff" />
+        <circle cx="30" cy="38" r="2" fill="#d9c9ff" />
+        <circle cx="30" cy="62" r="2" fill="#d9c9ff" />
+        <line x1="76" y1="46" x2="86" y2="38" stroke="#d9c9ff" strokeWidth="2" />
+        <line x1="76" y1="54" x2="86" y2="62" stroke="#d9c9ff" strokeWidth="2" />
       </>
     )
   },
@@ -127,6 +180,18 @@ const HULLS: Record<
         <polygon points="34,38 20,20 52,34" fill="#4a1a28" stroke="#ff5d6c" />
         <polygon points="34,62 20,80 52,66" fill="#4a1a28" stroke="#ff5d6c" />
         <polygon points="8,44 20,50 8,56" fill="#ff5d6c" />
+      </>
+    )
+  },
+  cicada: {
+    accent: '#7de0a0',
+    body: (
+      <>
+        <ellipse cx="46" cy="50" rx="30" ry="13" fill="#0f3320" stroke="#7de0a0" />
+        <polygon points="30,44 70,38 88,42 44,48" fill="#134428" stroke="#7de0a0" />
+        <polygon points="30,56 70,62 88,58 44,52" fill="#134428" stroke="#7de0a0" />
+        <circle cx="26" cy="50" r="4" fill="#7de0a0" />
+        <polygon points="80,50 70,46 70,54" fill="#7de0a0" />
       </>
     )
   },
@@ -177,6 +242,50 @@ const HULLS: Record<
         <polygon points="36,40 26,22 58,38" fill="#4a4416" stroke="#ffe14a" />
         <polygon points="36,60 26,78 58,62" fill="#4a4416" stroke="#ffe14a" />
         <polygon points="6,46 18,50 6,54" fill="#ffe14a" />
+      </>
+    )
+  },
+  goliath: {
+    accent: '#ffab4a',
+    body: (
+      <>
+        <rect x="14" y="34" width="56" height="32" rx="6" fill="#3a2a10" stroke="#ffab4a" />
+        <polygon points="84,50 70,40 70,60" fill="#ffab4a" />
+        <rect x="20" y="40" width="12" height="20" fill="#1f1506" stroke="#ffab4a" />
+        <rect x="36" y="40" width="12" height="20" fill="#1f1506" stroke="#ffab4a" />
+        <rect x="52" y="40" width="12" height="20" fill="#1f1506" stroke="#ffab4a" />
+        <line x1="22" y1="34" x2="14" y2="22" stroke="#ffab4a" strokeWidth="2" />
+        <line x1="22" y1="66" x2="14" y2="78" stroke="#ffab4a" strokeWidth="2" />
+        <circle cx="12" cy="20" r="3" fill="#ffab4a" />
+        <circle cx="12" cy="80" r="3" fill="#ffab4a" />
+      </>
+    )
+  },
+  atlas: {
+    accent: '#4ac0ff',
+    body: (
+      <>
+        <rect x="10" y="38" width="66" height="24" rx="4" fill="#0e2a3a" stroke="#4ac0ff" />
+        <polygon points="90,50 76,42 76,58" fill="#4ac0ff" />
+        <rect x="16" y="42" width="14" height="16" fill="#06141f" stroke="#4ac0ff" />
+        <rect x="34" y="42" width="14" height="16" fill="#06141f" stroke="#4ac0ff" />
+        <rect x="52" y="42" width="14" height="16" fill="#06141f" stroke="#4ac0ff" />
+        <line x1="10" y1="34" x2="76" y2="34" stroke="#4ac0ff" strokeWidth="2" />
+        <line x1="10" y1="66" x2="76" y2="66" stroke="#4ac0ff" strokeWidth="2" />
+      </>
+    )
+  },
+  monarch: {
+    accent: '#ff9e2c',
+    body: (
+      <>
+        <polygon points="20,50 70,44 88,50 70,56" fill="#3a2606" stroke="#ff9e2c" />
+        <polygon points="34,44 14,20 60,42" fill="#4a3008" stroke="#ff9e2c" />
+        <polygon points="34,56 14,80 60,58" fill="#4a3008" stroke="#ff9e2c" />
+        <line x1="28" y1="38" x2="44" y2="43" stroke="#ff9e2c" strokeWidth="2" />
+        <line x1="28" y1="62" x2="44" y2="57" stroke="#ff9e2c" strokeWidth="2" />
+        <circle cx="58" cy="50" r="4" fill="#ff9e2c" />
+        <circle cx="58" cy="50" r="8" fill="none" stroke="#ff9e2c" strokeWidth="1" opacity="0.6" />
       </>
     )
   },

@@ -295,6 +295,7 @@ export const uk = {
   ship: {
     title: 'Ваш корабель',
     type: 'Тип',
+    class: 'Клас',
     hull: 'Міцність корпусу',
     fuelTank: 'Паливний бак',
     cargoBays: 'Вантажні відсіки',
@@ -335,20 +336,35 @@ export const uk = {
   shipType: {
     flea: 'Блоха',
     gnat: 'Комар',
+    ant: 'Мураха',
     dragonfly: 'Бабка',
+    ladybird: 'Сонечко',
     firefly: 'Світлячок',
     mosquito: 'Москіт',
+    weevil: 'Довгоносик',
     locust: 'Сарана',
+    moth: 'Міль',
     bumblebee: 'Джміль',
     beetle: 'Жук',
     mantis: 'Богомол',
     hornet: 'Шершень',
+    cicada: 'Цикада',
     grasshopper: 'Коник',
     centipede: 'Стоніжка',
     termite: 'Терміт',
     scorpion: 'Скорпіон',
     wasp: 'Оса',
+    goliath: 'Голіаф',
+    atlas: 'Атлас',
+    monarch: 'Монарх',
     widow: 'Вдова'
+  },
+  shipClass: {
+    military: 'Військовий',
+    trade: 'Торговий',
+    civilian: 'Цивільний',
+    explorer: 'Розвідник',
+    industrial: 'Інженерний'
   },
   encounter: {
     title: 'Зустріч у космосі',

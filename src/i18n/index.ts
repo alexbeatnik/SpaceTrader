@@ -53,6 +53,7 @@ export function t(key: string, params?: Record<string, string | number>): string
 // Domain name helpers -------------------------------------------------------
 export const goodName = (id: string): string => t(`good.${id}`)
 export const shipName = (id: string): string => t(`shipType.${id}`)
+export const shipClassName = (id: string): string => t(`shipClass.${id}`)
 export const politicsName = (id: string): string => t(`politics.${id}`)
 export const techLevelName = (id: string): string => t(`tech.${id}`)
 export const statusName = (id: string): string => t(`status.${id}`)

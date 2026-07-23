@@ -34,6 +34,12 @@ export const HULL_UPGRADE_AMOUNT = 25
 export const MAX_HULL_UPGRADES = 5
 /** One-off price of an escape pod. */
 export const ESCAPE_POD_PRICE = 2000
+/** Extra warp range (parsecs) explorer-class hulls squeeze from their drives. */
+export const EXPLORER_RANGE_BONUS = 3
+/** Weapon damage multiplier on military-class hulls (tuned fire control). */
+export const MILITARY_WEAPON_BONUS = 1.15
+/** Units extracted per mining day by industrial-class hulls (others get 1). */
+export const INDUSTRIAL_MINING_YIELD = 2
 
 function emptyGoods(): Record<GoodId, number> {
   const rec = {} as Record<GoodId, number>
@@ -85,11 +91,12 @@ export function effectiveSkills(state: GameState): Skills {
   return s
 }
 
-/** Maximum fuel capacity including fuelCompactor gadgets. */
+/** Maximum fuel capacity including fuelCompactor gadgets and the explorer perk. */
 export function maxFuel(ship: Ship): number {
-  const base = SHIP_TYPES[ship.type].fuelTanks
+  const type = SHIP_TYPES[ship.type]
   const extra = ship.gadgets.filter((g) => g === 'fuelCompactor').length * EXTRA_FUEL_TANKS
-  return base + extra
+  const classBonus = type.shipClass === 'explorer' ? EXPLORER_RANGE_BONUS : 0
+  return type.fuelTanks + extra + classBonus
 }
 
 /**
@@ -130,7 +137,9 @@ export function currentShieldCharge(ship: Ship): number {
 }
 
 export function weaponPower(ship: Ship): number {
-  return ship.weapons.reduce((sum, w) => sum + WEAPONS[w].power, 0)
+  const raw = ship.weapons.reduce((sum, w) => sum + WEAPONS[w].power, 0)
+  const mul = SHIP_TYPES[ship.type].shipClass === 'military' ? MILITARY_WEAPON_BONUS : 1
+  return Math.round(raw * mul)
 }
 
 // --- New game ----------------------------------------------------------------

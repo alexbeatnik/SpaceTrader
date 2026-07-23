@@ -295,6 +295,7 @@ export const en = {
   ship: {
     title: 'Your ship',
     type: 'Type',
+    class: 'Class',
     hull: 'Hull strength',
     fuelTank: 'Fuel tank',
     cargoBays: 'Cargo bays',
@@ -335,20 +336,35 @@ export const en = {
   shipType: {
     flea: 'Flea',
     gnat: 'Gnat',
+    ant: 'Ant',
     dragonfly: 'Dragonfly',
+    ladybird: 'Ladybird',
     firefly: 'Firefly',
     mosquito: 'Mosquito',
+    weevil: 'Weevil',
     locust: 'Locust',
+    moth: 'Moth',
     bumblebee: 'Bumblebee',
     beetle: 'Beetle',
     mantis: 'Mantis',
     hornet: 'Hornet',
+    cicada: 'Cicada',
     grasshopper: 'Grasshopper',
     centipede: 'Centipede',
     termite: 'Termite',
     scorpion: 'Scorpion',
     wasp: 'Wasp',
+    goliath: 'Goliath',
+    atlas: 'Atlas',
+    monarch: 'Monarch',
     widow: 'Widow'
+  },
+  shipClass: {
+    military: 'Military',
+    trade: 'Trade',
+    civilian: 'Civilian',
+    explorer: 'Explorer',
+    industrial: 'Industrial'
   },
   encounter: {
     title: 'Encounter in space',

@@ -1,6 +1,14 @@
 import type { GameState, GoodId } from './types'
 import { Rng } from './rng'
-import { currentSystem, freeCargoBays, maxFuel, advanceDay, pushLog } from './game'
+import {
+  currentSystem,
+  freeCargoBays,
+  maxFuel,
+  advanceDay,
+  pushLog,
+  INDUSTRIAL_MINING_YIELD
+} from './game'
+import { SHIP_TYPES } from '../data/ships'
 import { spawnPirates, type Encounter } from './combat'
 
 export interface MineResult {
@@ -16,8 +24,9 @@ export interface MineResult {
 }
 
 /**
- * Extract one unit from the current system's mine site. A day passes each time,
- * and there is a chance raiders jump the operation.
+ * Extract from the current system's mine site. A day passes each time, and
+ * there is a chance raiders jump the operation. Industrial-class hulls run
+ * heavy rigs and extract several units per day.
  */
 export function mineOnce(state: GameState, rng: Rng): MineResult {
   const site = currentSystem(state).mineSite
@@ -32,12 +41,19 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
 
   advanceDay(state)
 
+  const yieldPerDay =
+    SHIP_TYPES[state.ship.type].shipClass === 'industrial' ? INDUSTRIAL_MINING_YIELD : 1
+
   let bonus: GoodId | undefined
+  let amount: number
   if (site.resource === 'fuel') {
-    state.ship.fuel = Math.min(maxFuel(state.ship), state.ship.fuel + 1)
+    const cap = maxFuel(state.ship)
+    amount = Math.min(yieldPerDay, cap - state.ship.fuel)
+    state.ship.fuel += amount
     pushLog(state, 'log.minedFuel')
   } else {
-    state.ship.cargo[site.resource] += 1
+    amount = Math.min(yieldPerDay, freeCargoBays(state.ship))
+    state.ship.cargo[site.resource] += amount
     pushLog(state, 'log.mined', { good: site.resource })
     // Asteroid fields occasionally yield a rare gem.
     if (
@@ -53,5 +69,5 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
 
   // Raiders sometimes pounce on an exposed mining operation.
   const encounter = rng.chance(0.12) ? spawnPirates(state, rng) : null
-  return { ok: true, resource: site.resource, amount: 1, bonus, encounter }
+  return { ok: true, resource: site.resource, amount, bonus, encounter }
 }

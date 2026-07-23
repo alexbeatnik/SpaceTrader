@@ -20,7 +20,7 @@ import {
   ESCAPE_POD_PRICE,
   type ShipTypeId
 } from '@game/index'
-import { weaponName, shieldName, gadgetName, shipName, economyName } from '@i18n/index'
+import { weaponName, shieldName, gadgetName, shipName, shipClassName, economyName } from '@i18n/index'
 import { fmt } from '../util/format'
 import { ShipArt } from '../components/ShipArt'
 
@@ -226,6 +226,7 @@ export function ShipyardScreen(): React.JSX.Element {
           <thead>
             <tr>
               <th>{t('ship.type')}</th>
+              <th>{t('ship.class')}</th>
               <th className="num">{t('ship.cargoBays')}</th>
               <th className="num">{t('ship.hull')}</th>
               <th className="num">{t('shipyard.weapons')}</th>
@@ -249,6 +250,7 @@ export function ShipyardScreen(): React.JSX.Element {
                       {shipName(id)}
                     </div>
                   </td>
+                  <td className="muted">{shipClassName(st.shipClass)}</td>
                   <td className="num">{st.cargoBays}</td>
                   <td className="num">{st.hullStrength}</td>
                   <td className="num">{st.weaponSlots}</td>

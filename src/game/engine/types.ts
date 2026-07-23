@@ -160,26 +160,56 @@ export interface MineSite {
 }
 
 // --- Ships & equipment -------------------------------------------------------
+
+/** Physical hull size — governs base slot capacity and docking restrictions. */
+export type ShipSize = 'small' | 'medium' | 'large' | 'capital'
+export const SHIP_SIZES = ['small', 'medium', 'large', 'capital'] as const
+
+/**
+ * Functional role of the hull — determines equipment slot distribution and
+ * grants a class perk:
+ *
+ * military   — most weapon & shield slots; +15% weapon damage in combat.
+ * trade      — biggest cargo holds and plenty of gadget slots.
+ * civilian   — balanced slots, no extremes; cheap all-rounders.
+ * explorer   — most gadget slots and long-range tanks; +3 parsecs warp range.
+ * industrial — heavy shields and utility slots; mines 2 units per day.
+ */
+export type ShipClass = 'military' | 'trade' | 'civilian' | 'explorer' | 'industrial'
+export const SHIP_CLASSES = ['military', 'trade', 'civilian', 'explorer', 'industrial'] as const
+
 export type ShipTypeId =
   | 'flea'
   | 'gnat'
+  | 'ant'
   | 'dragonfly'
+  | 'ladybird'
   | 'firefly'
   | 'mosquito'
+  | 'weevil'
   | 'locust'
+  | 'moth'
   | 'bumblebee'
   | 'beetle'
   | 'mantis'
   | 'hornet'
+  | 'cicada'
   | 'grasshopper'
   | 'centipede'
   | 'termite'
   | 'scorpion'
   | 'wasp'
+  | 'goliath'
+  | 'atlas'
+  | 'monarch'
   | 'widow'
 
 export interface ShipType {
   id: ShipTypeId
+  /** Physical hull size category. */
+  size: ShipSize
+  /** Functional role / class of the hull. */
+  shipClass: ShipClass
   price: number
   cargoBays: number
   weaponSlots: number

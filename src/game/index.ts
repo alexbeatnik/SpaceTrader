@@ -12,7 +12,7 @@ export * from './engine/mining'
 export { Rng, randomSeed } from './engine/rng'
 
 export { TRADE_GOODS, GOOD_IDS, SPECIAL_GOOD_IDS, isSpecialGood } from './data/goods'
-export { SHIP_TYPES, SHIP_TYPE_IDS } from './data/ships'
+export { SHIP_TYPES, SHIP_TYPE_IDS, SLOT_TABLE, slotsFor } from './data/ships'
 export { POLITICS, POLITICS_IDS } from './data/politics'
 export { ECONOMIES, ECONOMY_IDS, economyOf } from './data/economies'
 export {
@@ -25,4 +25,4 @@ export {
   EXTRA_CARGO_BAYS
 } from './data/equipment'
 export { MERCENARIES, MERCENARY_IDS, mercenaryWorth } from './data/mercenaries'
-export { TECH_LEVEL_IDS } from './engine/types'
+export { TECH_LEVEL_IDS, SHIP_SIZES, SHIP_CLASSES } from './engine/types'

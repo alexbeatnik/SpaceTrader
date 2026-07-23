@@ -17,7 +17,10 @@ import {
   buyHullUpgrade,
   HULL_UPGRADE_AMOUNT,
   MAX_HULL_UPGRADES,
-  advanceDay
+  advanceDay,
+  weaponPower,
+  EXPLORER_RANGE_BONUS,
+  INDUSTRIAL_MINING_YIELD
 } from './game'
 import { warp } from './warp'
 import { resolveRound, tradeBuy, tradeSell } from './combat'
@@ -765,6 +768,35 @@ describe('mining', () => {
     const g = newGame({ commanderName: 'Test', seed: 83 })
     g.systems[g.currentSystem].mineSite = null
     expect(mineOnce(g, new Rng(1)).ok).toBe(false)
+  })
+})
+
+describe('ship class perks', () => {
+  it('explorer hulls get extra warp range', () => {
+    const g = newGame({ commanderName: 'Test', seed: 84 })
+    g.ship.type = 'dragonfly' // explorer
+    expect(maxFuel(g.ship)).toBe(SHIP_TYPES.dragonfly.fuelTanks + EXPLORER_RANGE_BONUS)
+    g.ship.type = 'flea' // trade: no bonus
+    expect(maxFuel(g.ship)).toBe(SHIP_TYPES.flea.fuelTanks)
+  })
+
+  it('military hulls amplify weapon damage', () => {
+    const g = newGame({ commanderName: 'Test', seed: 84 })
+    g.ship.weapons = ['pulse', 'pulse']
+    g.ship.type = 'gnat' // civilian: raw power
+    const raw = weaponPower(g.ship)
+    g.ship.type = 'ladybird' // military: boosted
+    expect(weaponPower(g.ship)).toBeGreaterThan(raw)
+  })
+
+  it('industrial hulls mine several units per day', () => {
+    const g = newGame({ commanderName: 'Test', seed: 84 })
+    g.ship.type = 'ant' // industrial
+    g.systems[g.currentSystem].mineSite = { kind: 'iceField', resource: 'water', richness: 5 }
+    const before = g.ship.cargo.water
+    const res = mineOnce(g, new Rng(1))
+    expect(res.ok).toBe(true)
+    expect(g.ship.cargo.water).toBe(before + INDUSTRIAL_MINING_YIELD)
   })
 })
 
