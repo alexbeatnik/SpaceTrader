@@ -324,8 +324,11 @@ export const useGameStore = create<GameStore>((set, get) => {
         resolveRound(g, enc, action, rng)
 
         if (enc.status === 'playerDestroyed') {
+          // Whether the player survives depends on owning a pod *before*
+          // handleDestruction swaps in a fresh (pod-less) Flea.
+          const survives = g.ship.escapePod
           handleDestruction(g)
-          if (!g.ship.escapePod) {
+          if (!survives) {
             set({ game: clone(g), encounter: clone(enc), gameOver: true })
             return
           }

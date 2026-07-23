@@ -435,6 +435,29 @@ describe('encounter kinds', () => {
     expect(enc.status).toBe('oppDestroyed')
     expect(g.record.reputation).toBeGreaterThan(repBefore)
   })
+
+  it('a fatal blow with an escape pod flags survival, not permanent death', () => {
+    const g = newGame({ commanderName: 'Test', seed: 77 })
+    g.ship.hull = 5
+    g.ship.escapePod = true
+    g.skills.pilot = 0 // makes the enemy hit reliably
+    // An unkillable, hard-hitting opponent guarantees the player goes down.
+    const enc = testEncounter('pirate', {
+      hull: 99999,
+      maxHull: 99999,
+      weaponPower: 9999,
+      fighter: 12,
+      pilot: 5
+    })
+    const rng = new Rng(3)
+    let guard = 0
+    while (enc.status === 'ongoing' && guard++ < 200) resolveRound(g, enc, 'attack', rng)
+    expect(enc.status).toBe('playerDestroyed')
+    expect(g.ship.hull).toBeLessThanOrEqual(0)
+    // The engine keeps the pod flag set; the store reads it to grant survival.
+    expect(g.ship.escapePod).toBe(true)
+    expect(enc.messages.some((m) => m.key === 'encounter.escapePod')).toBe(true)
+  })
 })
 
 describe('trader trading', () => {
