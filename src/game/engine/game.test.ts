@@ -22,7 +22,7 @@ import { warp } from './warp'
 import { resolveRound, tradeBuy, tradeSell } from './combat'
 import type { Encounter, EncounterKind, Opponent } from './combat'
 import { generateGalaxy, SYSTEM_COUNT } from './galaxy'
-import { standardPrice } from './market'
+import { standardPrice, refreshMarket } from './market'
 import { TRADE_GOODS, GOOD_IDS } from '../data/goods'
 import { SHIP_TYPES, SHIP_TYPE_IDS } from '../data/ships'
 import { MERCENARIES, MERCENARY_IDS } from '../data/mercenaries'
@@ -176,6 +176,46 @@ describe('planet economies', () => {
     g.systems[g.currentSystem].economyType = 'resort'
     const dear = fuelPricePerParsec(g)
     expect(dear).toBeGreaterThan(cheap)
+  })
+})
+
+describe('exotic special-resource goods', () => {
+  it('are cheap at their source resource and not buyable elsewhere', () => {
+    const g = newGame({ commanderName: 'Test', seed: 90 })
+    const gems = TRADE_GOODS.gems
+    const source = { ...g.systems[0], specialResource: 'mineralRich' as const, techLevel: 3 as const }
+    const plain = { ...g.systems[0], specialResource: 'none' as const, techLevel: 2 as const }
+    expect(standardPrice(gems, source)).toBeGreaterThan(0)
+    expect(standardPrice(gems, plain)).toBe(0)
+  })
+
+  it('sell where wanted (complementary resource) but not at their own source', () => {
+    const g = newGame({ commanderName: 'Test', seed: 91 })
+    const rng = new Rng(1)
+
+    // Complementary planet (mineral-poor wants gems): sellable, not buyable.
+    const demand = structuredClone(g.systems[0])
+    demand.specialResource = 'mineralPoor'
+    demand.techLevel = 3
+    refreshMarket(demand, rng)
+    expect(demand.sellPrice.gems).toBeGreaterThan(0)
+    expect(demand.buyPrice.gems).toBe(0)
+
+    // Source planet: buyable, but no demand to sell back into.
+    const source = structuredClone(g.systems[0])
+    source.specialResource = 'mineralRich'
+    source.techLevel = 3
+    refreshMarket(source, rng)
+    expect(source.buyPrice.gems).toBeGreaterThan(0)
+    expect(source.sellPrice.gems).toBe(0)
+
+    // A plain low-tech planet without the resource: no gem trade at all.
+    const plain = structuredClone(g.systems[0])
+    plain.specialResource = 'none'
+    plain.techLevel = 2
+    refreshMarket(plain, rng)
+    expect(plain.buyPrice.gems).toBe(0)
+    expect(plain.sellPrice.gems).toBe(0)
   })
 })
 

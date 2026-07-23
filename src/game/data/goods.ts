@@ -142,7 +142,53 @@ export const TRADE_GOODS: Record<GoodId, TradeGood> = {
     illegal: false,
     minPrice: 3950,
     maxPrice: 4400
+  },
+
+  // --- Exotic goods: produced only at a source special resource, wanted where
+  // the complementary resource (or hi-tech demand) exists. ---
+  gems: exotic('gems', 900, 'mineralRich', 'mineralPoor'),
+  springWater: exotic('springWater', 220, 'sweetwater', 'desert'),
+  delicacies: exotic('delicacies', 350, 'richSoil', 'poorSoil'),
+  pelts: exotic('pelts', 650, 'richFauna', 'lifeless'),
+  mushrooms: exotic('mushrooms', 1300, 'weirdMushrooms'),
+  herbs: exotic('herbs', 480, 'lotsOfHerbs'),
+  artwork: exotic('artwork', 1600, 'artistic'),
+  relics: exotic('relics', 2100, 'warlike')
+}
+
+/** Helper to build an exotic (resource-gated) trade good with sane defaults. */
+function exotic(
+  id: GoodId,
+  basePrice: number,
+  producedByResource: TradeGood['producedByResource'],
+  wantedByResource?: TradeGood['wantedByResource']
+): TradeGood {
+  return {
+    id,
+    techProduction: 0,
+    techUsage: 0,
+    basePrice,
+    pricePerTech: 0,
+    variance: Math.round(basePrice * 0.06),
+    spikeStatus: null,
+    cheapResource: null,
+    expensiveResource: null,
+    illegal: false,
+    minPrice: Math.round(basePrice * 0.4),
+    maxPrice: Math.round(basePrice * 1.6),
+    producedByResource,
+    wantedByResource
   }
 }
 
 export const GOOD_IDS = Object.keys(TRADE_GOODS) as GoodId[]
+
+/** Ids of the exotic, resource-gated goods (a subset of GOOD_IDS). */
+export const SPECIAL_GOOD_IDS = GOOD_IDS.filter(
+  (id) => TRADE_GOODS[id].producedByResource !== undefined
+)
+
+/** Whether a good is an exotic, resource-gated commodity. */
+export function isSpecialGood(id: GoodId): boolean {
+  return TRADE_GOODS[id].producedByResource !== undefined
+}

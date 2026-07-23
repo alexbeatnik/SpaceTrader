@@ -5,6 +5,7 @@ import {
   currentSystem,
   TRADE_GOODS,
   GOOD_IDS,
+  isSpecialGood,
   freeCargoBays,
   type GoodId
 } from '@game/index'
@@ -47,7 +48,13 @@ export function MarketScreen(): React.JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {GOOD_IDS.map((id) => {
+            {GOOD_IDS.filter(
+              (id) =>
+                !isSpecialGood(id) ||
+                sys.buyPrice[id] > 0 ||
+                sys.sellPrice[id] > 0 ||
+                game.ship.cargo[id] > 0
+            ).map((id) => {
               const good = TRADE_GOODS[id]
               const held = game.ship.cargo[id]
               const buyP = sys.buyPrice[id]

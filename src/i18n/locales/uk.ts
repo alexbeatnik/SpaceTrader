@@ -306,7 +306,15 @@ export const uk = {
     medicine: 'Ліки',
     machines: 'Машини',
     narcotics: 'Наркотики',
-    robots: 'Роботи'
+    robots: 'Роботи',
+    gems: 'Рідкісні самоцвіти',
+    springWater: 'Джерельна вода',
+    delicacies: 'Делікатеси',
+    pelts: 'Екзотичне хутро',
+    mushrooms: 'Екзотичні гриби',
+    herbs: 'Цілющі трави',
+    artwork: 'Витвори мистецтва',
+    relics: 'Воєнні реліквії'
   },
   shipType: {
     flea: 'Блоха',

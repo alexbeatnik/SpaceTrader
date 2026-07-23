@@ -5,6 +5,7 @@ import {
   POLITICS,
   TRADE_GOODS,
   GOOD_IDS,
+  isSpecialGood,
   TECH_LEVEL_IDS,
   standardPrice
 } from '@game/index'
@@ -128,7 +129,9 @@ export function SystemScreen(): React.JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {GOOD_IDS.map((id) => {
+            {GOOD_IDS.filter(
+              (id) => !isSpecialGood(id) || sys.buyPrice[id] > 0 || sys.sellPrice[id] > 0
+            ).map((id) => {
               const good = TRADE_GOODS[id]
               const avg = standardPrice(good, sys)
               return (

@@ -28,6 +28,15 @@ export type GoodId =
   | 'machines'
   | 'narcotics'
   | 'robots'
+  // Exotic goods produced only where a matching special resource exists.
+  | 'gems'
+  | 'springWater'
+  | 'delicacies'
+  | 'pelts'
+  | 'mushrooms'
+  | 'herbs'
+  | 'artwork'
+  | 'relics'
 
 export interface TradeGood {
   id: GoodId
@@ -52,6 +61,13 @@ export interface TradeGood {
   /** Documented typical trading range, for reference/avg list. */
   minPrice: number
   maxPrice: number
+  /**
+   * Exotic good: produced (and cheaply buyable) only on planets whose special
+   * resource matches this. Undefined for ordinary, tech-produced goods.
+   */
+  producedByResource?: SpecialResource
+  /** Special resource whose planets crave this exotic good and pay a premium. */
+  wantedByResource?: SpecialResource
 }
 
 // --- Political systems -------------------------------------------------------

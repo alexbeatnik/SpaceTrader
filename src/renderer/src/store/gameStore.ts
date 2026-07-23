@@ -37,6 +37,7 @@ import {
   systemDistance,
   Rng,
   SHIP_TYPES,
+  GOOD_IDS,
   type GameState,
   type Encounter,
   type GameEvent,
@@ -488,8 +489,7 @@ function handleDestruction(g: GameState): void {
 }
 
 function emptyCargo(): GameState['ship']['cargo'] {
-  return {
-    water: 0, furs: 0, food: 0, ore: 0, games: 0,
-    firearms: 0, medicine: 0, machines: 0, narcotics: 0, robots: 0
-  }
+  const rec = {} as GameState['ship']['cargo']
+  for (const g of GOOD_IDS) rec[g] = 0
+  return rec
 }

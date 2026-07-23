@@ -10,7 +10,7 @@ export * from './engine/events'
 export * from './engine/quests'
 export { Rng, randomSeed } from './engine/rng'
 
-export { TRADE_GOODS, GOOD_IDS } from './data/goods'
+export { TRADE_GOODS, GOOD_IDS, SPECIAL_GOOD_IDS, isSpecialGood } from './data/goods'
 export { SHIP_TYPES, SHIP_TYPE_IDS } from './data/ships'
 export { POLITICS, POLITICS_IDS } from './data/politics'
 export { ECONOMIES, ECONOMY_IDS, economyOf } from './data/economies'

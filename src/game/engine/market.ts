@@ -9,6 +9,12 @@ import { economyOf } from '../data/economies'
  * fluctuation. Returns 0 when the good cannot be traded there at all.
  */
 export function standardPrice(good: TradeGood, sys: SolarSystem): number {
+  // Exotic goods are gated by a source resource, not by tech level. They are
+  // only buyable (cheaply) on the planet that produces them.
+  if (good.producedByResource) {
+    return sys.specialResource === good.producedByResource ? Math.round(good.basePrice * 0.5) : 0
+  }
+
   // Not produced at this tech level -> not available to buy.
   if (sys.techLevel < good.techProduction) return 0
 
@@ -53,8 +59,10 @@ export function refreshMarket(sys: SolarSystem, rng: Rng): void {
       continue
     }
 
-    // Quantity available scales with tech level and a random factor.
-    const supply = Math.max(0, (sys.techLevel + 1) * rng.int(3, 12))
+    // Quantity available: exotic goods are scarce; ordinary goods scale with tech.
+    const supply = good.producedByResource
+      ? rng.int(3, 15)
+      : Math.max(0, (sys.techLevel + 1) * rng.int(3, 12))
     sys.qty[id] = supply
 
     const fluct = rng.variance(good.variance)
@@ -72,6 +80,17 @@ function sellablePrice(
   buy: number,
   rng: Rng
 ): number {
+  // Exotic goods: no demand at their own source; wanted on the complementary
+  // resource planet (premium) or on any hi-tech planet hungry for exotics.
+  if (good.producedByResource) {
+    if (sys.specialResource === good.producedByResource) return 0
+    const complementary = !!good.wantedByResource && sys.specialResource === good.wantedByResource
+    if (!complementary && sys.techLevel < 6) return 0
+    let price = good.basePrice * (0.9 + sys.techLevel * 0.03)
+    if (complementary) price *= 1.6
+    return Math.max(1, Math.round(price + rng.variance(good.variance)))
+  }
+
   // Can't sell openly if forbidden here, or if system can't use the good.
   if (gov.forbidden.includes(good.id)) return 0
   if (sys.techLevel < good.techUsage) return 0

@@ -306,7 +306,15 @@ export const en = {
     medicine: 'Medicine',
     machines: 'Machines',
     narcotics: 'Narcotics',
-    robots: 'Robots'
+    robots: 'Robots',
+    gems: 'Rare gems',
+    springWater: 'Spring water',
+    delicacies: 'Delicacies',
+    pelts: 'Exotic pelts',
+    mushrooms: 'Exotic mushrooms',
+    herbs: 'Medicinal herbs',
+    artwork: 'Artwork',
+    relics: 'War relics'
   },
   shipType: {
     flea: 'Flea',
