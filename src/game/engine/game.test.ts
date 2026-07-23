@@ -16,7 +16,8 @@ import {
   maxHull,
   buyHullUpgrade,
   HULL_UPGRADE_AMOUNT,
-  MAX_HULL_UPGRADES
+  MAX_HULL_UPGRADES,
+  advanceDay
 } from './game'
 import { warp } from './warp'
 import { resolveRound, tradeBuy, tradeSell } from './combat'
@@ -37,7 +38,9 @@ import {
   generateQuestBoard,
   acceptBoardQuest,
   buyQuestSupplies,
-  questSupplyMissing
+  questSupplyMissing,
+  questSupply,
+  questSupplyUnitPrice
 } from './quests'
 import { Rng } from './rng'
 import type { Quest, GoodId } from './types'
@@ -188,6 +191,27 @@ describe('exotic special-resource goods', () => {
     const plain = { ...g.systems[0], specialResource: 'none' as const, techLevel: 2 as const }
     expect(standardPrice(gems, source)).toBeGreaterThan(0)
     expect(standardPrice(gems, plain)).toBe(0)
+  })
+
+  it('can be bought at their source and sold at a wanting planet', () => {
+    const g = newGame({ commanderName: 'Test', seed: 89 })
+    const rng = new Rng(2)
+    g.credits = 100000
+    // Current planet is a gem source — buy gems here.
+    const here = g.systems[g.currentSystem]
+    here.specialResource = 'mineralRich'
+    refreshMarket(here, rng)
+    expect(buyGood(g, 'gems', 3).ok).toBe(true)
+    const held = g.ship.cargo.gems
+    expect(held).toBeGreaterThan(0)
+
+    // Fly to a mineral-poor world that wants gems — sell them there.
+    const demand = g.systems.find((s) => s.id !== here.id)!
+    demand.specialResource = 'mineralPoor'
+    refreshMarket(demand, rng)
+    g.currentSystem = demand.id
+    expect(sellGood(g, 'gems', held).ok).toBe(true)
+    expect(g.ship.cargo.gems).toBe(0)
   })
 
   it('sell where wanted (complementary resource) but not at their own source', () => {
@@ -406,6 +430,41 @@ describe('quests', () => {
     expect(turnInQuest(g, 'test-fetch')).not.toBeNull()
     expect(g.credits).toBe(before + 1800)
     expect(g.ship.cargo.ore).toBe(0)
+  })
+
+  it('cargo-backed board quests always pay more than the goods cost', () => {
+    const g = newGame({ commanderName: 'Test', seed: 84 })
+    g.ship.type = 'centipede' // roomy hold so bulk contracts are valid
+    let checked = 0
+    for (let i = 0; i < 200; i++) {
+      const board = generateQuestBoard(g, new Rng((i * 2654435761 + 5) >>> 0))
+      for (const q of board) {
+        const need = questSupply(q)
+        if (!need) continue
+        const cost = need.amount * questSupplyUnitPrice(g, need.good)
+        expect(q.reward).toBeGreaterThan(cost)
+        checked++
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+
+  it('cannot accept a board quest when already at the active-quest cap', () => {
+    const g = newGame({ commanderName: 'Test', seed: 85 })
+    const board = generateQuestBoard(g, new Rng(1))
+    g.systems[g.currentSystem].questBoard = board
+    for (let i = 0; i < 5; i++) {
+      g.quests.push({
+        id: `dummy${i}`,
+        type: 'bounty',
+        giverSystem: g.currentSystem,
+        targetSystem: g.systems[1].id,
+        reward: 1000,
+        status: 'active',
+        bountyName: 'X'
+      })
+    }
+    expect(acceptBoardQuest(g, board[0].id).ok).toBe(false)
   })
 
   it('job board postings can be accepted and move into active quests', () => {
@@ -639,6 +698,20 @@ describe('quest generation', () => {
     for (const type of ['delivery', 'smuggle', 'passenger', 'bounty', 'fetch']) {
       expect(seen).toContain(type)
     }
+  })
+})
+
+describe('daily tick', () => {
+  it('advanceDay charges loan interest and crew wages', () => {
+    const g = newGame({ commanderName: 'Test', seed: 86 })
+    g.credits = 10000
+    g.debt = 1000
+    const dayBefore = g.day
+    advanceDay(g)
+    expect(g.day).toBe(dayBefore + 1)
+    // 10% interest is added to the debt and taken from credits.
+    expect(g.debt).toBe(1100)
+    expect(g.credits).toBeLessThan(10000)
   })
 })
 

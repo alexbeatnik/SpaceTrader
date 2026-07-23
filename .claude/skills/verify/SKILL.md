@@ -23,9 +23,11 @@ Covers both TS projects: `tsconfig.node.json` (main/preload/engine) and
 npm test
 ```
 
-Headless Vitest over `src/game/**/*.test.ts`. This is the authoritative check for
-game logic and is always runnable, even in sandboxes without a display. When you
-add or change engine behavior, add/extend a test here.
+Headless Vitest over `src/game/**/*.test.ts` — the authoritative check for game
+logic, always runnable even without a display. Coverage spans trading & pricing,
+planet economies, exotic resource goods, crew, equipment & hull upgrades, quests
+(board, manual turn-in, supplies), fleets & encounter kinds, mining, and warp.
+When you add or change engine behavior, add/extend a test here.
 
 ## 3. Production build (always)
 
@@ -48,6 +50,18 @@ Notes:
 - A `Renderer process crashed` / `Network service crashed` message in a headless
   sandbox is environmental, not a code bug — rely on steps 1–3 there.
 - Electron main/preload are CommonJS by design; do not add `"type": "module"`.
+
+## 5. Package the installer (optional — when asked to build the exe)
+
+```bash
+npm run dist
+```
+
+Produces `release/Star Trader-<version>-setup.exe` via electron-builder (NSIS),
+using the app icon in `build/icon.ico`. On Windows this can fail extracting the
+`winCodeSign` cache with a symlink-privilege error — see the workaround in
+`AGENTS.md` (pre-extract the archive excluding the macOS `darwin` folder). Code
+signing is skipped (no cert), so the installer is unsigned.
 
 ## Reporting
 
