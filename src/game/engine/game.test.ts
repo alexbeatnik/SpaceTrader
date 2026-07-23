@@ -5,14 +5,14 @@ import {
   sellGood,
   usedCargoBays,
   freeCargoBays,
-  refuelFull,
   hireMercenary,
   fireMercenary,
   effectiveSkills,
   crewWages,
   maxFuel,
   buyWeapon,
-  sellWeapon
+  sellWeapon,
+  fuelPricePerParsec
 } from './game'
 import { warp } from './warp'
 import { resolveRound, tradeBuy, tradeSell } from './combat'
@@ -22,8 +22,15 @@ import { standardPrice } from './market'
 import { TRADE_GOODS, GOOD_IDS } from '../data/goods'
 import { SHIP_TYPES, SHIP_TYPE_IDS } from '../data/ships'
 import { MERCENARIES, MERCENARY_IDS } from '../data/mercenaries'
-import { reachableSystems } from './travel'
-import { acceptQuest, checkQuestArrival, completeBounty, generateQuestOffer } from './quests'
+import { systemDistance } from './travel'
+import {
+  acceptQuest,
+  checkQuestArrival,
+  completeBounty,
+  generateQuestOffer,
+  buyQuestSupplies,
+  questSupplyMissing
+} from './quests'
 import { Rng } from './rng'
 import type { Quest, GoodId } from './types'
 
@@ -122,6 +129,36 @@ describe('pricing', () => {
     expect(standardPrice(TRADE_GOODS.water, high)).toBeGreaterThan(
       standardPrice(TRADE_GOODS.water, lowFixed)
     )
+  })
+})
+
+describe('planet economies', () => {
+  it('agrarian worlds sell food cheaper and machines dearer than industrial ones', () => {
+    const g = newGame({ commanderName: 'Test', seed: 8 })
+    const base = {
+      ...g.systems[0],
+      techLevel: 5 as const,
+      specialResource: 'none' as const,
+      status: 'uneventful' as const,
+      politics: 'democracy' as const
+    }
+    const agrarian = { ...base, economyType: 'agricultural' as const }
+    const industrial = { ...base, economyType: 'industrial' as const }
+    expect(standardPrice(TRADE_GOODS.food, agrarian)).toBeLessThan(
+      standardPrice(TRADE_GOODS.food, industrial)
+    )
+    expect(standardPrice(TRADE_GOODS.machines, agrarian)).toBeGreaterThan(
+      standardPrice(TRADE_GOODS.machines, industrial)
+    )
+  })
+
+  it('fuel is cheaper on energy worlds than on resort worlds', () => {
+    const g = newGame({ commanderName: 'Test', seed: 9 })
+    g.systems[g.currentSystem].economyType = 'refinery'
+    const cheap = fuelPricePerParsec(g)
+    g.systems[g.currentSystem].economyType = 'resort'
+    const dear = fuelPricePerParsec(g)
+    expect(dear).toBeGreaterThan(cheap)
   })
 })
 
@@ -309,6 +346,34 @@ describe('quests', () => {
     expect(g.credits).toBe(before + 4000)
     expect(g.record.reputation).toBeGreaterThan(rep)
   })
+
+  it('buys a cargo quest\'s required goods on the spot', () => {
+    const g = newGame({ commanderName: 'Test', seed: 47 })
+    g.credits = 100000
+    const target = g.systems.find((s) => s.id !== g.currentSystem)!
+    const quest: Quest = {
+      id: 'test-supply',
+      type: 'relief',
+      giverSystem: g.currentSystem,
+      targetSystem: target.id,
+      reward: 3000,
+      status: 'offered',
+      good: 'medicine',
+      amount: 4
+    }
+    acceptQuest(g, quest)
+    expect(questSupplyMissing(g, quest)).toBe(4)
+
+    const before = g.credits
+    const res = buyQuestSupplies(g, quest)
+    expect(res.ok).toBe(true)
+    expect(g.ship.cargo.medicine).toBe(4)
+    expect(g.credits).toBeLessThan(before)
+    expect(questSupplyMissing(g, quest)).toBe(0)
+
+    // Nothing left to buy once the hold already covers the requirement.
+    expect(buyQuestSupplies(g, quest).ok).toBe(false)
+  })
 })
 
 describe('data integrity', () => {
@@ -427,18 +492,49 @@ describe('quest generation', () => {
 })
 
 describe('travel and warp', () => {
+  /** Nearest other system to the current one (always exists in a full galaxy). */
+  const nearestTo = (g: ReturnType<typeof newGame>, fromId: number): number =>
+    g.systems
+      .filter((s) => s.id !== fromId)
+      .reduce((a, b) =>
+        systemDistance(g.systems[fromId], b) < systemDistance(g.systems[fromId], a) ? b : a
+      ).id
+
   it('warp to a reachable system advances the day and consumes fuel', () => {
     const g = newGame({ commanderName: 'Test', seed: 11 })
-    refuelFull(g)
-    const targets = reachableSystems(g)
-    expect(targets.length).toBeGreaterThan(0)
-    const target = targets[0]
+    const target = nearestTo(g, g.currentSystem)
+    g.ship.fuel = 999 // ample range to reach the nearest neighbour
     const fuelBefore = g.ship.fuel
     const dayBefore = g.day
-    const res = warp(g, target.id)
+    const res = warp(g, target)
     expect(res.ok).toBe(true)
     expect(g.day).toBe(dayBefore + 1)
     expect(g.ship.fuel).toBeLessThan(fuelBefore)
-    expect(g.currentSystem).toBe(target.id)
+    expect(g.currentSystem).toBe(target)
+  })
+
+  it('auto-refuel tops the tank back up on arrival when enabled', () => {
+    const g = newGame({ commanderName: 'Test', seed: 12 })
+    g.autoRefuel = true
+    g.credits = 100000
+    // Find a system pair within tank range and start the jump from there.
+    const cap = maxFuel(g.ship)
+    let fromId = -1
+    let toId = -1
+    for (const a of g.systems) {
+      const near = g.systems.find((b) => b.id !== a.id && systemDistance(a, b) <= cap)
+      if (near) {
+        fromId = a.id
+        toId = near.id
+        break
+      }
+    }
+    expect(fromId).toBeGreaterThanOrEqual(0)
+    g.currentSystem = fromId
+    g.ship.fuel = cap
+    const res = warp(g, toId)
+    expect(res.ok).toBe(true)
+    // The jump burned fuel, but auto-refuel refilled the tank on arrival.
+    expect(g.ship.fuel).toBe(maxFuel(g.ship))
   })
 })

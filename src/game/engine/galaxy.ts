@@ -3,10 +3,12 @@ import type {
   TechLevel,
   SpecialResource,
   SystemStatus,
-  PoliticsId
+  PoliticsId,
+  EconomyType
 } from './types'
 import { Rng } from './rng'
 import { POLITICS, POLITICS_IDS } from '../data/politics'
+import { ECONOMIES, ECONOMY_IDS } from '../data/economies'
 import { SYSTEM_NAMES } from '../data/systemNames'
 import { GOOD_IDS } from '../data/goods'
 import { MERCENARY_IDS } from '../data/mercenaries'
@@ -40,6 +42,15 @@ function pickPolitics(rng: Rng, tech: TechLevel): PoliticsId {
     return tech >= p.minTechLevel && tech <= p.maxTechLevel
   })
   return valid.length ? rng.pick(valid) : 'anarchy'
+}
+
+/** Pick a planet economy whose typical tech band contains `tech`. */
+function pickEconomy(rng: Rng, tech: TechLevel): EconomyType {
+  const valid = ECONOMY_IDS.filter((id) => {
+    const e = ECONOMIES[id]
+    return tech >= e.techMin && tech <= e.techMax
+  })
+  return valid.length ? rng.pick(valid) : 'agricultural'
 }
 
 function emptyGoodRecord(): Record<string, number> {
@@ -77,6 +88,7 @@ export function generateGalaxy(seed: number): SolarSystem[] {
       techLevel: tech,
       politics,
       specialResource: rng.pick(SPECIAL_RESOURCES),
+      economyType: pickEconomy(rng, tech),
       status: rng.pick(STATUSES),
       qty: emptyGoodRecord() as SolarSystem['qty'],
       buyPrice: emptyGoodRecord() as SolarSystem['buyPrice'],

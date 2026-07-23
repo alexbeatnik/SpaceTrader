@@ -1,7 +1,9 @@
 import type { GameState, Quest, GoodId } from './types'
 import { Rng } from './rng'
-import { currentSystem, pushLog, freeQuarters } from './game'
+import { currentSystem, pushLog, freeQuarters, freeCargoBays, type ActionResult } from './game'
 import { systemDistance } from './travel'
+import { standardPrice } from './market'
+import { TRADE_GOODS } from '../data/goods'
 
 // Pool of wanted-pirate names for bounty quests (proper nouns, locale-stable).
 export const BOUNTY_NAMES = [
@@ -149,6 +151,59 @@ export function acceptQuest(state: GameState, quest: Quest): void {
   quest.status = 'active'
   state.quests.push(quest)
   pushLog(state, 'quest.accepted', questParams(state, quest))
+}
+
+// --- Quest supplies ----------------------------------------------------------
+/** The goods a cargo-backed quest requires the player to carry, or null. */
+export function questSupply(quest: Quest): { good: GoodId; amount: number } | null {
+  if (
+    (quest.type === 'relief' || quest.type === 'smuggle' || quest.type === 'fetch') &&
+    quest.good &&
+    quest.amount
+  ) {
+    return { good: quest.good, amount: quest.amount }
+  }
+  return null
+}
+
+/** Fair per-unit price the quest-giver charges to supply a required good. */
+export function questSupplyUnitPrice(state: GameState, good: GoodId): number {
+  const std = standardPrice(TRADE_GOODS[good], currentSystem(state))
+  return std > 0 ? std : TRADE_GOODS[good].basePrice
+}
+
+/** Units still needed to fulfil a quest, given what is already in the hold. */
+export function questSupplyMissing(state: GameState, quest: Quest): number {
+  const need = questSupply(quest)
+  if (!need) return 0
+  return Math.max(0, need.amount - state.ship.cargo[need.good])
+}
+
+/**
+ * Buy the goods a quest requires directly from the giver, on the spot. Buys the
+ * missing amount, bounded by credits and free cargo space.
+ */
+export function buyQuestSupplies(state: GameState, quest: Quest): ActionResult {
+  const need = questSupply(quest)
+  if (!need) return { ok: false, error: 'error.cannotBuy' }
+  const missing = questSupplyMissing(state, quest)
+  if (missing <= 0) return { ok: false, error: 'error.cannotBuy' }
+
+  const unit = questSupplyUnitPrice(state, need.good)
+  const qty = Math.min(missing, Math.floor(state.credits / unit), freeCargoBays(state.ship))
+  if (qty <= 0) return { ok: false, error: 'error.cannotBuy' }
+
+  const cost = qty * unit
+  // Weighted-average purchase price for profit tracking (as in the market).
+  const prevQty = state.ship.cargo[need.good]
+  const prevCost = state.buyingPrice[need.good] * prevQty
+  state.ship.cargo[need.good] += qty
+  state.buyingPrice[need.good] =
+    state.ship.cargo[need.good] > 0
+      ? Math.round((prevCost + cost) / state.ship.cargo[need.good])
+      : 0
+  state.credits -= cost
+  return { ok: true, info: { key: 'info.bought', params: { qty, good: need.good, cost } } }
 }
 
 /**

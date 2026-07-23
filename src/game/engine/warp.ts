@@ -4,7 +4,7 @@ import { SHIP_TYPES } from '../data/ships'
 import { SHIELDS } from '../data/equipment'
 import { refreshMarket } from './market'
 import { fuelCost, systemDistance } from './travel'
-import { pushLog, crewWages } from './game'
+import { pushLog, crewWages, refuelFull } from './game'
 import { rollEncounter, createBountyEncounter, type Encounter } from './combat'
 import { maybeTriggerEvent, type GameEvent } from './events'
 import { checkQuestArrival, generateQuestOffer, hasActiveBounty } from './quests'
@@ -68,6 +68,11 @@ function onArrival(state: GameState, rng: Rng): void {
   state.ship.shieldPoints = state.ship.shields.map((s) => SHIELDS[s].power)
   // Refresh the destination economy for the new day.
   refreshMarket(target, rng)
+  // Auto-refuel at the spaceport if the player has opted in (buys what it can).
+  if (state.autoRefuel) {
+    const res = refuelFull(state)
+    if (res.ok && res.info) pushLog(state, 'log.autoRefuel', res.info.params)
+  }
 }
 
 /**

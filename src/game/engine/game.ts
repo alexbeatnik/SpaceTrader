@@ -10,7 +10,7 @@ import type {
   GadgetId
 } from './types'
 import { Rng, randomSeed } from './rng'
-import { generateGalaxy } from './galaxy'
+import { generateGalaxy, distance } from './galaxy'
 import { refreshMarket } from './market'
 import { SHIP_TYPES } from '../data/ships'
 import { GOOD_IDS } from '../data/goods'
@@ -23,6 +23,7 @@ import {
   GADGET_SKILL_BONUS
 } from '../data/equipment'
 import { MERCENARIES } from '../data/mercenaries'
+import { economyOf } from '../data/economies'
 
 export const GAME_VERSION = 1
 export const STARTING_CREDITS = 1000
@@ -84,6 +85,16 @@ export function maxFuel(ship: Ship): number {
   return base + extra
 }
 
+/**
+ * Fuel price per parsec at the current system: the ship's base cost scaled by
+ * the local economy (e.g. cheap on refinery worlds, dear on resort worlds).
+ */
+export function fuelPricePerParsec(state: GameState): number {
+  const base = SHIP_TYPES[state.ship.type].fuelCostPerParsec
+  const mul = economyOf(currentSystem(state).economyType).fuelCostMul
+  return Math.max(1, Math.round(base * mul))
+}
+
 /** Total daily wages owed to hired crew. */
 export function crewWages(state: GameState): number {
   return state.ship.crew.reduce((sum, id) => sum + (MERCENARIES[id]?.wage ?? 0), 0)
@@ -125,9 +136,16 @@ export function newGame(opts: NewGameOptions): GameState {
   // Assign initial markets.
   for (const sys of systems) refreshMarket(sys, rng)
 
-  // Start the player in a mid-tech, relatively safe system if possible.
+  // Start the player in a mid-tech, relatively safe system that has at least one
+  // neighbour within the starting ship's range (so they are never stranded).
+  const startRange = SHIP_TYPES.gnat.fuelTanks
+  const hasNeighbour = (s: SolarSystem): boolean =>
+    systems.some((o) => o.id !== s.id && distance(s, o) <= startRange)
   const startId =
-    systems.find((s) => s.techLevel >= 4 && s.techLevel <= 6)?.id ?? 0
+    systems.find((s) => s.techLevel >= 4 && s.techLevel <= 6 && hasNeighbour(s))?.id ??
+    systems.find((s) => hasNeighbour(s))?.id ??
+    systems.find((s) => s.techLevel >= 4 && s.techLevel <= 6)?.id ??
+    0
 
   const ship: Ship = {
     type: 'gnat',
@@ -157,6 +175,7 @@ export function newGame(opts: NewGameOptions): GameState {
     systems,
     insurance: false,
     noClaim: 0,
+    autoRefuel: false,
     buyingPrice: emptyGoods(),
     log: [],
     flags: {},
@@ -244,15 +263,15 @@ export function dumpGood(state: GameState, good: GoodId, amount: number): Action
 
 // --- Shipyard actions --------------------------------------------------------
 export function refuel(state: GameState, parsecs: number): ActionResult {
-  const type = SHIP_TYPES[state.ship.type]
+  const unit = fuelPricePerParsec(state)
   const needed = Math.min(parsecs, maxFuel(state.ship) - state.ship.fuel)
   if (needed <= 0) return fail('error.tankFull')
-  const affordable = Math.floor(state.credits / type.fuelCostPerParsec)
+  const affordable = Math.floor(state.credits / unit)
   const buy = Math.min(needed, affordable)
   if (buy <= 0) return fail('error.noCreditsFuel')
   state.ship.fuel += buy
-  state.credits -= buy * type.fuelCostPerParsec
-  return okInfo('info.refuelled', { parsecs: buy, cost: buy * type.fuelCostPerParsec })
+  state.credits -= buy * unit
+  return okInfo('info.refuelled', { parsecs: buy, cost: buy * unit })
 }
 
 export function refuelFull(state: GameState): ActionResult {

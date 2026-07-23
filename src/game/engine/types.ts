@@ -120,6 +120,17 @@ export type SystemStatus =
   | 'cropFailure'
   | 'lackOfWorkers'
 
+// --- Economy / planet type ---------------------------------------------------
+// A planet's economic specialisation. Shifts commodity prices (cheap where a
+// good is produced, dear where it must be imported) and the local fuel price.
+export type EconomyType =
+  | 'agricultural'
+  | 'mining'
+  | 'industrial'
+  | 'refinery'
+  | 'resort'
+  | 'hiTech'
+
 // --- Ships & equipment -------------------------------------------------------
 export type ShipTypeId =
   | 'flea'
@@ -193,6 +204,8 @@ export interface SolarSystem {
   techLevel: TechLevel
   politics: PoliticsId
   specialResource: SpecialResource
+  /** Economic specialisation of the planet (agricultural, industrial, …). */
+  economyType: EconomyType
   status: SystemStatus
   /** Current quantity available at market, keyed by good. */
   qty: Record<GoodId, number>
@@ -255,6 +268,8 @@ export interface GameState {
   /** Insurance active flag + accumulated no-claim days. */
   insurance: boolean
   noClaim: number
+  /** When true, the tank is filled automatically on each arrival. */
+  autoRefuel: boolean
   /** Purchase cost bookkeeping per good for profit display. */
   buyingPrice: Record<GoodId, number>
   /** Log of notable events, newest first (ids + params resolved in UI). */

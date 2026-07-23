@@ -18,6 +18,7 @@ import {
   politicsName,
   techLevelName,
   statusName,
+  economyName,
   goodName
 } from '@i18n/index'
 import { fmt } from '../util/format'
@@ -195,6 +196,10 @@ export function ChartScreen(): React.JSX.Element {
                   <div className="kv">
                     <span className="k">{t('system.government')}</span>
                     <span className="v">{politicsName(selected.politics)}</span>
+                  </div>
+                  <div className="kv">
+                    <span className="k">{t('system.economy')}</span>
+                    <span className="v">{economyName(selected.economyType)}</span>
                   </div>
                   <div className="kv">
                     <span className="k">{t('system.pirates')}</span>

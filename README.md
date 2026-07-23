@@ -19,8 +19,11 @@ Core systems implemented:
 
 - **Procedural galaxy** — 60 solar systems with tech levels, governments, special
   resources, situational events (war, plague, drought…), and wormholes.
-- **Dynamic market** — prices driven by tech level, government preferences,
-  special resources, events, and your Trader skill.
+- **Dynamic market** — prices driven by tech level, **planet economy type**
+  (agrarian, mining, industrial, energy, resort, hi-tech — e.g. food is cheap on
+  agrarian worlds, machines dear), government preferences, special resources,
+  events, and your Trader skill. Fuel price also varies by economy (cheap on
+  energy worlds, expensive on resorts), with an optional auto-refuel-on-arrival.
 - **Travel** — fuel-limited warp jumps across an interactive star chart, plus
   wormhole shortcuts. Each jump plays an animated, skippable **warp transition**
   (streaking stars, your ship, distance and day) so travel isn't instantaneous.

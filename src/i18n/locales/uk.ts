@@ -45,6 +45,8 @@ export const uk = {
     offerTitle: 'Спеціальне доручення',
     accept: 'Прийняти',
     decline: 'Відхилити',
+    acceptAndBuy: 'Прийняти й купити припаси',
+    supplies: 'Потрібні припаси',
     reward: 'Винагорода',
     type: {
       delivery: 'Кур’єрська доставка',
@@ -178,6 +180,7 @@ export const uk = {
   system: {
     techLevel: 'Рівень технологій',
     government: 'Уряд',
+    economy: 'Економіка',
     resource: 'Особливий ресурс',
     status: 'Ситуація',
     police: 'Поліція',
@@ -205,8 +208,10 @@ export const uk = {
   shipyard: {
     title: 'Верф',
     fuel: 'Паливо',
+    fuelPrice: 'Ціна пального',
     repair: 'Ремонт корпусу',
     refuelFull: 'Заправити повний бак',
+    autoRefuel: 'Автозаправка при прибутті',
     repairFull: 'Полагодити повністю',
     buyFuel: 'Купити паливо',
     weapons: 'Зброя',
@@ -381,6 +386,7 @@ export const uk = {
     empty: 'Поки що нічого не сталося.',
     gameStart: 'Початок подорожі в системі {system}.',
     arrived: 'Прибуття до системи {system} ({distance} пс).',
+    autoRefuel: 'Автозаправка: {parsecs} пс за {cost} кр.',
     wormhole: 'Стрибок через червоточину до {system} (податок {tax} кр).',
     plunderedTrader: 'Ви пограбували торговця ({qty} од.).',
     crewLeft: 'Нічим платити екіпажу — команда покинула вас.'
@@ -486,6 +492,14 @@ export const uk = {
     lotsOfHerbs: 'Цілющі трави',
     artistic: 'Мистецька',
     warlike: 'Войовнича'
+  },
+  economy: {
+    agricultural: 'Аграрна',
+    mining: 'Гірнича',
+    industrial: 'Індустріальна',
+    refinery: 'Енергетична',
+    resort: 'Курортна',
+    hiTech: 'Високотехнологічна'
   },
   weapon: {
     pulse: 'Імпульсний лазер',

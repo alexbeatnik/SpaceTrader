@@ -45,6 +45,8 @@ export const en = {
     offerTitle: 'Special Assignment',
     accept: 'Accept',
     decline: 'Decline',
+    acceptAndBuy: 'Accept & buy supplies',
+    supplies: 'Supplies needed',
     reward: 'Reward',
     type: {
       delivery: 'Courier delivery',
@@ -178,6 +180,7 @@ export const en = {
   system: {
     techLevel: 'Tech level',
     government: 'Government',
+    economy: 'Economy',
     resource: 'Special resource',
     status: 'Situation',
     police: 'Police',
@@ -205,8 +208,10 @@ export const en = {
   shipyard: {
     title: 'Shipyard',
     fuel: 'Fuel',
+    fuelPrice: 'Fuel price',
     repair: 'Hull repair',
     refuelFull: 'Fill the tank',
+    autoRefuel: 'Auto-refuel on arrival',
     repairFull: 'Full repair',
     buyFuel: 'Buy fuel',
     weapons: 'Weapons',
@@ -381,6 +386,7 @@ export const en = {
     empty: 'Nothing has happened yet.',
     gameStart: 'Journey begins in the {system} system.',
     arrived: 'Arrived at {system} ({distance} pc).',
+    autoRefuel: 'Auto-refuelled {parsecs} pc for {cost} cr.',
     wormhole: 'Wormhole jump to {system} (tax {tax} cr).',
     plunderedTrader: 'You plundered a trader ({qty} units).',
     crewLeft: 'You could not pay your crew — they left you.'
@@ -486,6 +492,14 @@ export const en = {
     lotsOfHerbs: 'Lots of herbs',
     artistic: 'Artistic',
     warlike: 'Warlike'
+  },
+  economy: {
+    agricultural: 'Agrarian',
+    mining: 'Mining',
+    industrial: 'Industrial',
+    refinery: 'Energy',
+    resort: 'Resort',
+    hiTech: 'High-tech'
   },
   weapon: {
     pulse: 'Pulse laser',

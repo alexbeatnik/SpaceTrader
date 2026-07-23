@@ -13,6 +13,7 @@ import {
   politicsName,
   statusName,
   resourceName,
+  economyName,
   goodName
 } from '@i18n/index'
 import { fmt } from '../util/format'
@@ -58,6 +59,10 @@ export function SystemScreen(): React.JSX.Element {
           <div className="kv">
             <span className="k">{t('system.government')}</span>
             <span className="v">{politicsName(sys.politics)}</span>
+          </div>
+          <div className="kv">
+            <span className="k">{t('system.economy')}</span>
+            <span className="v"><span className="badge">{economyName(sys.economyType)}</span></span>
           </div>
           <div className="kv">
             <span className="k">{t('system.resource')}</span>

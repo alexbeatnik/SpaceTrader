@@ -2,6 +2,7 @@ import type { SolarSystem, GoodId, TradeGood } from './types'
 import { Rng } from './rng'
 import { TRADE_GOODS, GOOD_IDS } from '../data/goods'
 import { POLITICS } from '../data/politics'
+import { economyOf } from '../data/economies'
 
 /**
  * Baseline "encyclopaedia" price for a good in a system, ignoring random
@@ -22,6 +23,10 @@ export function standardPrice(good: TradeGood, sys: SolarSystem): number {
   if (good.spikeStatus && sys.status === good.spikeStatus) {
     price = Math.round(price * 1.5)
   }
+
+  // Planet economy: cheap where the good is produced, dear where imported.
+  const econMul = economyOf(sys.economyType).goods[good.id]
+  if (econMul !== undefined) price = Math.round(price * econMul)
 
   const gov = POLITICS[sys.politics]
   if (gov.wanted === good.id) price = Math.round(price * 1.15)

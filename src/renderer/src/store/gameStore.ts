@@ -28,6 +28,7 @@ import {
   tradeBuy,
   tradeSell,
   acceptQuest,
+  buyQuestSupplies,
   pushLog,
   systemDistance,
   Rng,
@@ -105,6 +106,7 @@ interface GameStore {
   // shipyard
   refuel: (parsecs: number) => void
   refuelFull: () => void
+  setAutoRefuel: (enabled: boolean) => void
   repair: (units: number) => void
   repairFull: () => void
   buyWeapon: (id: WeaponId) => void
@@ -136,6 +138,7 @@ interface GameStore {
   dismissEncounter: () => void
   dismissEvent: () => void
   acceptQuestOffer: () => void
+  acceptQuestOfferBuying: () => void
   declineQuestOffer: () => void
 }
 
@@ -235,6 +238,12 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     refuel: (parsecs) => withGame((g) => applyResult(g, refuel(g, parsecs))),
     refuelFull: () => withGame((g) => applyResult(g, refuelFull(g))),
+    setAutoRefuel: (enabled) =>
+      withGame((g) => {
+        g.autoRefuel = enabled
+        set({ game: clone(g) })
+        void get().saveGame()
+      }),
     repair: (units) => withGame((g) => applyResult(g, repair(g, units))),
     repairFull: () => withGame((g) => applyResult(g, repairFull(g))),
     buyWeapon: (id) => withGame((g) => applyResult(g, buyWeapon(g, id))),
@@ -381,6 +390,23 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (!offer) return
         acceptQuest(g, offer)
         set({ game: clone(g), questOffer: null })
+        void get().saveGame()
+      }),
+
+    acceptQuestOfferBuying: () =>
+      withGame((g) => {
+        const offer = get().questOffer
+        if (!offer) return
+        acceptQuest(g, offer)
+        const res = buyQuestSupplies(g, offer)
+        set({
+          game: clone(g),
+          questOffer: null,
+          toast:
+            res.ok && res.info
+              ? { id: ++toastCounter, type: 'info', text: renderMessage(res.info.key, res.info.params) }
+              : get().toast
+        })
         void get().saveGame()
       }),
 

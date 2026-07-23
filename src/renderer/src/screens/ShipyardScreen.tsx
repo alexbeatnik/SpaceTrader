@@ -12,9 +12,10 @@ import {
   GADGET_IDS,
   maxHull,
   shipValue,
+  fuelPricePerParsec,
   type ShipTypeId
 } from '@game/index'
-import { weaponName, shieldName, gadgetName, shipName } from '@i18n/index'
+import { weaponName, shieldName, gadgetName, shipName, economyName } from '@i18n/index'
 import { fmt } from '../util/format'
 import { ShipArt } from '../components/ShipArt'
 
@@ -28,6 +29,7 @@ export function ShipyardScreen(): React.JSX.Element {
 
   const fuelMissing = type.fuelTanks - ship.fuel
   const hullMissing = maxHull(ship) - ship.hull
+  const fuelUnit = fuelPricePerParsec(game)
 
   return (
     <div>
@@ -41,16 +43,34 @@ export function ShipyardScreen(): React.JSX.Element {
             <span className="k">{t('shipyard.fuel')}</span>
             <span className="v">{ship.fuel}/{type.fuelTanks}</span>
           </div>
-          <div className="meter" style={{ margin: '6px 0 12px' }}>
+          <div className="meter" style={{ margin: '6px 0 8px' }}>
             <div className="meter-fill fuel" style={{ width: `${(ship.fuel / type.fuelTanks) * 100}%` }} />
+          </div>
+          <div className="kv" style={{ marginBottom: 8 }}>
+            <span className="k">{t('shipyard.fuelPrice')}</span>
+            <span className="v">
+              {fmt(fuelUnit)} {t('common.cr')}/{t('common.pc')}
+              <span className="muted" style={{ marginLeft: 6, fontWeight: 400 }}>
+                · {economyName(sys.economyType)}
+              </span>
+            </span>
           </div>
           <button
             className="btn btn-block"
             disabled={fuelMissing <= 0}
             onClick={() => s.refuelFull()}
           >
-            {t('shipyard.refuelFull')} · {fmt(fuelMissing * type.fuelCostPerParsec)} {t('common.cr')}
+            {t('shipyard.refuelFull')} · {fmt(fuelMissing * fuelUnit)} {t('common.cr')}
           </button>
+
+          <label className="checkbox-row" style={{ marginTop: 10 }}>
+            <input
+              type="checkbox"
+              checked={!!game.autoRefuel}
+              onChange={(e) => s.setAutoRefuel(e.target.checked)}
+            />
+            <span>{t('shipyard.autoRefuel')}</span>
+          </label>
 
           <div className="kv" style={{ marginTop: 18 }}>
             <span className="k">{t('shipyard.repair')}</span>
