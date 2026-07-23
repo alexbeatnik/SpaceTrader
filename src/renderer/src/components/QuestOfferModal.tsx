@@ -6,7 +6,10 @@ import { fmt } from '../util/format'
 const ICON: Record<string, string> = {
   delivery: '📦',
   relief: '⛑️',
-  bounty: '🎯'
+  bounty: '🎯',
+  passenger: '🧳',
+  smuggle: '🕶️',
+  fetch: '📥'
 }
 
 export function QuestOfferModal(): React.JSX.Element | null {

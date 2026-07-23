@@ -30,6 +30,21 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     repairCostPerUnit: 1,
     minTechLevel: 4
   },
+  dragonfly: {
+    // Nimble long-range scout: little cargo, but reaches far and carries gadgets.
+    id: 'dragonfly',
+    price: 16000,
+    cargoBays: 12,
+    weaponSlots: 1,
+    shieldSlots: 1,
+    gadgetSlots: 2,
+    crewQuarters: 1,
+    fuelTanks: 20,
+    hullStrength: 70,
+    fuelCostPerParsec: 2,
+    repairCostPerUnit: 1,
+    minTechLevel: 4
+  },
   firefly: {
     id: 'firefly',
     price: 25000,
@@ -56,6 +71,21 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     hullStrength: 100,
     fuelCostPerParsec: 5,
     repairCostPerUnit: 1,
+    minTechLevel: 5
+  },
+  locust: {
+    // Cheap swarm hauler: big hold, thin hull — a courier's workhorse.
+    id: 'locust',
+    price: 45000,
+    cargoBays: 45,
+    weaponSlots: 1,
+    shieldSlots: 1,
+    gadgetSlots: 1,
+    crewQuarters: 2,
+    fuelTanks: 15,
+    hullStrength: 80,
+    fuelCostPerParsec: 8,
+    repairCostPerUnit: 2,
     minTechLevel: 5
   },
   bumblebee: {
@@ -86,6 +116,21 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     repairCostPerUnit: 2,
     minTechLevel: 5
   },
+  mantis: {
+    // Dedicated mid-game fighter: three guns, solid shields, tough hull.
+    id: 'mantis',
+    price: 95000,
+    cargoBays: 18,
+    weaponSlots: 3,
+    shieldSlots: 2,
+    gadgetSlots: 2,
+    crewQuarters: 2,
+    fuelTanks: 16,
+    hullStrength: 140,
+    fuelCostPerParsec: 12,
+    repairCostPerUnit: 3,
+    minTechLevel: 6
+  },
   hornet: {
     id: 'hornet',
     price: 100000,
@@ -114,6 +159,21 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     repairCostPerUnit: 3,
     minTechLevel: 6
   },
+  centipede: {
+    // Heavy freighter: enormous hold and quarters, but sluggish and lightly armed.
+    id: 'centipede',
+    price: 180000,
+    cargoBays: 75,
+    weaponSlots: 1,
+    shieldSlots: 2,
+    gadgetSlots: 2,
+    crewQuarters: 4,
+    fuelTanks: 14,
+    hullStrength: 160,
+    fuelCostPerParsec: 18,
+    repairCostPerUnit: 3,
+    minTechLevel: 6
+  },
   termite: {
     id: 'termite',
     price: 225000,
@@ -124,6 +184,21 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     crewQuarters: 3,
     fuelTanks: 13,
     hullStrength: 200,
+    fuelCostPerParsec: 20,
+    repairCostPerUnit: 4,
+    minTechLevel: 7
+  },
+  scorpion: {
+    // Pure warship: four hardpoints and heavy shields on a durable hull.
+    id: 'scorpion',
+    price: 260000,
+    cargoBays: 25,
+    weaponSlots: 4,
+    shieldSlots: 3,
+    gadgetSlots: 2,
+    crewQuarters: 3,
+    fuelTanks: 15,
+    hullStrength: 220,
     fuelCostPerParsec: 20,
     repairCostPerUnit: 4,
     minTechLevel: 7
@@ -140,6 +215,21 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     hullStrength: 200,
     fuelCostPerParsec: 20,
     repairCostPerUnit: 4,
+    minTechLevel: 7
+  },
+  widow: {
+    // Elite flagship: top firepower, heavy shields and four gadget slots.
+    id: 'widow',
+    price: 380000,
+    cargoBays: 30,
+    weaponSlots: 4,
+    shieldSlots: 3,
+    gadgetSlots: 4,
+    crewQuarters: 3,
+    fuelTanks: 18,
+    hullStrength: 240,
+    fuelCostPerParsec: 18,
+    repairCostPerUnit: 5,
     minTechLevel: 7
   }
 }

@@ -22,24 +22,35 @@ Core systems implemented:
 - **Dynamic market** — prices driven by tech level, government preferences,
   special resources, events, and your Trader skill.
 - **Travel** — fuel-limited warp jumps across an interactive star chart, plus
-  wormhole shortcuts.
+  wormhole shortcuts. Each jump plays an animated, skippable **warp transition**
+  (streaking stars, your ship, distance and day) so travel isn't instantaneous.
+- **Star chart** — interactive map with a fuel-range ring, wormhole links, and
+  **pulsing markers on active quest destinations** (with where each job was taken
+  and its reward).
 - **Encounters & combat** — turn-based fights with pirates, police inspections
-  (submit / bribe / flee / fight), traders, plunder, and escape pods. Opponents
-  scale with your wealth, combat reputation, and criminal record.
-- **Crew & mercenaries** — hire named mercenaries from system personnel rosters;
-  they take over duties in their best skill and draw a daily wage.
-- **Quests** — special assignments offered on arrival: courier deliveries, relief
-  missions to systems in crisis, and bounty hunts for named wanted pirates, with
-  a quest log tracking active and completed jobs.
-- **Special events** — one-off events on quiet arrivals (derelicts, fuel leaks,
-  micrometeorites, tolls, lotteries, news tips, wandering experts).
+  (submit / bribe / flee / fight), traders, and two extra threats: **bounty
+  hunters** who come for wanted commanders (bribe or buy your freedom) and rare,
+  deadly **alien raiders**. Plunder, escape pods, and opponents that scale with
+  your wealth, combat reputation, and criminal record.
+- **Crew & mercenaries** — hire from a roster of **26 named mercenaries** spread
+  across system personnel offices; each takes over duties in their best skill and
+  draws a daily wage.
+- **Quests** — special assignments offered on arrival across **six types**:
+  courier deliveries, relief missions to systems in crisis, bounty hunts for
+  named wanted pirates, VIP **passenger** transport, high-risk **smuggling** runs,
+  and **supply contracts** (fetch goods and bring them back), with a quest log
+  tracking active and completed jobs.
+- **Special events** — one-off events on quiet arrivals: derelicts, fuel leaks,
+  micrometeorites, ion storms, tolls, lotteries, news tips, veteran instructors,
+  friendly convoys, refugees, colony rewards, and ancient alien probes.
 - **Economy** — bank loans with daily interest, ship insurance with no-claim
   discount.
-- **Shipyard & modules** — 10 ship types, five laser tiers, three shield tiers,
-  seven gadgets (extra bays, fuel compactor, hidden compartment, cloaking, …),
-  refuel/repair, escape pods, and sell-back of installed equipment.
+- **Shipyard & modules** — **16 ship types** from the nimble Flea scout to the
+  elite Widow flagship, five laser tiers, three shield tiers, seven gadgets
+  (extra bays, fuel compactor, hidden compartment, cloaking, …), refuel/repair,
+  escape pods, and sell-back of installed equipment.
 - **Ship art** — every hull has its own hand-built SVG silhouette, shown in the
-  ship view, shipyard, and combat.
+  ship view, shipyard, combat, and the warp animation.
 - **Save/Load** — a single persistent save stored in the app's user-data folder.
 - **i18n** — English and Ukrainian, switchable at runtime.
 
@@ -66,8 +77,10 @@ src/
   i18n/        Locale dictionaries (en, uk) + translation helpers
   renderer/    React app
     src/
-      components/  HUD, nav, toast, modals (combat, amount, game over)
-      screens/     Menu, System, Market, Shipyard, Bank, Star Chart, Ship, Log
+      components/  HUD, nav, toast, ship art, warp transition, modals
+                   (combat, event, quest offer, amount, game over)
+      screens/     Menu, System, Market, Shipyard, Bank, Crew, Quests,
+                   Star Chart, Ship, Log
       store/       Zustand store wiring the engine to the UI
 ```
 

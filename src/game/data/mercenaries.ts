@@ -18,7 +18,17 @@ export const MERCENARIES: Record<string, Mercenary> = {
   mira: { id: 'mira', skills: { pilot: 3, fighter: 3, trader: 5, engineer: 4 }, wage: 40 },
   nox: { id: 'nox', skills: { pilot: 5, fighter: 10, trader: 2, engineer: 5 }, wage: 90 },
   orin: { id: 'orin', skills: { pilot: 10, fighter: 6, trader: 4, engineer: 7 }, wage: 95 },
-  pax: { id: 'pax', skills: { pilot: 4, fighter: 4, trader: 4, engineer: 4 }, wage: 35 }
+  pax: { id: 'pax', skills: { pilot: 4, fighter: 4, trader: 4, engineer: 4 }, wage: 35 },
+  quen: { id: 'quen', skills: { pilot: 6, fighter: 7, trader: 5, engineer: 5 }, wage: 70 },
+  rhea: { id: 'rhea', skills: { pilot: 8, fighter: 4, trader: 6, engineer: 5 }, wage: 70 },
+  sol: { id: 'sol', skills: { pilot: 5, fighter: 5, trader: 5, engineer: 9 }, wage: 75 },
+  tavi: { id: 'tavi', skills: { pilot: 9, fighter: 5, trader: 3, engineer: 6 }, wage: 80 },
+  ulf: { id: 'ulf', skills: { pilot: 3, fighter: 9, trader: 4, engineer: 6 }, wage: 75 },
+  vera: { id: 'vera', skills: { pilot: 6, fighter: 6, trader: 9, engineer: 4 }, wage: 80 },
+  wren: { id: 'wren', skills: { pilot: 7, fighter: 3, trader: 6, engineer: 7 }, wage: 70 },
+  xara: { id: 'xara', skills: { pilot: 5, fighter: 8, trader: 5, engineer: 8 }, wage: 90 },
+  yuki: { id: 'yuki', skills: { pilot: 8, fighter: 8, trader: 5, engineer: 7 }, wage: 100 },
+  zane: { id: 'zane', skills: { pilot: 10, fighter: 9, trader: 6, engineer: 8 }, wage: 125 }
 }
 
 export const MERCENARY_IDS = Object.keys(MERCENARIES)

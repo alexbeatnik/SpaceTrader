@@ -25,8 +25,11 @@ import {
   warp,
   resolveRound,
   plunder,
+  tradeBuy,
+  tradeSell,
   acceptQuest,
   pushLog,
+  systemDistance,
   Rng,
   SHIP_TYPES,
   type GameState,
@@ -40,7 +43,8 @@ import {
   type WeaponId,
   type ShieldId,
   type GadgetId,
-  type NewGameOptions
+  type NewGameOptions,
+  type WarpResult
 } from '@game/index'
 import { renderMessage } from '@i18n/index'
 
@@ -62,6 +66,19 @@ export interface Toast {
   text: string
 }
 
+/** Descriptor of an in-progress warp jump, used to drive the travel animation. */
+export interface TravelAnim {
+  fromId: number
+  toId: number
+  fromName: string
+  toName: string
+  distance: number
+  viaWormhole: boolean
+  shipType: ShipTypeId
+  /** Animation duration in milliseconds. */
+  durationMs: number
+}
+
 interface GameStore {
   game: GameState | null
   encounter: Encounter | null
@@ -70,6 +87,8 @@ interface GameStore {
   screen: Screen
   toast: Toast | null
   gameOver: boolean
+  /** Active warp animation; while set, the destination results are deferred. */
+  travel: TravelAnim | null
 
   // lifecycle
   startNewGame: (opts: NewGameOptions) => void
@@ -109,8 +128,11 @@ interface GameStore {
 
   // travel & combat
   warpTo: (targetId: number) => void
+  finishTravel: () => void
   combatAction: (action: CombatAction) => void
   plunderNow: () => void
+  tradeBuyFromTrader: (good: GoodId, amount: number) => void
+  tradeSellToTrader: (good: GoodId, amount: number) => void
   dismissEncounter: () => void
   dismissEvent: () => void
   acceptQuestOffer: () => void
@@ -118,6 +140,10 @@ interface GameStore {
 }
 
 let toastCounter = 0
+
+// Warp result whose encounter/event/offer is deferred until the travel
+// animation finishes. Kept outside reactive state (it is not rendered directly).
+let pendingWarp: WarpResult | null = null
 
 function clone<T>(v: T): T {
   return structuredClone(v)
@@ -158,9 +184,11 @@ export const useGameStore = create<GameStore>((set, get) => {
     screen: 'menu',
     toast: null,
     gameOver: false,
+    travel: null,
 
     startNewGame: (opts) => {
       const game = newGame(opts)
+      pendingWarp = null
       set({
         game,
         screen: 'system',
@@ -168,7 +196,8 @@ export const useGameStore = create<GameStore>((set, get) => {
         event: null,
         questOffer: null,
         gameOver: false,
-        toast: null
+        toast: null,
+        travel: null
       })
       void get().saveGame()
     },
@@ -179,7 +208,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (!data) return false
       try {
         const game = JSON.parse(data) as GameState
-        set({ game, screen: 'system', encounter: null, gameOver: false })
+        pendingWarp = null
+        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, gameOver: false, travel: null })
         return true
       } catch {
         return false
@@ -194,7 +224,10 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     setScreen: (s) => set({ screen: s }),
 
-    quitToMenu: () => set({ screen: 'menu', encounter: null }),
+    quitToMenu: () => {
+      pendingWarp = null
+      set({ screen: 'menu', encounter: null, event: null, questOffer: null, travel: null })
+    },
 
     buy: (good, amount) => withGame((g) => applyResult(g, buyGood(g, good, amount))),
     sell: (good, amount) => withGame((g) => applyResult(g, sellGood(g, good, amount))),
@@ -223,28 +256,56 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     warpTo: (targetId) =>
       withGame((g) => {
+        // Capture origin details before the jump mutates the game state.
+        const fromSys = g.systems[g.currentSystem]
+        const toSys = g.systems[targetId]
+        const viaWormhole = fromSys.wormholeTo === targetId
+        const distance = systemDistance(fromSys, toSys)
+        const fromName = fromSys.nameId
+        const toName = toSys.nameId
+        const shipType = g.ship.type
+
         const result = warp(g, targetId)
         if (!result.ok) {
           set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error!) } })
           return
         }
-        const done = result.questsCompleted ?? []
+
+        // Defer surfacing encounter/event/offer until the travel animation ends.
+        pendingWarp = result
+        const durationMs = viaWormhole
+          ? 1600
+          : Math.min(3400, Math.max(1500, distance * 130))
+
         set({
           game: clone(g),
-          encounter: result.encounter ? clone(result.encounter) : null,
-          event: result.event ? clone(result.event) : null,
-          questOffer: result.questOffer ? clone(result.questOffer) : null,
+          encounter: null,
+          event: null,
+          questOffer: null,
           screen: 'system',
-          toast: done.length
-            ? {
-                id: ++toastCounter,
-                type: 'info',
-                text: renderMessage('quest.completedToast', { reward: done.reduce((s, q) => s + q.reward, 0) })
-              }
-            : get().toast
+          travel: { fromId: fromSys.id, toId: targetId, fromName, toName, distance, viaWormhole, shipType, durationMs }
         })
         void get().saveGame()
       }),
+
+    finishTravel: () => {
+      const result = pendingWarp
+      pendingWarp = null
+      const done = result?.questsCompleted ?? []
+      set({
+        travel: null,
+        encounter: result?.encounter ? clone(result.encounter) : null,
+        event: result?.event ? clone(result.event) : null,
+        questOffer: result?.questOffer ? clone(result.questOffer) : null,
+        toast: done.length
+          ? {
+              id: ++toastCounter,
+              type: 'info',
+              text: renderMessage('quest.completedToast', { reward: done.reduce((s, q) => s + q.reward, 0) })
+            }
+          : get().toast
+      })
+    },
 
     combatAction: (action) =>
       withGame((g) => {
@@ -270,6 +331,40 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (!enc) return
         plunder(g, enc)
         set({ game: clone(g), encounter: clone(enc) })
+      }),
+
+    tradeBuyFromTrader: (good, amount) =>
+      withGame((g) => {
+        const enc = get().encounter
+        if (!enc) return
+        const result = tradeBuy(g, enc, good, amount)
+        if (result.ok && result.info) {
+          set({
+            game: clone(g),
+            encounter: clone(enc),
+            toast: { id: ++toastCounter, type: 'info', text: renderMessage(result.info.key, result.info.params) }
+          })
+          void get().saveGame()
+        } else if (result.error) {
+          set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error) } })
+        }
+      }),
+
+    tradeSellToTrader: (good, amount) =>
+      withGame((g) => {
+        const enc = get().encounter
+        if (!enc) return
+        const result = tradeSell(g, enc, good, amount)
+        if (result.ok && result.info) {
+          set({
+            game: clone(g),
+            encounter: clone(enc),
+            toast: { id: ++toastCounter, type: 'info', text: renderMessage(result.info.key, result.info.params) }
+          })
+          void get().saveGame()
+        } else if (result.error) {
+          set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error) } })
+        }
       }),
 
     dismissEncounter: () => {

@@ -15,6 +15,20 @@ export function questDescription(q: Quest, game: GameState): string {
       })
     case 'bounty':
       return t('quest.desc.bounty', { bounty: q.bountyName ?? '', system })
+    case 'passenger':
+      return t('quest.desc.passenger', { passenger: q.passengerName ?? '', system })
+    case 'smuggle':
+      return t('quest.desc.smuggle', {
+        amount: q.amount ?? 0,
+        good: goodName(q.good ?? ''),
+        system
+      })
+    case 'fetch':
+      return t('quest.desc.fetch', {
+        amount: q.amount ?? 0,
+        good: goodName(q.good ?? ''),
+        system
+      })
   }
 }
 

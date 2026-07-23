@@ -8,6 +8,7 @@ import { CombatModal } from './components/CombatModal'
 import { EventModal } from './components/EventModal'
 import { QuestOfferModal } from './components/QuestOfferModal'
 import { GameOverModal } from './components/GameOverModal'
+import { WarpTransition } from './components/WarpTransition'
 import { MenuScreen } from './screens/MenuScreen'
 import { SystemScreen } from './screens/SystemScreen'
 import { MarketScreen } from './screens/MarketScreen'
@@ -24,6 +25,7 @@ export function App(): React.JSX.Element {
   const screen = useGameStore((s) => s.screen)
   const encounter = useGameStore((s) => s.encounter)
   const gameOver = useGameStore((s) => s.gameOver)
+  const travel = useGameStore((s) => s.travel)
   useI18n() // subscribe to locale changes for the whole tree
 
   useEffect(() => {
@@ -58,9 +60,10 @@ export function App(): React.JSX.Element {
           {screen === 'log' && <LogScreen />}
         </div>
       </div>
-      {encounter && !gameOver && <CombatModal />}
-      {!encounter && !gameOver && <EventModal />}
-      {!encounter && !gameOver && <QuestOfferModal />}
+      {travel && <WarpTransition />}
+      {!travel && encounter && !gameOver && <CombatModal />}
+      {!travel && !encounter && !gameOver && <EventModal />}
+      {!travel && !encounter && !gameOver && <QuestOfferModal />}
       {gameOver && <GameOverModal />}
       <Toast />
     </div>

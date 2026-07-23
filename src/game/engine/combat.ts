@@ -2,12 +2,12 @@ import type { GameState, GoodId, ShipTypeId, WeaponId, ShieldId } from './types'
 import { Rng } from './rng'
 import { SHIP_TYPES } from '../data/ships'
 import { WEAPONS, SHIELDS } from '../data/equipment'
-import { GOOD_IDS } from '../data/goods'
+import { GOOD_IDS, TRADE_GOODS } from '../data/goods'
 import { POLITICS } from '../data/politics'
-import { effectiveSkills, weaponPower, freeCargoBays, pushLog } from './game'
+import { effectiveSkills, weaponPower, freeCargoBays, pushLog, type ActionResult } from './game'
 import { completeBounty } from './quests'
 
-export type EncounterKind = 'trader' | 'pirate' | 'police'
+export type EncounterKind = 'trader' | 'pirate' | 'police' | 'bountyHunter' | 'alien'
 
 export type EncounterStatus =
   | 'ongoing'
@@ -35,6 +35,14 @@ export interface Opponent {
   fleeing: boolean
 }
 
+/** A trader's willingness to deal: what it sells to, and buys from, the player. */
+export interface TradeOffer {
+  /** Goods the trader offers for sale, with a unit price and remaining stock. */
+  sells: Partial<Record<GoodId, { price: number; qty: number }>>
+  /** Goods the trader will buy from the player, with the unit price it pays. */
+  buys: Partial<Record<GoodId, number>>
+}
+
 export interface Encounter {
   kind: EncounterKind
   opponent: Opponent
@@ -44,6 +52,8 @@ export interface Encounter {
   /** Set when this pirate is a bounty target from an active quest. */
   bountyQuestId?: string
   bountyName?: string
+  /** Trader-only: random goods/prices the player can trade with. */
+  trade?: TradeOffer
   /** Rounds log keyed for i18n. */
   messages: { key: string; params?: Record<string, string | number> }[]
 }
@@ -65,6 +75,15 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
   const dest = state.systems[state.currentSystem]
   const gov = POLITICS[dest.politics]
 
+  // A rare, roaming alien raider can appear anywhere in deep space.
+  if (rng.chance(0.015)) return makeEncounter('alien', state, rng)
+
+  // Outlaws attract bounty hunters: the more wanted you are, the likelier.
+  const wanted = Math.max(0, -state.record.policeRecord)
+  if (wanted >= 3 && rng.chance(Math.min(0.2, 0.02 + wanted * 0.02))) {
+    return makeEncounter('bountyHunter', state, rng)
+  }
+
   // Base probabilities derived from government strengths.
   const pPirate = gov.strengthPirates * 0.03
   const pPolice = gov.strengthPolice * 0.025
@@ -82,8 +101,12 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
  * combat reputation; for the police it also grows with how wanted the player is.
  */
 function threatLevel(kind: EncounterKind, state: GameState): number {
+  // Aliens are always a top-tier threat regardless of the player's standing.
+  if (kind === 'alien') return 5
   let worth = state.credits + Math.max(0, state.record.reputation) * 120
   if (kind === 'police') worth += Math.max(0, -state.record.policeRecord) * 6000
+  // Bounty hunters come better-equipped the more notorious you are.
+  if (kind === 'bountyHunter') worth += Math.max(0, -state.record.policeRecord) * 9000
   if (worth > 150000) return 5
   if (worth > 80000) return 4
   if (worth > 40000) return 3
@@ -93,49 +116,70 @@ function threatLevel(kind: EncounterKind, state: GameState): number {
 }
 
 function shipForThreat(threat: number): ShipTypeId {
-  return (['gnat', 'firefly', 'mosquito', 'hornet', 'wasp', 'wasp'] as ShipTypeId[])[threat]
+  return (['gnat', 'firefly', 'mantis', 'hornet', 'scorpion', 'widow'] as ShipTypeId[])[threat]
 }
 
 function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encounter {
   const threat = threatLevel(kind, state)
   const shipType =
     kind === 'trader'
-      ? rng.pick(['flea', 'gnat', 'firefly', 'beetle'] as ShipTypeId[])
-      : shipForThreat(threat)
+      ? rng.pick(['flea', 'gnat', 'locust', 'firefly', 'beetle', 'centipede'] as ShipTypeId[])
+      : kind === 'alien'
+        ? rng.pick(['scorpion', 'widow'] as ShipTypeId[])
+        : kind === 'bountyHunter'
+          ? rng.pick(['mantis', 'hornet', 'scorpion'] as ShipTypeId[])
+          : shipForThreat(threat)
   const type = SHIP_TYPES[shipType]
 
   // Higher-threat opponents field better shields and weapons.
   const shieldTier: ShieldId = threat >= 4 ? 'reflective' : 'energy'
   const oppShields = type.shieldSlots > 0 ? SHIELDS[shieldTier].power * Math.min(type.shieldSlots, 2) : 0
-  const weaponTier: WeaponId = threat >= 4 ? 'military' : threat >= 2 ? 'beam' : 'pulse'
+  const weaponTier: WeaponId =
+    kind === 'alien' ? 'fusion' : threat >= 4 ? 'military' : threat >= 2 ? 'beam' : 'pulse'
   const oppWeapon =
     type.weaponSlots > 0 ? WEAPONS[weaponTier].power * Math.min(type.weaponSlots, 2) : 0
 
   const cargo = {} as Record<GoodId, number>
   for (const g of GOOD_IDS) cargo[g] = 0
+  let trade: TradeOffer | undefined
   if (kind === 'trader') {
-    // Traders carry some loot.
-    const loot = rng.int(2, Math.min(10, type.cargoBays))
-    for (let i = 0; i < loot; i++) cargo[rng.pick(GOOD_IDS)]++
+    // Traders carry random wares to sell and a wishlist to buy from the player.
+    trade = makeTradeOffer(rng)
+    // The hold mirrors what's on offer (keeps plunder consistent with trade).
+    for (const g of GOOD_IDS) {
+      const s = trade.sells[g]
+      if (s) cargo[g] = s.qty
+    }
   }
+
+  // Aliens and bounty hunters are hardened: extra hull and sharper crews.
+  const hullMul = kind === 'alien' ? 1.5 : kind === 'bountyHunter' ? 1.2 : 1
+  const baseHull = Math.round(type.hullStrength * hullMul)
+  const skillBonus = kind === 'alien' ? 4 : kind === 'bountyHunter' ? 2 : 0
 
   const opponent: Opponent = {
     kind,
     shipType,
-    hull: type.hullStrength,
-    maxHull: type.hullStrength,
+    hull: baseHull,
+    maxHull: baseHull,
     shieldPoints: oppShields,
     maxShield: oppShields,
-    weaponPower: kind === 'police' ? Math.max(oppWeapon, WEAPONS.pulse.power) : oppWeapon,
-    pilot: Math.min(12, rng.int(3, 8) + threat),
-    fighter: Math.min(12, rng.int(3, 8) + threat),
+    weaponPower:
+      kind === 'police' || kind === 'bountyHunter'
+        ? Math.max(oppWeapon, WEAPONS.pulse.power)
+        : oppWeapon,
+    pilot: Math.min(13, rng.int(3, 8) + threat + skillBonus),
+    fighter: Math.min(13, rng.int(3, 8) + threat + skillBonus),
     cargo,
     fleeing: false
   }
 
+  // Both police and bounty hunters can be bought off where officials are corruptible.
+  const canBribe = kind === 'police' || kind === 'bountyHunter'
   const bribeCost =
-    kind === 'police' ? (POLITICS[state.systems[state.currentSystem].politics].bribeLevel > 0
-      ? rng.int(100, 100 + state.credits * 0.05) : 0) : 0
+    canBribe && POLITICS[state.systems[state.currentSystem].politics].bribeLevel > 0
+      ? rng.int(100, 100 + Math.round(state.credits * 0.05))
+      : 0
 
   return {
     kind,
@@ -143,8 +187,103 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
     status: 'ongoing',
     round: 0,
     bribeCost,
+    trade,
     messages: [{ key: `encounter.${kind}.appear`, params: { ship: shipType } }]
   }
+}
+
+/** Fisher–Yates shuffle using the seeded RNG (does not mutate the input). */
+function shuffled<T>(arr: readonly T[], rng: Rng): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = rng.int(0, i)
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/** Random selection of wares (with prices) a met trader will deal in. */
+function makeTradeOffer(rng: Rng): TradeOffer {
+  const sells: TradeOffer['sells'] = {}
+  const buys: TradeOffer['buys'] = {}
+
+  // Wares on offer: 3–6 goods, priced 0.6–1.15× their base (bargains happen).
+  for (const g of shuffled(GOOD_IDS, rng).slice(0, rng.int(3, 6))) {
+    const base = TRADE_GOODS[g].basePrice
+    sells[g] = {
+      price: Math.max(1, Math.round(base * (0.6 + rng.next() * 0.55))),
+      qty: rng.int(1, 8)
+    }
+  }
+  // Wishlist to buy from the player: 2–4 goods, paying 0.75–1.25× base.
+  for (const g of shuffled(GOOD_IDS, rng).slice(0, rng.int(2, 4))) {
+    const base = TRADE_GOODS[g].basePrice
+    buys[g] = Math.max(1, Math.round(base * (0.75 + rng.next() * 0.5)))
+  }
+  return { sells, buys }
+}
+
+// --- In-encounter trading ----------------------------------------------------
+/** Buy `good` from the met trader at its offered price. */
+export function tradeBuy(
+  state: GameState,
+  enc: Encounter,
+  good: GoodId,
+  amount: number
+): ActionResult {
+  if (enc.kind !== 'trader' || enc.status !== 'ongoing' || !enc.trade) {
+    return { ok: false, error: 'error.cannotBuy' }
+  }
+  const offer = enc.trade.sells[good]
+  if (!offer || offer.qty <= 0) return { ok: false, error: 'error.notSold' }
+
+  const unit = offer.price
+  const qty = Math.min(
+    amount,
+    offer.qty,
+    Math.floor(state.credits / unit),
+    freeCargoBays(state.ship)
+  )
+  if (qty <= 0) return { ok: false, error: 'error.cannotBuy' }
+
+  const cost = qty * unit
+  // Weighted-average purchase price for profit tracking (as in the market).
+  const prevQty = state.ship.cargo[good]
+  const prevCost = state.buyingPrice[good] * prevQty
+  state.ship.cargo[good] += qty
+  state.buyingPrice[good] =
+    state.ship.cargo[good] > 0 ? Math.round((prevCost + cost) / state.ship.cargo[good]) : 0
+  state.credits -= cost
+  offer.qty -= qty
+  enc.opponent.cargo[good] = Math.max(0, enc.opponent.cargo[good] - qty)
+
+  return { ok: true, info: { key: 'info.bought', params: { qty, good, cost } } }
+}
+
+/** Sell `good` to the met trader at the price it is willing to pay. */
+export function tradeSell(
+  state: GameState,
+  enc: Encounter,
+  good: GoodId,
+  amount: number
+): ActionResult {
+  if (enc.kind !== 'trader' || enc.status !== 'ongoing' || !enc.trade) {
+    return { ok: false, error: 'error.notWanted' }
+  }
+  const unit = enc.trade.buys[good]
+  if (!unit || unit <= 0) return { ok: false, error: 'error.notWanted' }
+
+  const have = state.ship.cargo[good]
+  if (have <= 0) return { ok: false, error: 'error.nothingToSell' }
+
+  const qty = Math.min(amount, have)
+  const revenue = qty * unit
+  state.ship.cargo[good] -= qty
+  state.credits += revenue
+  if (state.ship.cargo[good] === 0) state.buyingPrice[good] = 0
+  enc.opponent.cargo[good] = (enc.opponent.cargo[good] ?? 0) + qty
+
+  return { ok: true, info: { key: 'info.sold', params: { qty, good, revenue } } }
 }
 
 /** Build a tough pirate encounter for a bounty quest target. */
@@ -239,14 +378,14 @@ export function resolveRound(
     return
   }
 
-  if (action === 'bribe' && enc.kind === 'police') {
+  if (action === 'bribe' && (enc.kind === 'police' || enc.kind === 'bountyHunter')) {
     if (enc.bribeCost <= 0) {
       msg('encounter.police.incorruptible')
       return
     }
     if (state.credits >= enc.bribeCost) {
       state.credits -= enc.bribeCost
-      msg('encounter.police.bribed', { amount: enc.bribeCost })
+      msg(`encounter.${enc.kind}.bribed`, { amount: enc.bribeCost })
       enc.status = 'bribed'
     } else {
       msg('error.notEnoughCredits')
@@ -276,7 +415,14 @@ export function resolveRound(
       state.record.policeRecord -= 1
       msg('encounter.police.arrested', { fine })
       enc.status = 'playerSurrendered'
+    } else if (enc.kind === 'bountyHunter') {
+      // A bounty hunter collects on your head: a hefty cut, but you walk free.
+      const ransom = Math.min(state.credits, Math.max(500, Math.round(state.credits * 0.35)))
+      state.credits -= ransom
+      msg('encounter.bountyHunter.paid', { amount: ransom })
+      enc.status = 'playerSurrendered'
     }
+    // Aliens do not take surrender.
     return
   }
 
@@ -328,6 +474,8 @@ export function resolveRound(
       }
       if (enc.kind === 'pirate') state.record.policeRecord += 1
       if (enc.kind === 'police') state.record.policeRecord -= 5
+      if (enc.kind === 'bountyHunter') state.record.reputation += 2
+      if (enc.kind === 'alien') state.record.reputation += 3
       // Bounty target destroyed -> complete the quest and pay out.
       if (enc.bountyQuestId) {
         const q = completeBounty(state, enc.bountyQuestId)
@@ -337,9 +485,10 @@ export function resolveRound(
       return
     }
 
-    // Opponent may surrender if badly hurt (traders/pirates only).
+    // Opponent may surrender if badly hurt (traders & pirates only; hunters and
+    // aliens fight to the end).
     if (
-      enc.kind !== 'police' &&
+      (enc.kind === 'trader' || enc.kind === 'pirate') &&
       opp.hull < opp.maxHull * 0.3 &&
       rng.chance(0.3)
     ) {
@@ -353,6 +502,8 @@ export function resolveRound(
   const oppWillFight =
     enc.kind === 'pirate' ||
     enc.kind === 'police' ||
+    enc.kind === 'bountyHunter' ||
+    enc.kind === 'alien' ||
     (enc.kind === 'trader' && action === 'attack')
 
   if (oppWillFight && opp.weaponPower > 0) {

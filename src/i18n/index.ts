@@ -75,5 +75,8 @@ export function renderMessage(
   if (typeof mapped.good === 'string') mapped.good = goodName(mapped.good)
   if (typeof mapped.ship === 'string') mapped.ship = shipName(mapped.ship)
   if (typeof mapped.name === 'string') mapped.name = mercName(mapped.name)
+  // Some params carry an i18n key (e.g. a skill or status) to be localised inline.
+  if (typeof mapped.skill === 'string' && mapped.skill.startsWith('skill.')) mapped.skill = t(mapped.skill)
+  if (typeof mapped.status === 'string' && mapped.status.startsWith('status.')) mapped.status = t(mapped.status)
   return t(key, mapped)
 }

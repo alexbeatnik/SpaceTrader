@@ -1,31 +1,63 @@
+import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
-import { renderMessage } from '@i18n/index'
+import { renderMessage, goodName } from '@i18n/index'
 import { shipName } from '@i18n/index'
 import {
   maxHull,
   totalShieldPower,
   currentShieldCharge,
-  SHIP_TYPES
+  freeCargoBays,
+  SHIP_TYPES,
+  GOOD_IDS,
+  type GoodId
 } from '@game/index'
+import { fmt } from '../util/format'
 import { ShipArt } from './ShipArt'
+import { AmountModal } from './AmountModal'
+
+type TradeDialog = { mode: 'buy' | 'sell'; good: GoodId } | null
 
 export function CombatModal(): React.JSX.Element | null {
   const game = useGameStore((s) => s.game)!
   const enc = useGameStore((s) => s.encounter)!
   const combatAction = useGameStore((s) => s.combatAction)
   const plunderNow = useGameStore((s) => s.plunderNow)
+  const tradeBuyFromTrader = useGameStore((s) => s.tradeBuyFromTrader)
+  const tradeSellToTrader = useGameStore((s) => s.tradeSellToTrader)
   const dismiss = useGameStore((s) => s.dismissEncounter)
   const { t } = useI18n()
+  const [tradeDialog, setTradeDialog] = useState<TradeDialog>(null)
 
   if (!enc) return null
   const opp = enc.opponent
   const oppType = SHIP_TYPES[opp.shipType]
   const ship = game.ship
   const terminal = enc.status !== 'ongoing'
+  const canTrade = enc.kind === 'trader' && !terminal && !!enc.trade
+
+  const maxTradeBuy = (id: GoodId): number => {
+    const offer = enc.trade?.sells[id]
+    if (!offer || offer.price <= 0) return 0
+    return Math.min(offer.qty, freeCargoBays(ship), Math.floor(game.credits / offer.price))
+  }
 
   const kindColor =
-    enc.kind === 'pirate' ? 'bad' : enc.kind === 'police' ? 'warn' : ''
+    enc.kind === 'pirate' || enc.kind === 'alien'
+      ? 'bad'
+      : enc.kind === 'police' || enc.kind === 'bountyHunter'
+        ? 'warn'
+        : ''
+  const oppAccent =
+    enc.kind === 'alien'
+      ? '#b06bff'
+      : enc.kind === 'pirate'
+        ? '#ff5d6c'
+        : enc.kind === 'bountyHunter'
+          ? '#ff7a3c'
+          : enc.kind === 'police'
+            ? '#ffc04a'
+            : undefined
 
   return (
     <div className="overlay">
@@ -33,15 +65,13 @@ export function CombatModal(): React.JSX.Element | null {
         <h2>
           ⚠ {t('encounter.title')}{' '}
           <span className={`badge ${kindColor}`} style={{ marginLeft: 8 }}>
-            {t(
-              `system.${enc.kind === 'police' ? 'police' : enc.kind === 'pirate' ? 'pirates' : 'traders'}`
-            )}
+            {t(`encounter.kind.${enc.kind}`)}
           </span>
         </h2>
 
         {/* Opponent status */}
         <div className="ship-visual" style={{ marginBottom: 12 }}>
-          <ShipArt type={opp.shipType} size={64} flip accent={enc.kind === 'pirate' ? '#ff5d6c' : enc.kind === 'police' ? '#ffc04a' : undefined} />
+          <ShipArt type={opp.shipType} size={64} flip accent={oppAccent} />
           <div style={{ flex: 1 }}>
             <div className="kv">
               <span className="k">{shipName(opp.shipType)}</span>
@@ -77,6 +107,66 @@ export function CombatModal(): React.JSX.Element | null {
           </div>
         </div>
 
+        {/* Trader marketplace */}
+        {canTrade && enc.trade && (
+          <div className="trade-panel">
+            <div className="trade-head">🤝 {t('encounter.trade.title')}</div>
+            <div className="trade-cols">
+              <div className="trade-col">
+                <div className="trade-col-title">{t('encounter.trade.onOffer')}</div>
+                {GOOD_IDS.filter((id) => enc.trade!.sells[id]).length === 0 ? (
+                  <div className="muted" style={{ fontSize: 12 }}>{t('encounter.trade.nothing')}</div>
+                ) : (
+                  GOOD_IDS.filter((id) => enc.trade!.sells[id]).map((id) => {
+                    const offer = enc.trade!.sells[id]!
+                    return (
+                      <div className="trade-row" key={id}>
+                        <span className="trade-name">{goodName(id)}</span>
+                        <span className="trade-meta">
+                          {fmt(offer.price)} · ×{offer.qty}
+                        </span>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          disabled={maxTradeBuy(id) <= 0}
+                          onClick={() => setTradeDialog({ mode: 'buy', good: id })}
+                        >
+                          {t('common.buy')}
+                        </button>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              <div className="trade-col">
+                <div className="trade-col-title">{t('encounter.trade.wants')}</div>
+                {GOOD_IDS.filter((id) => enc.trade!.buys[id]).length === 0 ? (
+                  <div className="muted" style={{ fontSize: 12 }}>{t('encounter.trade.nothing')}</div>
+                ) : (
+                  GOOD_IDS.filter((id) => enc.trade!.buys[id]).map((id) => {
+                    const price = enc.trade!.buys[id]!
+                    const held = ship.cargo[id]
+                    return (
+                      <div className="trade-row" key={id}>
+                        <span className="trade-name">{goodName(id)}</span>
+                        <span className="trade-meta">
+                          {fmt(price)} · {t('market.inHold')} {held}
+                        </span>
+                        <button
+                          className="btn btn-sm"
+                          disabled={held <= 0}
+                          onClick={() => setTradeDialog({ mode: 'sell', good: id })}
+                        >
+                          {t('common.sell')}
+                        </button>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Combat log */}
         <div className="combat-log">
           {[...enc.messages].reverse().map((m, i) => (
@@ -95,25 +185,23 @@ export function CombatModal(): React.JSX.Element | null {
                 💨 {t('encounter.action.flee')}
               </button>
               {enc.kind === 'police' && (
-                <>
-                  <button className="btn" onClick={() => combatAction('submit')}>
-                    {t('encounter.action.submit')}
-                  </button>
-                  {enc.bribeCost > 0 && (
-                    <button className="btn" onClick={() => combatAction('bribe')}>
-                      💰 {t('encounter.action.bribe')}
-                    </button>
-                  )}
-                </>
+                <button className="btn" onClick={() => combatAction('submit')}>
+                  {t('encounter.action.submit')}
+                </button>
               )}
-              {enc.kind === 'pirate' && (
+              {(enc.kind === 'police' || enc.kind === 'bountyHunter') && enc.bribeCost > 0 && (
+                <button className="btn" onClick={() => combatAction('bribe')}>
+                  💰 {t('encounter.action.bribe')}
+                </button>
+              )}
+              {(enc.kind === 'pirate' || enc.kind === 'bountyHunter') && (
                 <button className="btn" onClick={() => combatAction('surrender')}>
                   🏳 {t('encounter.action.surrender')}
                 </button>
               )}
               {enc.kind === 'trader' && (
                 <button className="btn" onClick={() => combatAction('ignore')}>
-                  {t('encounter.action.ignore')}
+                  👋 {t('encounter.action.leave')}
                 </button>
               )}
             </>
@@ -132,6 +220,33 @@ export function CombatModal(): React.JSX.Element | null {
           )}
         </div>
       </div>
+
+      {tradeDialog && enc.trade && (
+        <AmountModal
+          title={
+            tradeDialog.mode === 'buy'
+              ? t('market.buyAmount', { good: goodName(tradeDialog.good) })
+              : t('market.sellAmount', { good: goodName(tradeDialog.good) })
+          }
+          max={
+            tradeDialog.mode === 'buy'
+              ? maxTradeBuy(tradeDialog.good)
+              : ship.cargo[tradeDialog.good]
+          }
+          unitPrice={
+            tradeDialog.mode === 'buy'
+              ? enc.trade.sells[tradeDialog.good]?.price ?? 0
+              : enc.trade.buys[tradeDialog.good] ?? 0
+          }
+          confirmLabel={tradeDialog.mode === 'buy' ? t('common.buy') : t('common.sell')}
+          onConfirm={(amount) => {
+            if (tradeDialog.mode === 'buy') tradeBuyFromTrader(tradeDialog.good, amount)
+            else tradeSellToTrader(tradeDialog.good, amount)
+            setTradeDialog(null)
+          }}
+          onCancel={() => setTradeDialog(null)}
+        />
+      )}
     </div>
   )
 }

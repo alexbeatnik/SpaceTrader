@@ -21,6 +21,7 @@ import {
   goodName
 } from '@i18n/index'
 import { fmt } from '../util/format'
+import { questTypeLabel } from '../util/questText'
 
 const VIEW_W = 760
 const VIEW_H = Math.round((VIEW_W * GALAXY_HEIGHT) / GALAXY_WIDTH)
@@ -34,7 +35,12 @@ export function ChartScreen(): React.JSX.Element {
   const range = maxRange(game)
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
+  // Active quests: their destination systems get a marker on the map.
+  const activeQuests = game.quests.filter((q) => q.status === 'active')
+  const questTargetIds = new Set(activeQuests.map((q) => q.targetSystem))
+
   const selected = selectedId !== null ? game.systems[selectedId] : null
+  const selectedQuests = selected ? activeQuests.filter((q) => q.targetSystem === selected.id) : []
   const selDist = selected ? systemDistance(here, selected) : 0
   const viaWormhole = selected ? here.wormholeTo === selected.id : false
   const canWarp = selected
@@ -82,6 +88,7 @@ export function ChartScreen(): React.JSX.Element {
               const reachable = systemDistance(here, sys) <= game.ship.fuel && sys.id !== here.id
               const isHere = sys.id === here.id
               const isSel = sys.id === selectedId
+              const isQuest = questTargetIds.has(sys.id)
               const r = isHere ? 6 : 4
               const color = isHere
                 ? '#4fd1ff'
@@ -96,16 +103,38 @@ export function ChartScreen(): React.JSX.Element {
                   style={{ cursor: 'pointer' }}
                   onClick={() => setSelectedId(sys.id)}
                 >
+                  {isQuest && (
+                    <circle
+                      className="quest-ring"
+                      cx={sys.x * SCALE}
+                      cy={sys.y * SCALE}
+                      r={r + 6}
+                      fill="none"
+                      stroke="#ffc04a"
+                      strokeWidth={1.6}
+                      strokeDasharray="3 3"
+                    />
+                  )}
                   {isSel && (
                     <circle cx={sys.x * SCALE} cy={sys.y * SCALE} r={r + 5} fill="none" stroke="#fff" strokeWidth={1.5} />
                   )}
                   <circle cx={sys.x * SCALE} cy={sys.y * SCALE} r={r} fill={color} />
-                  {(isHere || sys.visited || isSel) && (
+                  {isQuest && (
+                    <text
+                      x={sys.x * SCALE}
+                      y={sys.y * SCALE - r - 6}
+                      fontSize={11}
+                      textAnchor="middle"
+                    >
+                      📋
+                    </text>
+                  )}
+                  {(isHere || sys.visited || isSel || isQuest) && (
                     <text
                       x={sys.x * SCALE + r + 3}
                       y={sys.y * SCALE + 3}
                       fontSize={9}
-                      fill={isHere ? '#4fd1ff' : '#8b95c4'}
+                      fill={isHere ? '#4fd1ff' : isQuest ? '#ffc04a' : '#8b95c4'}
                     >
                       {sys.nameId}
                     </text>
@@ -127,6 +156,33 @@ export function ChartScreen(): React.JSX.Element {
               ) : (
                 <div className="badge" style={{ marginBottom: 10 }}>
                   {viaWormhole ? t('chart.viaWormhole') : `${selDist} ${t('common.pc')}`}
+                </div>
+              )}
+
+              {selectedQuests.length > 0 && (
+                <div
+                  style={{
+                    marginBottom: 12,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(255,192,74,0.08)',
+                    border: '1px solid rgba(255,192,74,0.3)'
+                  }}
+                >
+                  <div className="badge warn" style={{ marginBottom: 8 }}>
+                    📋 {t('chart.questHere')}
+                  </div>
+                  {selectedQuests.map((q) => (
+                    <div key={q.id} style={{ marginBottom: 6 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{questTypeLabel(q)}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {t('quest.takenAt', {
+                          system: game.systems[q.giverSystem]?.nameId ?? '—'
+                        })}{' '}
+                        · {fmt(q.reward)} {t('common.cr')}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 

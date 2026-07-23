@@ -3,7 +3,14 @@ import { useI18n } from '../hooks/useI18n'
 import { questDescription, questTypeLabel } from '../util/questText'
 import { fmt } from '../util/format'
 
-const ICON: Record<string, string> = { delivery: '📦', relief: '⛑️', bounty: '🎯' }
+const ICON: Record<string, string> = {
+  delivery: '📦',
+  relief: '⛑️',
+  bounty: '🎯',
+  passenger: '🧳',
+  smuggle: '🕶️',
+  fetch: '📥'
+}
 
 export function QuestsScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
@@ -29,6 +36,11 @@ export function QuestsScreen(): React.JSX.Element {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
                   <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    📍 {t('quest.takenAt', { system: game.systems[q.giverSystem]?.nameId ?? '—' })}
+                    {' · '}🎯 {t('quest.destination')}:{' '}
+                    {game.systems[q.targetSystem]?.nameId ?? '—'}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="badge">{t('quest.reward')}</div>

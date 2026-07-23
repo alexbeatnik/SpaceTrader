@@ -49,16 +49,24 @@ export const en = {
     type: {
       delivery: 'Courier delivery',
       relief: 'Relief mission',
-      bounty: 'Bounty hunt'
+      bounty: 'Bounty hunt',
+      passenger: 'Passenger transport',
+      smuggle: 'Smuggling run',
+      fetch: 'Supply contract'
     },
     desc: {
       delivery: 'Deliver a package to the {system} system.',
       relief: 'Deliver {amount} × {good} to {system}, a system in crisis.',
-      bounty: 'Track down and destroy the pirate {bounty} (headed for {system}).'
+      bounty: 'Track down and destroy the pirate {bounty} (headed for {system}).',
+      passenger: 'Transport {passenger} safely to the {system} system.',
+      smuggle: 'Smuggle {amount} × {good} past the patrols to {system}.',
+      fetch: 'Source {amount} × {good} and bring it back to {system}.'
     },
     accepted: 'Assignment accepted — reward {reward} cr.',
     completed: 'Assignment completed — reward {reward} cr.',
-    completedToast: 'Assignment complete! +{reward} cr'
+    completedToast: 'Assignment complete! +{reward} cr',
+    takenAt: 'Taken at {system}',
+    destination: 'Destination'
   },
   crew: {
     title: 'Crew',
@@ -76,7 +84,9 @@ export const en = {
   merc: {
     alyssa: 'Alyssa', bran: 'Bran', cyra: 'Cyra', dex: 'Dex', elin: 'Elin',
     ferro: 'Ferro', gwen: 'Gwen', hoshi: 'Hoshi', ivo: 'Ivo', juno: 'Juno',
-    kai: 'Kai', lena: 'Lena', mira: 'Mira', nox: 'Nox', orin: 'Orin', pax: 'Pax'
+    kai: 'Kai', lena: 'Lena', mira: 'Mira', nox: 'Nox', orin: 'Orin', pax: 'Pax',
+    quen: 'Quen', rhea: 'Rhea', sol: 'Sol', tavi: 'Tavi', ulf: 'Ulf',
+    vera: 'Vera', wren: 'Wren', xara: 'Xara', yuki: 'Yuki', zane: 'Zane'
   },
   event: {
     derelict: {
@@ -112,6 +122,38 @@ export const en = {
       title: 'Wandering expert',
       body: 'A seasoned engineer shared some tricks. Your Engineer skill rose by 1.',
       log: 'Wandering expert: +1 Engineer.'
+    },
+    ionStorm: {
+      title: 'Ion storm',
+      body: 'An ion storm battered your hull for {dmg} damage.',
+      log: 'Ion storm: -{dmg} hull.'
+    },
+    skillTrainer: {
+      title: 'Veteran instructor',
+      body: 'A retired ace drilled you hard. Your {skill} skill rose by 1.',
+      log: 'Trained by a veteran: +1 {skill}.'
+    },
+    merchantConvoy: {
+      title: 'Friendly convoy',
+      bodyGoods: 'A passing convoy shared surplus stock: {qty} × {good}.',
+      bodyCredits: 'A passing convoy paid {gift} cr for your navigation charts.',
+      logGoods: 'Convoy gift: +{qty} {good}.',
+      logCredits: 'Convoy gift: +{gift} cr.'
+    },
+    refugees: {
+      title: 'Refugees',
+      body: 'You gave stranded refugees {aid} cr for passage. Your reputation grew.',
+      log: 'Helped refugees: -{aid} cr, +1 reputation.'
+    },
+    bountyPayout: {
+      title: 'Grateful colony',
+      body: 'A colony you once protected rewarded you with {reward} cr.',
+      log: 'Colony reward: +{reward} cr.'
+    },
+    ancientProbe: {
+      title: 'Ancient probe',
+      body: 'You recovered a derelict alien probe and sold its tech for {value} cr.',
+      log: 'Alien probe sold: +{value} cr.'
     }
   },
   menu: {
@@ -208,7 +250,12 @@ export const en = {
     selectTarget: 'Select a destination system',
     viaWormhole: 'Via wormhole',
     wormholeTax: 'Wormhole tax',
-    unvisited: 'Unexplored'
+    unvisited: 'Unexplored',
+    questHere: 'Assignment target'
+  },
+  warp: {
+    jumping: 'Warp jump in progress',
+    skip: 'Skip'
   },
   ship: {
     title: 'Your ship',
@@ -245,25 +292,52 @@ export const en = {
   shipType: {
     flea: 'Flea',
     gnat: 'Gnat',
+    dragonfly: 'Dragonfly',
     firefly: 'Firefly',
     mosquito: 'Mosquito',
+    locust: 'Locust',
     bumblebee: 'Bumblebee',
     beetle: 'Beetle',
+    mantis: 'Mantis',
     hornet: 'Hornet',
     grasshopper: 'Grasshopper',
+    centipede: 'Centipede',
     termite: 'Termite',
-    wasp: 'Wasp'
+    scorpion: 'Scorpion',
+    wasp: 'Wasp',
+    widow: 'Widow'
   },
   encounter: {
     title: 'Encounter in space',
+    kind: {
+      trader: 'Trader',
+      pirate: 'Pirate',
+      police: 'Police',
+      bountyHunter: 'Bounty hunter',
+      alien: 'Alien'
+    },
     trader: {
       appear: 'You meet a trader flying a {ship}.',
       ignore: 'The trader goes on its way.'
+    },
+    trade: {
+      title: 'Trade with the trader',
+      onOffer: 'For sale',
+      wants: 'Will buy',
+      nothing: 'Nothing right now.'
     },
     pirate: {
       appear: 'A pirate in a {ship} attacks!',
       plundered: 'Pirates plundered your hold ({qty} units).',
       extort: 'Pirates extorted a ransom: {amount} cr.'
+    },
+    bountyHunter: {
+      appear: 'A bounty hunter in a {ship} has come to collect on your head!',
+      bribed: 'The hunter pockets {amount} cr and stands down.',
+      paid: 'You pay the hunter {amount} cr to buy your freedom.'
+    },
+    alien: {
+      appear: 'An unknown alien vessel ({ship}-class) closes in, weapons hot!'
     },
     bounty: {
       appear: 'The wanted pirate {name} attacks!',
@@ -285,6 +359,7 @@ export const en = {
       bribe: 'Offer a bribe',
       surrender: 'Surrender',
       ignore: 'Ignore',
+      leave: 'Leave',
       continue: 'Continue',
       plunder: 'Plunder'
     },

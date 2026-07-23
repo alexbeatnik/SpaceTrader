@@ -135,6 +135,129 @@ const EVENTS: EventDef[] = [
         bodyKey: 'event.wanderer.body'
       }
     }
+  },
+  {
+    id: 'ionStorm',
+    weight: 2,
+    run: (state, rng) => {
+      if (state.ship.hull <= 12) return null
+      const dmg = Math.min(state.ship.hull - 6, rng.int(4, Math.max(5, Math.round(maxHull(state.ship) * 0.12))))
+      state.ship.hull -= dmg
+      pushLog(state, 'event.ionStorm.log', { dmg })
+      return {
+        id: 'ionStorm',
+        titleKey: 'event.ionStorm.title',
+        bodyKey: 'event.ionStorm.body',
+        params: { dmg }
+      }
+    }
+  },
+  {
+    id: 'skillTrainer',
+    weight: 2,
+    run: (state, rng) => {
+      // A retired ace drills you in one discipline (each learnable once).
+      const trainable = [
+        { skill: 'pilot', flag: 'trainedPilot' },
+        { skill: 'fighter', flag: 'trainedFighter' },
+        { skill: 'trader', flag: 'trainedTrader' }
+      ] as Array<{ skill: 'pilot' | 'fighter' | 'trader'; flag: string }>
+      const options = trainable.filter(
+        (o) => (state.flags[o.flag] ?? 0) < 1 && state.skills[o.skill] < MAX_SKILL
+      )
+      if (options.length === 0) return null
+      const choice = rng.pick(options)
+      state.flags[choice.flag] = 1
+      state.skills[choice.skill] = Math.min(MAX_SKILL, state.skills[choice.skill] + 1)
+      pushLog(state, 'event.skillTrainer.log', { skill: `skill.${choice.skill}` })
+      return {
+        id: 'skillTrainer',
+        titleKey: 'event.skillTrainer.title',
+        bodyKey: 'event.skillTrainer.body',
+        params: { skill: `skill.${choice.skill}` }
+      }
+    }
+  },
+  {
+    id: 'merchantConvoy',
+    weight: 3,
+    run: (state, rng) => {
+      // A friendly convoy shares fuel money or a bit of surplus stock.
+      if (freeCargoBays(state.ship) > 0 && rng.chance(0.5)) {
+        const qty = Math.min(freeCargoBays(state.ship), rng.int(1, 4))
+        const good = rng.pick(GOOD_IDS)
+        state.ship.cargo[good] += qty
+        pushLog(state, 'event.merchantConvoy.logGoods', { qty, good })
+        const ev: GameEvent = {
+          id: 'merchantConvoy',
+          titleKey: 'event.merchantConvoy.title',
+          bodyKey: 'event.merchantConvoy.bodyGoods',
+          params: { qty, good }
+        }
+        return ev
+      }
+      const gift = rng.int(150, 900)
+      state.credits += gift
+      pushLog(state, 'event.merchantConvoy.logCredits', { gift })
+      const ev: GameEvent = {
+        id: 'merchantConvoy',
+        titleKey: 'event.merchantConvoy.title',
+        bodyKey: 'event.merchantConvoy.bodyCredits',
+        params: { gift }
+      }
+      return ev
+    }
+  },
+  {
+    id: 'refugees',
+    weight: 2,
+    run: (state, rng) => {
+      // Give a struggling family passage money; the deed earns goodwill.
+      const aid = Math.min(state.credits, rng.int(100, 500))
+      if (aid < 100) return null
+      state.credits -= aid
+      state.record.reputation += 1
+      pushLog(state, 'event.refugees.log', { aid })
+      return {
+        id: 'refugees',
+        titleKey: 'event.refugees.title',
+        bodyKey: 'event.refugees.body',
+        params: { aid }
+      }
+    }
+  },
+  {
+    id: 'bountyPayout',
+    weight: 2,
+    run: (state, rng) => {
+      // A grateful colony rewards a captain of standing.
+      if (state.record.reputation < 4) return null
+      const reward = rng.int(400, 1200) + state.record.reputation * 60
+      state.credits += reward
+      pushLog(state, 'event.bountyPayout.log', { reward })
+      return {
+        id: 'bountyPayout',
+        titleKey: 'event.bountyPayout.title',
+        bodyKey: 'event.bountyPayout.body',
+        params: { reward }
+      }
+    }
+  },
+  {
+    id: 'ancientProbe',
+    weight: 2,
+    run: (state, rng) => {
+      // Recover a drifting alien probe and sell its exotic tech.
+      const value = rng.int(500, 1800)
+      state.credits += value
+      pushLog(state, 'event.ancientProbe.log', { value })
+      return {
+        id: 'ancientProbe',
+        titleKey: 'event.ancientProbe.title',
+        bodyKey: 'event.ancientProbe.body',
+        params: { value }
+      }
+    }
   }
 ]
 

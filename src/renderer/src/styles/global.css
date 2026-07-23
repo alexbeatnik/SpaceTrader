@@ -410,6 +410,52 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
 }
 .field-label { font-size: 12px; color: var(--text-dim); text-align: left; margin-bottom: -6px; }
 
+/* --- Trader marketplace (inside the encounter modal) --- */
+.trade-panel {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: rgba(56, 224, 138, 0.06);
+  border: 1px solid rgba(56, 224, 138, 0.28);
+  border-radius: var(--radius-sm);
+}
+.trade-head {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--good);
+  margin-bottom: 10px;
+}
+.trade-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 560px) {
+  .trade-cols { grid-template-columns: 1fr; }
+}
+.trade-col-title {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+.trade-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.trade-row:last-child { border-bottom: none; }
+.trade-name { flex: 1; font-size: 13px; font-weight: 600; }
+.trade-meta {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.trade-row .btn-sm { padding: 3px 10px; }
+
 .combat-log {
   max-height: 200px;
   overflow-y: auto;
@@ -443,6 +489,103 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
   border-radius: var(--radius);
   overflow: hidden;
 }
+/* Pulsing ring marking a system that is an active quest destination. */
+.quest-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: quest-pulse 1.7s ease-in-out infinite;
+}
+@keyframes quest-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+/* --- Warp / travel animation --- */
+.warp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 50%, #0a1030 0%, #04060f 60%, #01020a 100%);
+  animation: warp-fade-in 0.25s ease;
+}
+@keyframes warp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.warp-streaks { position: absolute; inset: 0; pointer-events: none; }
+.warp-streak {
+  position: absolute;
+  right: -260px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent) 40%, #fff);
+  animation-name: warp-fly;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+@keyframes warp-fly {
+  from { transform: translateX(0) scaleX(0.2); opacity: 0; }
+  10% { opacity: 1; }
+  to { transform: translateX(-118vw) scaleX(1); opacity: 0; }
+}
+
+.warp-core {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.warp-route {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.warp-route .warp-from { color: var(--text-dim); }
+.warp-route .warp-to { color: var(--accent); }
+.warp-route .warp-arrow { color: var(--accent-2); font-size: 18px; }
+
+.warp-ship {
+  filter: drop-shadow(0 0 26px rgba(79, 209, 255, 0.55));
+  animation: warp-bob 1.7s ease-in-out infinite;
+}
+@keyframes warp-bob {
+  0%, 100% { transform: translateY(-5px); }
+  50% { transform: translateY(5px); }
+}
+.warp-sub { color: var(--text-dim); font-size: 13px; }
+
+.warp-progress {
+  width: 340px;
+  max-width: 70vw;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.warp-progress > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 0.1s linear;
+}
+.warp-caption {
+  color: var(--text-faint);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  animation: warp-pulse 1.2s ease-in-out infinite;
+}
+@keyframes warp-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.warp-skip { margin-top: 6px; opacity: 0.8; }
 
 .log-list { display: flex; flex-direction: column; gap: 2px; }
 .log-entry {

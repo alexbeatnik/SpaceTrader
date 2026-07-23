@@ -124,14 +124,20 @@ export type SystemStatus =
 export type ShipTypeId =
   | 'flea'
   | 'gnat'
+  | 'dragonfly'
   | 'firefly'
   | 'mosquito'
+  | 'locust'
   | 'bumblebee'
   | 'beetle'
+  | 'mantis'
   | 'hornet'
   | 'grasshopper'
+  | 'centipede'
   | 'termite'
+  | 'scorpion'
   | 'wasp'
+  | 'widow'
 
 export interface ShipType {
   id: ShipTypeId
@@ -267,7 +273,13 @@ export interface LogEntry {
 }
 
 // --- Quests ------------------------------------------------------------------
-export type QuestType = 'delivery' | 'relief' | 'bounty'
+export type QuestType =
+  | 'delivery'
+  | 'relief'
+  | 'bounty'
+  | 'passenger'
+  | 'smuggle'
+  | 'fetch'
 export type QuestStatus = 'offered' | 'active' | 'completed'
 
 export interface Quest {
@@ -277,9 +289,11 @@ export interface Quest {
   targetSystem: number
   reward: number
   status: QuestStatus
-  /** relief: good and amount that must be delivered to the target. */
+  /** relief / smuggle / fetch: good and amount that must be delivered. */
   good?: GoodId
   amount?: number
   /** bounty: name of the wanted pirate to destroy. */
   bountyName?: string
+  /** passenger: name of the VIP being transported. */
+  passengerName?: string
 }

@@ -15,12 +15,43 @@ import {
   sellWeapon
 } from './game'
 import { warp } from './warp'
+import { resolveRound, tradeBuy, tradeSell } from './combat'
+import type { Encounter, EncounterKind, Opponent } from './combat'
 import { generateGalaxy, SYSTEM_COUNT } from './galaxy'
 import { standardPrice } from './market'
-import { TRADE_GOODS } from '../data/goods'
+import { TRADE_GOODS, GOOD_IDS } from '../data/goods'
+import { SHIP_TYPES, SHIP_TYPE_IDS } from '../data/ships'
+import { MERCENARIES, MERCENARY_IDS } from '../data/mercenaries'
 import { reachableSystems } from './travel'
-import { acceptQuest, checkQuestArrival, completeBounty } from './quests'
-import type { Quest } from './types'
+import { acceptQuest, checkQuestArrival, completeBounty, generateQuestOffer } from './quests'
+import { Rng } from './rng'
+import type { Quest, GoodId } from './types'
+
+// --- Test helpers ------------------------------------------------------------
+function emptyCargo(): Record<GoodId, number> {
+  const rec = {} as Record<GoodId, number>
+  for (const g of GOOD_IDS) rec[g] = 0
+  return rec
+}
+
+/** Build an ongoing encounter with an inert opponent, overriding as needed. */
+function testEncounter(kind: EncounterKind, opp: Partial<Opponent> = {}): Encounter {
+  const opponent: Opponent = {
+    kind,
+    shipType: 'gnat',
+    hull: 100,
+    maxHull: 100,
+    shieldPoints: 0,
+    maxShield: 0,
+    weaponPower: 0,
+    pilot: 0,
+    fighter: 5,
+    cargo: emptyCargo(),
+    fleeing: false,
+    ...opp
+  }
+  return { kind, opponent, status: 'ongoing', round: 0, bribeCost: 0, messages: [] }
+}
 
 describe('galaxy generation', () => {
   it('is deterministic for a given seed', () => {
@@ -189,6 +220,76 @@ describe('quests', () => {
     expect(g.ship.cargo.medicine).toBe(2)
   })
 
+  it('passenger quest completes on arrival at the destination', () => {
+    const g = newGame({ commanderName: 'Test', seed: 44 })
+    const target = g.systems.find((s) => s.id !== g.currentSystem)!
+    const quest: Quest = {
+      id: 'test-passenger',
+      type: 'passenger',
+      giverSystem: g.currentSystem,
+      targetSystem: target.id,
+      reward: 2000,
+      status: 'offered',
+      passengerName: 'Envoy Sarn'
+    }
+    acceptQuest(g, quest)
+    const before = g.credits
+    g.currentSystem = target.id
+    const done = checkQuestArrival(g)
+    expect(done.map((q) => q.id)).toContain('test-passenger')
+    expect(g.credits).toBe(before + 2000)
+  })
+
+  it('smuggle quest requires the contraband in the hold and consumes it', () => {
+    const g = newGame({ commanderName: 'Test', seed: 45 })
+    const target = g.systems.find((s) => s.id !== g.currentSystem)!
+    const quest: Quest = {
+      id: 'test-smuggle',
+      type: 'smuggle',
+      giverSystem: g.currentSystem,
+      targetSystem: target.id,
+      reward: 5000,
+      status: 'offered',
+      good: 'firearms',
+      amount: 3
+    }
+    acceptQuest(g, quest)
+    g.currentSystem = target.id
+    expect(checkQuestArrival(g).length).toBe(0)
+    g.ship.cargo.firearms = 4
+    const before = g.credits
+    expect(checkQuestArrival(g).length).toBe(1)
+    expect(g.credits).toBe(before + 5000)
+    expect(g.ship.cargo.firearms).toBe(1)
+  })
+
+  it('fetch quest completes when the goods are returned to the giver system', () => {
+    const g = newGame({ commanderName: 'Test', seed: 46 })
+    const giver = g.currentSystem
+    const quest: Quest = {
+      id: 'test-fetch',
+      type: 'fetch',
+      giverSystem: giver,
+      targetSystem: giver, // must return here
+      reward: 1800,
+      status: 'offered',
+      good: 'ore',
+      amount: 4
+    }
+    acceptQuest(g, quest)
+    // Fly away — no completion elsewhere.
+    const elsewhere = g.systems.find((s) => s.id !== giver)!
+    g.currentSystem = elsewhere.id
+    expect(checkQuestArrival(g).length).toBe(0)
+    // Return with the goods.
+    g.currentSystem = giver
+    g.ship.cargo.ore = 4
+    const before = g.credits
+    expect(checkQuestArrival(g).length).toBe(1)
+    expect(g.credits).toBe(before + 1800)
+    expect(g.ship.cargo.ore).toBe(0)
+  })
+
   it('bounty completion pays reward and raises reputation', () => {
     const g = newGame({ commanderName: 'Test', seed: 43 })
     const quest: Quest = {
@@ -207,6 +308,121 @@ describe('quests', () => {
     expect(q).not.toBeNull()
     expect(g.credits).toBe(before + 4000)
     expect(g.record.reputation).toBeGreaterThan(rep)
+  })
+})
+
+describe('data integrity', () => {
+  it('every ship type has a complete, sane stat block', () => {
+    for (const id of SHIP_TYPE_IDS) {
+      const s = SHIP_TYPES[id]
+      expect(s.id).toBe(id)
+      expect(s.price).toBeGreaterThan(0)
+      expect(s.hullStrength).toBeGreaterThan(0)
+      expect(s.fuelTanks).toBeGreaterThan(0)
+      expect(s.crewQuarters).toBeGreaterThanOrEqual(1)
+    }
+    for (const id of ['dragonfly', 'locust', 'mantis', 'centipede', 'scorpion', 'widow'] as const) {
+      expect(SHIP_TYPE_IDS).toContain(id)
+    }
+  })
+
+  it('every mercenary has four skills and a positive wage', () => {
+    for (const id of MERCENARY_IDS) {
+      const m = MERCENARIES[id]
+      expect(m.id).toBe(id)
+      expect(m.wage).toBeGreaterThan(0)
+      for (const k of ['pilot', 'fighter', 'trader', 'engineer'] as const) {
+        expect(m.skills[k]).toBeGreaterThanOrEqual(0)
+      }
+    }
+    expect(MERCENARY_IDS).toContain('zane')
+  })
+})
+
+describe('encounter kinds', () => {
+  it('surrendering to a bounty hunter costs a ransom but ends the fight', () => {
+    const g = newGame({ commanderName: 'Test', seed: 72 })
+    g.credits = 10000
+    const enc = testEncounter('bountyHunter')
+    resolveRound(g, enc, 'surrender', new Rng(1))
+    expect(enc.status).toBe('playerSurrendered')
+    expect(g.credits).toBe(6500) // max(500, round(10000 * 0.35)) = 3500 taken
+  })
+
+  it('a corruptible bounty hunter can be bribed', () => {
+    const g = newGame({ commanderName: 'Test', seed: 73 })
+    g.credits = 10000
+    const enc = testEncounter('bountyHunter')
+    enc.bribeCost = 500
+    resolveRound(g, enc, 'bribe', new Rng(1))
+    expect(enc.status).toBe('bribed')
+    expect(g.credits).toBe(9500)
+  })
+
+  it('destroying an alien vessel raises combat reputation', () => {
+    const g = newGame({ commanderName: 'Test', seed: 74 })
+    g.skills.fighter = 13 // near-certain hits
+    const enc = testEncounter('alien', { hull: 1, maxHull: 1, pilot: 0, weaponPower: 0 })
+    const repBefore = g.record.reputation
+    const rng = new Rng(5)
+    let guard = 0
+    while (enc.status === 'ongoing' && guard++ < 100) resolveRound(g, enc, 'attack', rng)
+    expect(enc.status).toBe('oppDestroyed')
+    expect(g.record.reputation).toBeGreaterThan(repBefore)
+  })
+})
+
+describe('trader trading', () => {
+  it('buys goods from a met trader: credits down, cargo up, stock down', () => {
+    const g = newGame({ commanderName: 'Test', seed: 61 })
+    g.credits = 10000
+    const enc = testEncounter('trader', { cargo: { ...emptyCargo(), water: 5 } })
+    enc.trade = { sells: { water: { price: 20, qty: 5 } }, buys: {} }
+    const res = tradeBuy(g, enc, 'water', 3)
+    expect(res.ok).toBe(true)
+    expect(g.credits).toBe(10000 - 60)
+    expect(g.ship.cargo.water).toBe(3)
+    expect(enc.trade.sells.water?.qty).toBe(2)
+  })
+
+  it('sells goods to a met trader: credits up, cargo down', () => {
+    const g = newGame({ commanderName: 'Test', seed: 62 })
+    g.ship.cargo.furs = 4
+    const before = g.credits
+    const enc = testEncounter('trader')
+    enc.trade = { sells: {}, buys: { furs: 200 } }
+    const res = tradeSell(g, enc, 'furs', 2)
+    expect(res.ok).toBe(true)
+    expect(g.ship.cargo.furs).toBe(2)
+    expect(g.credits).toBe(before + 400)
+  })
+
+  it('refuses to trade a good the trader is not dealing in', () => {
+    const g = newGame({ commanderName: 'Test', seed: 63 })
+    const enc = testEncounter('trader')
+    enc.trade = { sells: {}, buys: {} }
+    expect(tradeBuy(g, enc, 'water', 1).ok).toBe(false)
+    expect(tradeSell(g, enc, 'water', 1).ok).toBe(false)
+  })
+})
+
+describe('quest generation', () => {
+  it('offers the full range of quest types over many rolls', () => {
+    const g = newGame({ commanderName: 'Test', seed: 999 })
+    g.ship.type = 'bumblebee' // spare quarters so passenger quests can appear
+    const seen = new Set<string>()
+    for (let i = 0; i < 800; i++) {
+      g.quests = []
+      const q = generateQuestOffer(g, new Rng((i * 2654435761 + 1) >>> 0))
+      if (q) {
+        expect(q.targetSystem).toBeGreaterThanOrEqual(0)
+        expect(q.reward).toBeGreaterThan(0)
+        seen.add(q.type)
+      }
+    }
+    for (const type of ['delivery', 'smuggle', 'passenger', 'bounty', 'fetch']) {
+      expect(seen).toContain(type)
+    }
   })
 })
 

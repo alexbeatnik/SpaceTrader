@@ -16,7 +16,10 @@ A modern desktop remake of the classic *Space Trader* game, built with
 2. **Never hard-code user-facing strings in the engine or components.** The
    engine emits stable ids + params; the UI resolves them via `@i18n/index`
    (`t`, `renderMessage`, and the `*Name` helpers). Add new strings to **both**
-   `en.ts` and `uk.ts` with matching key structure.
+   `en.ts` and `uk.ts` with matching key structure. A message param may itself
+   carry an i18n key to be localized inline — `renderMessage` auto-translates
+   `good`, `ship`, `name` (mercenary), and any `skill`/`status` param whose value
+   starts with `skill.`/`status.`.
 3. **Keep the engine pure.** Everything under `src/game/` must have **no imports
    from React, Electron, the DOM, or the renderer.** The engine takes and mutates
    a plain `GameState` and returns typed `ActionResult`s. This keeps it testable
@@ -39,6 +42,26 @@ A modern desktop remake of the classic *Space Trader* game, built with
   `ActionResult`s into toasts via `renderMessage`.
 - `src/main/` + `src/preload/` — Electron shell and the save/load IPC
   (`window.api.saveGame/loadGame/hasSave`).
+
+### Travel animation (deferred encounters)
+
+`warp()` in the engine is synchronous: it mutates `GameState` (fuel, day,
+position, market) and returns a `WarpResult` bundling any encounter/event/quest
+offer. To keep a jump from feeling instantaneous, the store splits this into two
+phases:
+
+- `warpTo(targetId)` runs `warp()`, stashes the result in a module-level
+  `pendingWarp`, and sets a `travel: TravelAnim` descriptor **instead of**
+  surfacing the encounter/event/offer.
+- `<WarpTransition>` renders while `travel` is set (a skippable, timed overlay),
+  then calls `finishTravel()`, which moves `pendingWarp` into the reactive
+  `encounter`/`event`/`questOffer` fields and clears `travel`.
+
+So the combat/event/offer modals only mount **after** the animation. When adding
+flow that runs on arrival, thread it through `WarpResult` → `pendingWarp` →
+`finishTravel`, not directly out of `warpTo`. Note: `pendingWarp` lives outside
+reactive state and is not persisted, so a hard close mid-animation drops that
+one pending encounter (acceptable).
 
 ### Adding a game mechanic (typical flow)
 
@@ -78,6 +101,18 @@ imports tidy.
 - Electron main/preload are built as **CommonJS** (no `"type": "module"` in
   `package.json`). Don't add it back — ESM main triggered a CJS-interop crash on
   startup with this Electron version.
+- **Store changes need a dev restart.** Vite HMR does not re-run the Zustand
+  `create()` closure, so edits to `gameStore.ts` actions (e.g. `warpTo`) may keep
+  running the old implementation until `npm run dev` is restarted. If new UI
+  behavior "doesn't take", restart dev before assuming a bug.
+- **Packaging on Windows (`npm run dist`)** can fail while extracting
+  electron-builder's `winCodeSign` cache with `Cannot create symbolic link: A
+  required privilege is not held by the client` — that archive contains macOS
+  symlinks Windows can't create without Developer Mode/admin. Workaround: manually
+  extract the cached archive into `winCodeSign-2.6.0`, excluding the macOS folder,
+  e.g. `7za x <cache>/winCodeSign/<hash>.7z -o<cache>/winCodeSign/winCodeSign-2.6.0
+  -xr!darwin`, then re-run `npm run dist`. Code signing is skipped (no cert), so
+  the produced installer is unsigned.
 
 ## Conventions
 
