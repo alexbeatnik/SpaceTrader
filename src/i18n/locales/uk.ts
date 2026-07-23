@@ -256,7 +256,12 @@ export const uk = {
     viaWormhole: 'Через червоточину',
     wormholeTax: 'Плата за червоточину',
     unvisited: 'Не досліджено',
-    questHere: 'Ціль завдання'
+    questHere: 'Ціль завдання',
+    priceTable: 'Ціни та навар за одиницю',
+    buyCol: 'Купівля',
+    sellCol: 'Продаж',
+    margin: 'Навар/од',
+    marginHint: 'Навар за одиницю: купити у поточній системі, продати тут.'
   },
   warp: {
     jumping: 'Триває варп-стрибок',

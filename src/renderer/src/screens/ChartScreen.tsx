@@ -6,10 +6,8 @@ import {
   systemDistance,
   maxRange,
   POLITICS,
-  TRADE_GOODS,
   GOOD_IDS,
   TECH_LEVEL_IDS,
-  standardPrice,
   GALAXY_WIDTH,
   GALAXY_HEIGHT,
   wormholeTax
@@ -251,15 +249,52 @@ export function ChartScreen(): React.JSX.Element {
 
               {selected.visited && (
                 <div style={{ marginTop: 14 }}>
-                  <div className="screen-sub" style={{ marginBottom: 4 }}>{t('market.avgPrice')}</div>
-                  {GOOD_IDS.filter((id) => standardPrice(TRADE_GOODS[id], selected) > 0)
-                    .slice(0, 6)
-                    .map((id) => (
-                      <div className="kv" key={id} style={{ padding: '3px 0' }}>
-                        <span className="k">{goodName(id)}</span>
-                        <span className="v">{fmt(standardPrice(TRADE_GOODS[id], selected))}</span>
-                      </div>
-                    ))}
+                  <div className="screen-sub" style={{ marginBottom: 6 }}>{t('chart.priceTable')}</div>
+                  <div className="chart-price-wrap">
+                    <table className="chart-price-table">
+                      <thead>
+                        <tr>
+                          <th>{t('market.good')}</th>
+                          <th className="num">{t('chart.buyCol')}</th>
+                          <th className="num">{t('chart.sellCol')}</th>
+                          <th className="num" title={t('chart.marginHint')}>{t('chart.margin')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {GOOD_IDS.filter(
+                          (id) => selected.buyPrice[id] > 0 || selected.sellPrice[id] > 0
+                        ).map((id) => {
+                          const buyP = selected.buyPrice[id]
+                          const sellP = selected.sellPrice[id]
+                          const hereBuy = here.buyPrice[id]
+                          // Profit per unit: buy at the current system, sell here.
+                          const margin =
+                            selected.id !== here.id && sellP > 0 && hereBuy > 0
+                              ? sellP - hereBuy
+                              : null
+                          return (
+                            <tr key={id}>
+                              <td>{goodName(id)}</td>
+                              <td className="num">{buyP > 0 ? fmt(buyP) : '—'}</td>
+                              <td className="num">{sellP > 0 ? fmt(sellP) : '—'}</td>
+                              <td
+                                className={`num ${
+                                  margin === null ? 'muted' : margin > 0 ? 'pos' : margin < 0 ? 'neg' : ''
+                                }`}
+                              >
+                                {margin === null ? '—' : (margin > 0 ? '+' : '') + fmt(margin)}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {selected.id !== here.id && (
+                    <div className="muted" style={{ marginTop: 6, fontSize: 11 }}>
+                      {t('chart.marginHint')}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

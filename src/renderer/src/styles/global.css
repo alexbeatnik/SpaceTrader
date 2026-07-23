@@ -507,6 +507,12 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
   border-radius: var(--radius);
   overflow: hidden;
 }
+/* Compact price/profit table in the star-chart detail panel. */
+.chart-price-wrap { overflow-x: auto; }
+.chart-price-table { font-size: 12px; }
+.chart-price-table th { padding: 5px 6px; font-size: 9.5px; }
+.chart-price-table td { padding: 5px 6px; }
+
 /* Pulsing ring marking a system that is an active quest destination. */
 .quest-ring {
   transform-box: fill-box;

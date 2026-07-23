@@ -256,7 +256,12 @@ export const en = {
     viaWormhole: 'Via wormhole',
     wormholeTax: 'Wormhole tax',
     unvisited: 'Unexplored',
-    questHere: 'Assignment target'
+    questHere: 'Assignment target',
+    priceTable: 'Prices & profit per unit',
+    buyCol: 'Buy',
+    sellCol: 'Sell',
+    margin: 'Profit/u',
+    marginHint: 'Profit per unit: buy at your current system, sell here.'
   },
   warp: {
     jumping: 'Warp jump in progress',
