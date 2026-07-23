@@ -1,6 +1,6 @@
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
-import { currentSystem, canTurnIn, questSupply, type Quest } from '@game/index'
+import { currentSystem, canTurnIn, questSupply, freeCargoBays, type Quest } from '@game/index'
 import { goodName } from '@i18n/index'
 import { questDescription, questTypeLabel } from '../util/questText'
 import { fmt } from '../util/format'
@@ -17,7 +17,9 @@ const ICON: Record<string, string> = {
 export function QuestsScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
   const acceptBoard = useGameStore((s) => s.acceptBoardQuest)
+  const abandon = useGameStore((s) => s.abandonQuest)
   const turnIn = useGameStore((s) => s.turnInQuest)
+  const buy = useGameStore((s) => s.buy)
   const { t } = useI18n()
 
   const here = currentSystem(game)
@@ -95,6 +97,15 @@ export function QuestsScreen(): React.JSX.Element {
         <div className="grid" style={{ gap: 12 }}>
           {active.map((q) => {
             const ready = canTurnIn(game, q)
+            const need = questSupply(q)
+            const missing = need ? Math.max(0, need.amount - game.ship.cargo[need.good]) : 0
+            // The supply shortcut only works where the good is actually sold.
+            const canBuyHere =
+              need !== null &&
+              missing > 0 &&
+              here.buyPrice[need.good] > 0 &&
+              here.qty[need.good] > 0 &&
+              freeCargoBays(game.ship) > 0
             return (
               <div className="panel panel-pad" key={q.id}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -105,23 +116,40 @@ export function QuestsScreen(): React.JSX.Element {
                     <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                       📍 {t('quest.takenAt', { system: game.systems[q.giverSystem]?.nameId ?? '—' })}
                       {' · '}🎯 {game.systems[q.targetSystem]?.nameId ?? '—'}
-                      {questSupply(q) && <> · <Progress q={q} /></>}
+                      {need && <> · <Progress q={q} /></>}
                     </div>
+                    {need && missing > 0 && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ marginTop: 6 }}
+                        disabled={!canBuyHere}
+                        onClick={() => buy(need.good, missing)}
+                      >
+                        🛒 {t('quest.buySupplies')}
+                      </button>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
-                    {q.type === 'bounty' ? (
-                      <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>{t('quest.viaCombat')}</div>
-                    ) : (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                      {q.type === 'bounty' ? (
+                        <div className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>{t('quest.viaCombat')}</div>
+                      ) : (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          disabled={!ready}
+                          onClick={() => turnIn(q.id)}
+                        >
+                          {t('quest.turnIn')}
+                        </button>
+                      )}
                       <button
-                        className="btn btn-sm btn-primary"
-                        style={{ marginTop: 6 }}
-                        disabled={!ready}
-                        onClick={() => turnIn(q.id)}
+                        className="btn btn-sm btn-danger"
+                        onClick={() => abandon(q.id)}
                       >
-                        {t('quest.turnIn')}
+                        {t('quest.abandon')}
                       </button>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>

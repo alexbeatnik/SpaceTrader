@@ -51,6 +51,8 @@ export const uk = {
     board: 'Дошка завдань',
     boardEmpty: 'Наразі тут немає оголошень.',
     turnIn: 'Здати',
+    abandon: 'Відмовитись',
+    buySupplies: 'Купити припаси',
     rewardTitle: 'Завдання виконано!',
     readyToast: 'Тут можна здати завдань: {count} — відкрийте «Завдання».',
     viaCombat: 'знищити в бою',
@@ -71,6 +73,7 @@ export const uk = {
       fetch: 'Роздобути {amount} × {good} і привезти назад до {system}.'
     },
     accepted: 'Прийнято доручення — винагорода {reward} кр.',
+    abandoned: 'Доручення скасовано.',
     completed: 'Доручення виконано — винагорода {reward} кр.',
     completedToast: 'Завдання виконано! +{reward} кр',
     takenAt: 'Отримано в {system}',
@@ -384,8 +387,8 @@ export const uk = {
       appear: 'Невідомий інопланетний корабель (клас {ship}) наближається, зброя напоготові!'
     },
     bounty: {
-      appear: 'Розшукуваний пірат {name} нападає!',
-      done: '{name} знищено! Винагорода {reward} кр.'
+      appear: 'Розшукуваний пірат {bounty} нападає!',
+      done: '{bounty} знищено! Винагорода {reward} кр.'
     },
     police: {
       appear: 'Поліцейський патруль на {ship} вимагає зупинитися.',
@@ -486,7 +489,8 @@ export const uk = {
     tooManyQuests: 'У вас і так забагато активних завдань.',
     questGone: 'Це оголошення вже недоступне.',
     noMineSite: 'Тут немає що видобувати.',
-    holdFull: 'Вантажний трюм повний.'
+    holdFull: 'Вантажний трюм повний.',
+    loadFailed: 'Не вдалося завантажити файл збереження — можливо, він пошкоджений.'
   },
   tech: {
     preAgricultural: 'Доаграрний',

@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { ShipTypeId } from '@game/index'
 
 interface Props {
@@ -210,6 +211,9 @@ const HULLS: Record<
 
 export function ShipArt({ type, size = 64, flip = false, accent }: Props): React.JSX.Element {
   const hull = HULLS[type] ?? HULLS.gnat
+  // Unique per instance: two same-type ships (player vs opponent in combat)
+  // would otherwise collide on the gradient id and share the first one's paint.
+  const glowId = `glow-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   return (
     <svg
       width={size}
@@ -218,12 +222,12 @@ export function ShipArt({ type, size = 64, flip = false, accent }: Props): React
       style={{ transform: flip ? 'scaleX(-1)' : undefined, overflow: 'visible' }}
     >
       <defs>
-        <radialGradient id={`glow-${type}`} cx="50%" cy="50%" r="50%">
+        <radialGradient id={glowId} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor={accent ?? hull.accent} stopOpacity="0.25" />
           <stop offset="100%" stopColor={accent ?? hull.accent} stopOpacity="0" />
         </radialGradient>
       </defs>
-      <circle cx="50" cy="50" r="46" fill={`url(#glow-${type})`} />
+      <circle cx="50" cy="50" r="46" fill={`url(#${glowId})`} />
       <g strokeWidth={2} strokeLinejoin="round">
         {hull.body}
       </g>

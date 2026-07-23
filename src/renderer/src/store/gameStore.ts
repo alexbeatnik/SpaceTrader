@@ -30,6 +30,7 @@ import {
   tradeSell,
   acceptQuest,
   acceptBoardQuest,
+  abandonQuest,
   buyQuestSupplies,
   turnInQuest,
   generateQuestBoard,
@@ -165,6 +166,7 @@ interface GameStore {
   acceptQuestOfferBuying: () => void
   declineQuestOffer: () => void
   acceptBoardQuest: (questId: string) => void
+  abandonQuest: (questId: string) => void
   turnInQuest: (questId: string) => void
   dismissQuestReward: () => void
 }
@@ -247,15 +249,18 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     loadGame: async () => {
       if (typeof window === 'undefined' || !window.api) return false
-      const data = await window.api.loadGame()
-      if (!data) return false
       try {
+        const data = await window.api.loadGame()
+        if (!data) return false
         const game = JSON.parse(data) as GameState
         ensureBoard(game)
         pendingWarp = null
         set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, gameOver: false, travel: null })
         return true
       } catch {
+        // Corrupt save file or a failed read — tell the player instead of
+        // silently doing nothing.
+        set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage('error.loadFailed') } })
         return false
       }
     },
@@ -263,7 +268,11 @@ export const useGameStore = create<GameStore>((set, get) => {
     saveGame: async () => {
       const g = get().game
       if (!g || typeof window === 'undefined' || !window.api) return
-      await window.api.saveGame(JSON.stringify(g))
+      try {
+        await window.api.saveGame(JSON.stringify(g))
+      } catch {
+        // A failed save must not crash the game; the next auto-save retries.
+      }
     },
 
     setScreen: (s) => set({ screen: s }),
@@ -435,6 +444,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (!enc) return
         plunder(g, enc)
         set({ game: clone(g), encounter: clone(enc) })
+        void get().saveGame()
       }),
 
     tradeBuyFromTrader: (good, amount) =>
@@ -510,6 +520,13 @@ export const useGameStore = create<GameStore>((set, get) => {
     acceptBoardQuest: (questId) =>
       withGame((g) => {
         const res = acceptBoardQuest(g, questId)
+        applyResult(g, res)
+        if (res.ok) void get().saveGame()
+      }),
+
+    abandonQuest: (questId) =>
+      withGame((g) => {
+        const res = abandonQuest(g, questId)
         applyResult(g, res)
         if (res.ok) void get().saveGame()
       }),

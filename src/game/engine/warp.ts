@@ -74,7 +74,7 @@ export function warp(state: GameState, targetId: number): WarpResult {
     if (encounter && encounter.kind === 'pirate') {
       encounter.bountyQuestId = bounty.id
       encounter.bountyName = bounty.bountyName
-      encounter.messages = [{ key: 'encounter.bounty.appear', params: { name: bounty.bountyName } }]
+      encounter.messages = [{ key: 'encounter.bounty.appear', params: { bounty: bounty.bountyName } }]
     } else if (!encounter && rng.chance(0.35)) {
       encounter = createBountyEncounter(state, bounty.id, bounty.bountyName, rng)
     }

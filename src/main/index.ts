@@ -46,16 +46,25 @@ function createWindow(): void {
 
 // --- Persistence IPC ---------------------------------------------------------
 ipcMain.handle('save:write', async (_e, data: string) => {
-  const dir = SAVE_DIR()
-  if (!existsSync(dir)) await mkdir(dir, { recursive: true })
-  await writeFile(SAVE_FILE(), data, 'utf-8')
-  return true
+  try {
+    const dir = SAVE_DIR()
+    if (!existsSync(dir)) await mkdir(dir, { recursive: true })
+    await writeFile(SAVE_FILE(), data, 'utf-8')
+    return true
+  } catch {
+    // Disk errors must not reject into the renderer's fire-and-forget save.
+    return false
+  }
 })
 
 ipcMain.handle('save:read', async () => {
-  const file = SAVE_FILE()
-  if (!existsSync(file)) return null
-  return await readFile(file, 'utf-8')
+  try {
+    const file = SAVE_FILE()
+    if (!existsSync(file)) return null
+    return await readFile(file, 'utf-8')
+  } catch {
+    return null
+  }
 })
 
 ipcMain.handle('save:exists', async () => existsSync(SAVE_FILE()))

@@ -5,7 +5,7 @@ import {
   totalCargoBays,
   usedCargoBays,
   maxHull,
-  SHIP_TYPES,
+  maxFuel,
   currentSystem
 } from '@game/index'
 import { LocaleToggle } from './LocaleToggle'
@@ -14,7 +14,6 @@ export function Hud(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
   const { t } = useI18n()
   const ship = game.ship
-  const type = SHIP_TYPES[ship.type]
   const sys = currentSystem(game)
 
   return (
@@ -38,7 +37,7 @@ export function Hud(): React.JSX.Element {
       <div className="hud-stat">
         <span className="label">{t('hud.fuel')}</span>
         <span className="value">
-          {ship.fuel}/{type.fuelTanks}
+          {ship.fuel}/{maxFuel(ship)}
         </span>
       </div>
       <div className="hud-stat">

@@ -37,6 +37,7 @@ import {
   generateQuestOffer,
   generateQuestBoard,
   acceptBoardQuest,
+  abandonQuest,
   buyQuestSupplies,
   questSupplyMissing,
   questSupply,
@@ -500,6 +501,26 @@ describe('quests', () => {
     expect(g.record.reputation).toBeGreaterThan(rep)
   })
 
+  it('an active quest can be abandoned and leaves the journal', () => {
+    const g = newGame({ commanderName: 'Test', seed: 49 })
+    const quest: Quest = {
+      id: 'test-abandon',
+      type: 'delivery',
+      giverSystem: g.currentSystem,
+      targetSystem: g.systems[1].id,
+      reward: 1000,
+      status: 'offered'
+    }
+    acceptQuest(g, quest)
+    expect(g.quests.some((q) => q.id === 'test-abandon')).toBe(true)
+
+    const res = abandonQuest(g, 'test-abandon')
+    expect(res.ok).toBe(true)
+    expect(g.quests.some((q) => q.id === 'test-abandon')).toBe(false)
+    // Abandoning twice (or a non-active quest) fails.
+    expect(abandonQuest(g, 'test-abandon').ok).toBe(false)
+  })
+
   it('buys a cargo quest\'s required goods on the spot', () => {
     const g = newGame({ commanderName: 'Test', seed: 47 })
     g.credits = 100000
@@ -538,6 +559,10 @@ describe('data integrity', () => {
       expect(s.hullStrength).toBeGreaterThan(0)
       expect(s.fuelTanks).toBeGreaterThan(0)
       expect(s.crewQuarters).toBeGreaterThanOrEqual(1)
+      // Every hull can mount at least one weapon, shield and gadget.
+      expect(s.weaponSlots).toBeGreaterThanOrEqual(1)
+      expect(s.shieldSlots).toBeGreaterThanOrEqual(1)
+      expect(s.gadgetSlots).toBeGreaterThanOrEqual(1)
     }
     for (const id of ['dragonfly', 'locust', 'mantis', 'centipede', 'scorpion', 'widow'] as const) {
       expect(SHIP_TYPE_IDS).toContain(id)

@@ -335,6 +335,18 @@ export function turnInQuest(state: GameState, questId: string): Quest | null {
   return q
 }
 
+/**
+ * Abandon an active quest: it leaves the journal without a reward. Any goods
+ * already bought for it stay in the hold (they can be sold or used elsewhere).
+ */
+export function abandonQuest(state: GameState, questId: string): ActionResult {
+  const idx = state.quests.findIndex((q) => q.id === questId && q.status === 'active')
+  if (idx < 0) return { ok: false, error: 'error.questGone' }
+  const [q] = state.quests.splice(idx, 1)
+  pushLog(state, 'quest.abandoned', questParams(state, q))
+  return { ok: true, info: { key: 'quest.abandoned', params: questParams(state, q) } }
+}
+
 /** Mark a bounty quest complete (called from combat when the target dies). */
 export function completeBounty(state: GameState, questId: string): Quest | null {
   const q = state.quests.find((x) => x.id === questId && x.status === 'active')

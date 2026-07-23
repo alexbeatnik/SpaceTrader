@@ -36,7 +36,8 @@ Core systems implemented:
   (streaking stars, your ship, distance and day) so travel isn't instantaneous.
 - **Star chart** — interactive map with a fuel-range ring, wormhole links, and
   **pulsing markers on active quest destinations** (with where each job was taken
-  and its reward).
+  and its reward). A marker glows **dim** while you lack the goods needed for
+  that job's hand-in, and bright once your hold has everything required.
 - **Encounters & combat** — turn-based fights that can be a lone ship or a whole
   group: **pirate ambushes** (up to 5 ships) and **trader caravans** you fight
   through one ship at a time, each dropping loot when destroyed. Police
@@ -51,8 +52,12 @@ Core systems implemented:
   varied sizes (small runs to bulk freighter contracts) across **six types**:
   courier deliveries, relief missions, bounty hunts, VIP **passenger** transport,
   high-risk **smuggling** runs, and **supply contracts**. Buy the required goods
-  on the spot when accepting, track coloured have/need progress, then **hand jobs
-  in manually** at the destination for a reward that always beats plain trading.
+  on the spot when accepting (or later, via the **buy-supplies shortcut** on the
+  job card — active wherever the goods are actually sold), track coloured
+  have/need progress, then **hand jobs in manually** at the destination for a
+  reward that always beats plain trading. A **badge on the Quests tab** counts
+  the jobs you can hand in right here, and any assignment can be **abandoned**
+  at any time.
 - **Special events** — one-off events on quiet arrivals: derelicts, fuel leaks,
   micrometeorites, ion storms, tolls, lotteries, news tips, veteran instructors,
   friendly convoys, refugees, colony rewards, and ancient alien probes.
@@ -62,7 +67,8 @@ Core systems implemented:
   elite Widow flagship, five laser tiers, three shield tiers, seven gadgets
   (extra bays, fuel compactor, hidden compartment, cloaking, …), refuel/repair,
   **hull-reinforcement upgrades** (+HP), escape pods, and sell-back of installed
-  equipment.
+  equipment. Every hull mounts at least one weapon, shield and gadget slot, so
+  any ship can be outfitted — even the humble Flea.
 - **Ship art** — every hull has its own hand-built SVG silhouette, shown in the
   ship view, shipyard, combat, and the warp animation.
 - **Save/Load** — a single persistent save stored in the app's user-data folder.

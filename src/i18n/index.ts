@@ -8,8 +8,8 @@ const DICTS: Record<Locale, Dict> = { uk, en }
 export const LOCALES: Locale[] = ['uk', 'en']
 const STORAGE_KEY = 'star-trader:locale'
 
-let current: Locale =
-  (typeof localStorage !== 'undefined' && (localStorage.getItem(STORAGE_KEY) as Locale)) || 'en'
+const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
+let current: Locale = LOCALES.includes(stored as Locale) ? (stored as Locale) : 'en'
 
 const listeners = new Set<() => void>()
 
@@ -73,9 +73,11 @@ export function renderMessage(
 ): string {
   if (!params) return t(key)
   const mapped: Record<string, string | number> = { ...params }
-  if (typeof mapped.good === 'string') mapped.good = goodName(mapped.good)
-  if (typeof mapped.ship === 'string') mapped.ship = shipName(mapped.ship)
-  if (typeof mapped.name === 'string') mapped.name = mercName(mapped.name)
+  // Empty-string params (e.g. a quest without a good) are left untouched so
+  // they never resolve to a bogus key like "good.".
+  if (typeof mapped.good === 'string' && mapped.good) mapped.good = goodName(mapped.good)
+  if (typeof mapped.ship === 'string' && mapped.ship) mapped.ship = shipName(mapped.ship)
+  if (typeof mapped.name === 'string' && mapped.name) mapped.name = mercName(mapped.name)
   // Some params carry an i18n key (e.g. a skill or status) to be localised inline.
   if (typeof mapped.skill === 'string' && mapped.skill.startsWith('skill.')) mapped.skill = t(mapped.skill)
   if (typeof mapped.status === 'string' && mapped.status.startsWith('status.')) mapped.status = t(mapped.status)

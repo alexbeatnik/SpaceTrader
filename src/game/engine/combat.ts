@@ -386,7 +386,7 @@ export function createBountyEncounter(
   enc.opponent.pilot = Math.min(12, enc.opponent.pilot + 2)
   enc.bountyQuestId = questId
   enc.bountyName = bountyName
-  enc.messages = [{ key: 'encounter.bounty.appear', params: { name: bountyName } }]
+  enc.messages = [{ key: 'encounter.bounty.appear', params: { bounty: bountyName } }]
   return enc
 }
 
@@ -554,7 +554,7 @@ export function resolveRound(
       // Bounty target destroyed -> complete the quest and pay out.
       if (enc.bountyQuestId) {
         const q = completeBounty(state, enc.bountyQuestId)
-        if (q) msg('encounter.bounty.done', { name: enc.bountyName ?? '', reward: q.reward })
+        if (q) msg('encounter.bounty.done', { bounty: enc.bountyName ?? '', reward: q.reward })
       }
       // The wreck spills its cargo into your hold.
       dropLoot(state, opp, rng, msg)

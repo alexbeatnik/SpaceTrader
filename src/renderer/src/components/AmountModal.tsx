@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useI18n } from '../hooks/useI18n'
+import { fmt } from '../util/format'
 
 interface Props {
   title: string
@@ -46,7 +47,7 @@ export function AmountModal({
         {unitPrice !== undefined && (
           <div className="kv">
             <span className="k">{t('common.total')}</span>
-            <span className="v">{amount * unitPrice} {t('common.cr')}</span>
+            <span className="v">{fmt(amount * unitPrice)} {t('common.cr')}</span>
           </div>
         )}
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>

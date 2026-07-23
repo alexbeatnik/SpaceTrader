@@ -19,7 +19,9 @@ A modern desktop remake of the classic *Space Trader* game, built with
    `en.ts` and `uk.ts` with matching key structure. A message param may itself
    carry an i18n key to be localized inline — `renderMessage` auto-translates
    `good`, `ship`, `name` (mercenary), and any `skill`/`status` param whose value
-   starts with `skill.`/`status.`.
+   starts with `skill.`/`status.`. Bounty-pirate and passenger names are proper
+   nouns, not dictionary ids: pass them as `bounty`/`passenger` params (verbatim
+   interpolation) — **never** as `name`, which is reserved for mercenary ids.
 3. **Keep the engine pure.** Everything under `src/game/` must have **no imports
    from React, Electron, the DOM, or the renderer.** The engine takes and mutates
    a plain `GameState` and returns typed `ActionResult`s. This keeps it testable
@@ -84,6 +86,18 @@ and **hands quests in manually** at the destination — `warp` no longer complet
 them. Use `canTurnIn(state, quest)` / `turnInQuest(state, id)` (bounties still
 resolve via combat). Cargo-quest rewards go through `cargoReward`, which anchors
 the payout to the goods' acquisition cost so a contract always beats trading.
+
+Related quest UX wired to the same engine helpers:
+
+- `abandonQuest(state, id)` drops an active quest from the journal (no reward;
+  goods already bought stay in the hold).
+- The Quests nav tab shows a badge with `questsReadyToTurnIn(state).length`.
+- On the star chart, quest-target markers render **dimmed** while
+  `questSupplyMissing(state, quest) > 0` (supplies not yet in the hold) and
+  bright once the player carries everything needed.
+- The quest card's "buy supplies" shortcut buys the missing amount straight
+  from the local market (`buyGood`) and is enabled only where the good is
+  actually sold (`buyPrice > 0 && qty > 0`) with free cargo space.
 
 ### Exotic (resource-gated) goods
 
@@ -150,3 +164,9 @@ imports tidy.
 - Prefer the `@game`, `@i18n`, and `@` path aliases over long relative imports.
 - Ship/good/government identifiers are lowercase camelCase string literal unions;
   keep new ids consistent and add matching locale keys.
+- Every ship hull mounts at least one weapon, shield and gadget slot (a
+  data-integrity test enforces this) — keep it that way when adding hulls.
+- Prices that the UI must quote live in the engine as exported constants (e.g.
+  `ESCAPE_POD_PRICE`), never hard-coded in components.
+- Fuel capacity displays always use `maxFuel(ship)` (includes fuelCompactor
+  gadgets), not raw `SHIP_TYPES[type].fuelTanks`.

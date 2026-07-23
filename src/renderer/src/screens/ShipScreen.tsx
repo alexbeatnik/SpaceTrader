@@ -1,9 +1,9 @@
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
 import {
-  SHIP_TYPES,
   GOOD_IDS,
   maxHull,
+  maxFuel,
   totalCargoBays,
   usedCargoBays,
   totalShieldPower,
@@ -18,7 +18,6 @@ export function ShipScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
   const { t } = useI18n()
   const ship = game.ship
-  const type = SHIP_TYPES[ship.type]
   const cargoItems = GOOD_IDS.filter((id) => ship.cargo[id] > 0)
 
   return (
@@ -55,7 +54,7 @@ export function ShipScreen(): React.JSX.Element {
             </div>
           )}
           <div className="kv"><span className="k">{t('ship.cargoBays')}</span><span className="v">{usedCargoBays(ship)}/{totalCargoBays(ship)}</span></div>
-          <div className="kv"><span className="k">{t('ship.fuelTank')}</span><span className="v">{ship.fuel}/{type.fuelTanks} {t('common.pc')}</span></div>
+          <div className="kv"><span className="k">{t('ship.fuelTank')}</span><span className="v">{ship.fuel}/{maxFuel(ship)} {t('common.pc')}</span></div>
           <div className="kv"><span className="k">{t('shipyard.weapons')}</span><span className="v">{ship.weapons.length ? ship.weapons.map(weaponName).join(', ') : t('ship.empty')} ({weaponPower(ship)}⚔)</span></div>
           <div className="kv"><span className="k">{t('shipyard.shields')}</span><span className="v">{ship.shields.length ? ship.shields.map(shieldName).join(', ') : t('ship.empty')}</span></div>
           <div className="kv"><span className="k">{t('shipyard.gadgets')}</span><span className="v">{ship.gadgets.length ? ship.gadgets.map(gadgetName).join(', ') : t('ship.empty')}</span></div>

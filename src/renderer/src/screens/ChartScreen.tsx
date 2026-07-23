@@ -10,7 +10,8 @@ import {
   TECH_LEVEL_IDS,
   GALAXY_WIDTH,
   GALAXY_HEIGHT,
-  wormholeTax
+  wormholeTax,
+  questSupplyMissing
 } from '@game/index'
 import {
   politicsName,
@@ -34,9 +35,14 @@ export function ChartScreen(): React.JSX.Element {
   const range = maxRange(game)
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
-  // Active quests: their destination systems get a marker on the map.
+  // Active quests: their destination systems get a marker on the map. A marker
+  // is dimmed while the supplies needed for hand-in are not (yet) in the hold.
   const activeQuests = game.quests.filter((q) => q.status === 'active')
-  const questTargetIds = new Set(activeQuests.map((q) => q.targetSystem))
+  const questReadyAt = new Map<number, boolean>()
+  for (const q of activeQuests) {
+    const ready = questSupplyMissing(game, q) === 0
+    questReadyAt.set(q.targetSystem, (questReadyAt.get(q.targetSystem) ?? false) || ready)
+  }
 
   const selected = selectedId !== null ? game.systems[selectedId] : null
   const selectedQuests = selected ? activeQuests.filter((q) => q.targetSystem === selected.id) : []
@@ -87,7 +93,8 @@ export function ChartScreen(): React.JSX.Element {
               const reachable = systemDistance(here, sys) <= game.ship.fuel && sys.id !== here.id
               const isHere = sys.id === here.id
               const isSel = sys.id === selectedId
-              const isQuest = questTargetIds.has(sys.id)
+              const isQuest = questReadyAt.has(sys.id)
+              const questDim = isQuest && !questReadyAt.get(sys.id)
               const r = isHere ? 6 : 4
               const color = isHere
                 ? '#4fd1ff'
@@ -112,6 +119,7 @@ export function ChartScreen(): React.JSX.Element {
                       stroke="#ffc04a"
                       strokeWidth={1.6}
                       strokeDasharray="3 3"
+                      opacity={questDim ? 0.3 : 1}
                     />
                   )}
                   {isSel && (
@@ -124,6 +132,7 @@ export function ChartScreen(): React.JSX.Element {
                       y={sys.y * SCALE - r - 6}
                       fontSize={11}
                       textAnchor="middle"
+                      opacity={questDim ? 0.35 : 1}
                     >
                       📋
                     </text>
@@ -134,6 +143,7 @@ export function ChartScreen(): React.JSX.Element {
                       y={sys.y * SCALE + 3}
                       fontSize={9}
                       fill={isHere ? '#4fd1ff' : isQuest ? '#ffc04a' : '#8b95c4'}
+                      opacity={questDim ? 0.5 : 1}
                     >
                       {sys.nameId}
                     </text>

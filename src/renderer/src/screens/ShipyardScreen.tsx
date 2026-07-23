@@ -11,11 +11,13 @@ import {
   SHIELD_IDS,
   GADGET_IDS,
   maxHull,
+  maxFuel,
   shipValue,
   fuelPricePerParsec,
   hullUpgradePrice,
   HULL_UPGRADE_AMOUNT,
   MAX_HULL_UPGRADES,
+  ESCAPE_POD_PRICE,
   type ShipTypeId
 } from '@game/index'
 import { weaponName, shieldName, gadgetName, shipName, economyName } from '@i18n/index'
@@ -30,7 +32,8 @@ export function ShipyardScreen(): React.JSX.Element {
   const ship = game.ship
   const type = SHIP_TYPES[ship.type]
 
-  const fuelMissing = type.fuelTanks - ship.fuel
+  const fuelCap = maxFuel(ship) // includes fuelCompactor gadgets
+  const fuelMissing = fuelCap - ship.fuel
   const hullMissing = maxHull(ship) - ship.hull
   const fuelUnit = fuelPricePerParsec(game)
 
@@ -44,10 +47,10 @@ export function ShipyardScreen(): React.JSX.Element {
         <div className="panel panel-pad">
           <div className="kv">
             <span className="k">{t('shipyard.fuel')}</span>
-            <span className="v">{ship.fuel}/{type.fuelTanks}</span>
+            <span className="v">{ship.fuel}/{fuelCap}</span>
           </div>
           <div className="meter" style={{ margin: '6px 0 8px' }}>
-            <div className="meter-fill fuel" style={{ width: `${(ship.fuel / type.fuelTanks) * 100}%` }} />
+            <div className="meter-fill fuel" style={{ width: `${(ship.fuel / fuelCap) * 100}%` }} />
           </div>
           <div className="kv" style={{ marginBottom: 8 }}>
             <span className="k">{t('shipyard.fuelPrice')}</span>
@@ -111,8 +114,12 @@ export function ShipyardScreen(): React.JSX.Element {
             {ship.escapePod ? (
               <div className="badge">{t('shipyard.hasEscapePod')}</div>
             ) : (
-              <button className="btn btn-block" onClick={() => s.buyEscapePod()}>
-                {t('shipyard.buyEscapePod')} · 2 000 {t('common.cr')}
+              <button
+                className="btn btn-block"
+                disabled={game.credits < ESCAPE_POD_PRICE}
+                onClick={() => s.buyEscapePod()}
+              >
+                {t('shipyard.buyEscapePod')} · {fmt(ESCAPE_POD_PRICE)} {t('common.cr')}
               </button>
             )}
           </div>

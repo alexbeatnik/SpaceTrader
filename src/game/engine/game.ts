@@ -32,6 +32,8 @@ export const MAX_SKILL = 10
 export const HULL_UPGRADE_AMOUNT = 25
 /** Maximum reinforced-hull upgrades a ship may carry. */
 export const MAX_HULL_UPGRADES = 5
+/** One-off price of an escape pod. */
+export const ESCAPE_POD_PRICE = 2000
 
 function emptyGoods(): Record<GoodId, number> {
   const rec = {} as Record<GoodId, number>
@@ -358,9 +360,8 @@ export function buyGadget(state: GameState, id: GadgetId): ActionResult {
 
 export function buyEscapePod(state: GameState): ActionResult {
   if (state.ship.escapePod) return fail('error.alreadyOwned')
-  const price = 2000
-  if (state.credits < price) return fail('error.notEnoughCredits')
-  state.credits -= price
+  if (state.credits < ESCAPE_POD_PRICE) return fail('error.notEnoughCredits')
+  state.credits -= ESCAPE_POD_PRICE
   state.ship.escapePod = true
   return okInfo('info.escapePodBought')
 }

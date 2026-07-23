@@ -51,6 +51,8 @@ export const en = {
     board: 'Job board',
     boardEmpty: 'No postings here right now.',
     turnIn: 'Hand in',
+    abandon: 'Abandon',
+    buySupplies: 'Buy supplies',
     rewardTitle: 'Assignment complete!',
     readyToast: 'You can hand in {count} assignment(s) here — open Quests.',
     viaCombat: 'destroy in combat',
@@ -71,6 +73,7 @@ export const en = {
       fetch: 'Source {amount} × {good} and bring it back to {system}.'
     },
     accepted: 'Assignment accepted — reward {reward} cr.',
+    abandoned: 'Assignment abandoned.',
     completed: 'Assignment completed — reward {reward} cr.',
     completedToast: 'Assignment complete! +{reward} cr',
     takenAt: 'Taken at {system}',
@@ -384,8 +387,8 @@ export const en = {
       appear: 'An unknown alien vessel ({ship}-class) closes in, weapons hot!'
     },
     bounty: {
-      appear: 'The wanted pirate {name} attacks!',
-      done: '{name} eliminated! Reward {reward} cr.'
+      appear: 'The wanted pirate {bounty} attacks!',
+      done: '{bounty} eliminated! Reward {reward} cr.'
     },
     police: {
       appear: 'A police patrol in a {ship} orders you to stop.',
@@ -486,7 +489,8 @@ export const en = {
     tooManyQuests: 'You are juggling too many assignments already.',
     questGone: 'That posting is no longer available.',
     noMineSite: 'There is nothing to mine here.',
-    holdFull: 'The cargo hold is full.'
+    holdFull: 'The cargo hold is full.',
+    loadFailed: 'Could not load the save file — it may be corrupted.'
   },
   tech: {
     preAgricultural: 'Pre-agricultural',
