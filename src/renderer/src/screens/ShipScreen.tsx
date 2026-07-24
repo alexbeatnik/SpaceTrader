@@ -11,7 +11,11 @@ import {
   weaponPower,
   HULL_UPGRADE_AMOUNT,
   notoriety,
-  standing
+  standing,
+  crewCount,
+  crewRepairPerDay,
+  minCrew,
+  recommendedCrew
 } from '@game/index'
 import { shipName, weaponName, shieldName, gadgetName, goodName } from '@i18n/index'
 import { ShipArt } from '../components/ShipArt'
@@ -69,6 +73,19 @@ export function ShipScreen(): React.JSX.Element {
           <div className="kv"><span className="k">{t('skill.fighter')}</span><span className="v">{game.skills.fighter}</span></div>
           <div className="kv"><span className="k">{t('skill.trader')}</span><span className="v">{game.skills.trader}</span></div>
           <div className="kv"><span className="k">{t('skill.engineer')}</span><span className="v">{game.skills.engineer}</span></div>
+          <div className="kv"><span className="k">{t('skill.electrician')}</span><span className="v">{game.skills.electrician}</span></div>
+
+          <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('crew.title')}</div>
+          <div className="kv">
+            <span className="k">{t('crew.aboard')}</span>
+            <span className={`v ${crewCount(game) < minCrew(game) ? 'neg' : 'pos'}`}>
+              {crewCount(game)} / {minCrew(game)} · {t('crew.recommended')} {recommendedCrew(game)}
+            </span>
+          </div>
+          <div className="kv">
+            <span className="k">{t('crew.repair')}</span>
+            <span className="v">{crewRepairPerDay(game)} {t('crew.hpPerDay')}</span>
+          </div>
 
           <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('record.title')}</div>
           <div className="kv">

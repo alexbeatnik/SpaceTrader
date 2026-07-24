@@ -70,7 +70,22 @@ import {
   questDemand
 } from './quests'
 import { runEscort, escortLegs, ESCORT_KILL_BONUS } from './escort'
-import { escortShipProblem, canEscort } from './game'
+import { escortShipProblem, canEscort, buyRobot, freeQuarters } from './game'
+import {
+  assignRoles,
+  berthsUsed,
+  crewCount,
+  crewLoad,
+  crewRepairPerDay,
+  crewShortfall,
+  generateCrewRoster,
+  minCrew,
+  roleRisk,
+  robotsPowered,
+  rollCrewIncident,
+  shipRobots
+} from './crew'
+import { CREW_ROLES, PROFESSIONS } from './types'
 import { Rng } from './rng'
 import type { Quest, GoodId } from './types'
 
@@ -123,13 +138,26 @@ describe('galaxy generation', () => {
 })
 
 describe('new game', () => {
-  it('starts with a Gnat, 1000 credits and day 1', () => {
+  it('starts solo in a Flea with 1000 credits on day 1', () => {
     const g = newGame({ commanderName: 'Test', seed: 42 })
-    expect(g.ship.type).toBe('gnat')
+    // The Flea is the only hull one person may legally fly.
+    expect(g.ship.type).toBe('flea')
+    expect(SHIP_TYPES.flea.minCrew).toBe(1)
+    expect(g.ship.crew).toEqual([])
     expect(g.credits).toBe(1000)
     expect(g.day).toBe(1)
     expect(g.systems.length).toBe(SYSTEM_COUNT)
     expect(g.systems[g.currentSystem].visited).toBe(true)
+  })
+
+  it('every hull but the Flea needs a crew of at least two', () => {
+    for (const id of SHIP_TYPE_IDS) {
+      const type = SHIP_TYPES[id]
+      if (id === 'flea') continue
+      expect(type.minCrew).toBeGreaterThanOrEqual(2)
+      // There must be somewhere to put the hands the hull demands.
+      expect(type.crewQuarters).toBeGreaterThanOrEqual(type.minCrew)
+    }
   })
 })
 
@@ -204,6 +232,7 @@ describe('planet economies', () => {
 
   it('fuel is cheaper on energy worlds than on resort worlds', () => {
     const g = newGame({ commanderName: 'Test', seed: 9 })
+    g.ship.type = 'bumblebee' // a thirstier hull, so the multiplier is visible
     g.systems[g.currentSystem].economyType = 'refinery'
     const cheap = fuelPricePerParsec(g)
     g.systems[g.currentSystem].economyType = 'resort'
@@ -276,12 +305,13 @@ describe('exotic special-resource goods', () => {
 describe('crew / mercenaries', () => {
   it('hiring a mercenary raises effective skills and daily wages', () => {
     const g = newGame({ commanderName: 'Test', seed: 21 })
-    g.skills = { pilot: 5, fighter: 5, trader: 5, engineer: 5 }
+    g.skills = { pilot: 5, fighter: 5, trader: 5, engineer: 5, electrician: 5 }
     g.ship.type = 'bumblebee' // has spare crew quarters
-    g.systems[g.currentSystem].mercenaryId = 'nox' // fighter 10
+    g.systems[g.currentSystem].mercenaryIds = ['nox'] // fighter 10
     const hired = hireMercenary(g, 'nox')
     expect(hired.ok).toBe(true)
     expect(g.ship.crew).toContain('nox')
+    // With two hands aboard, Nox takes the guns and the commander the helm.
     expect(effectiveSkills(g).fighter).toBe(10)
     expect(crewWages(g)).toBeGreaterThan(0)
 
@@ -291,10 +321,10 @@ describe('crew / mercenaries', () => {
     expect(crewWages(g)).toBe(0)
   })
 
-  it('cannot hire without free quarters (Gnat has none)', () => {
+  it('cannot hire without free quarters (the Flea has none)', () => {
     const g = newGame({ commanderName: 'Test', seed: 22 })
-    g.systems[g.currentSystem].mercenaryId = 'pax'
-    // Gnat has 1 crew quarter = commander only, so no room.
+    g.systems[g.currentSystem].mercenaryIds = ['pax']
+    // The Flea has a single berth — the commander's own.
     const res = hireMercenary(g, 'pax')
     expect(res.ok).toBe(false)
   })
@@ -715,6 +745,197 @@ describe('encounter kinds', () => {
     // The engine keeps the pod flag set; the store reads it to grant survival.
     expect(g.ship.escapePod).toBe(true)
     expect(enc.messages.some((m) => m.key === 'encounter.escapePod')).toBe(true)
+  })
+})
+
+describe('crew stations and manning', () => {
+  it('a solo Flea pilot is not penalised — the hull is built for one', () => {
+    const g = newGame({ commanderName: 'Test', seed: 400 })
+    expect(crewCount(g)).toBe(1)
+    expect(crewShortfall(g)).toBe(0)
+    expect(crewLoad(g)).toBe(1)
+    // All five commander skills still come through at full value.
+    const eff = effectiveSkills(g)
+    expect(eff.pilot).toBe(5)
+    expect(eff.fighter).toBe(5)
+    expect(eff.engineer).toBe(5)
+    expect(eff.electrician).toBe(5)
+  })
+
+  it('one hand in a capital hull is stretched thin', () => {
+    const g = newGame({ commanderName: 'Test', seed: 401 })
+    g.ship.type = 'atlas'
+    expect(minCrew(g)).toBe(7)
+    expect(crewShortfall(g)).toBe(6)
+    expect(crewLoad(g)).toBeCloseTo(7, 5)
+    // Stations nobody can reach are worked at a heavy penalty.
+    const posts = assignRoles(g)
+    const covered = CREW_ROLES.filter((r) => posts[r].covered)
+    expect(covered.length).toBe(3) // one hand can properly stand one watch
+    expect(effectiveSkills(g).fighter).toBeLessThan(5)
+  })
+
+  it('specialists take the stations they are best at', () => {
+    const g = newGame({ commanderName: 'Test', seed: 402 })
+    g.ship.type = 'grasshopper' // large: four berths
+    g.ship.crew = ['nox', 'wren', 'dex'] // gunner, electrician, mechanic
+    const posts = assignRoles(g)
+    expect(posts.gunner.hand?.id).toBe('nox')
+    expect(posts.electrician.hand?.id).toBe('wren')
+    expect(posts.mechanic.hand?.id).toBe('dex')
+    expect(posts.pilot.hand?.kind).toBe('commander')
+    for (const role of CREW_ROLES) expect(posts[role].covered).toBe(false)
+  })
+
+  it('an electrician with no mechanic aboard works both posts', () => {
+    const g = newGame({ commanderName: 'Test', seed: 403 })
+    g.ship.type = 'gnat' // small: two berths, minimum crew of two
+    g.ship.crew = ['wren'] // electrician 9, engineer 7
+    const posts = assignRoles(g)
+    expect(posts.electrician.hand?.id).toBe('wren')
+    // Two hands, four posts: the other two are covered by double duty.
+    const covered = CREW_ROLES.filter((r) => posts[r].covered)
+    expect(covered.length).toBe(2)
+    expect(posts[covered[0]].hand).not.toBeNull()
+  })
+
+  it('leaving a station unmanned drives its incident risk up', () => {
+    const solo = newGame({ commanderName: 'Test', seed: 404 })
+    solo.ship.type = 'atlas'
+    const crewed = newGame({ commanderName: 'Test', seed: 404 })
+    crewed.ship.type = 'atlas'
+    crewed.ship.crew = ['orin', 'nox', 'sol', 'wren', 'juno', 'pax']
+    expect(roleRisk(solo, 'electrician')).toBeGreaterThan(roleRisk(crewed, 'electrician'))
+    expect(roleRisk(crewed, 'electrician')).toBeLessThan(0.01)
+  })
+
+  it('a neglected ship eventually has an accident, and it costs something', () => {
+    const g = newGame({ commanderName: 'Test', seed: 405 })
+    g.ship.type = 'atlas' // seven hands needed, flying with one
+    g.skills = { pilot: 1, fighter: 1, trader: 1, engineer: 1, electrician: 1 }
+    g.ship.hull = 400
+    g.ship.cargo.water = 20
+    g.ship.fuel = 12
+
+    const rng = new Rng(5)
+    let incident = null
+    for (let i = 0; i < 200 && !incident; i++) incident = rollCrewIncident(g, rng)
+    expect(incident).not.toBeNull()
+    expect(CREW_ROLES).toContain(incident!.role)
+    // Whatever happened, it cost hull, cargo or fuel.
+    const lost = g.ship.hull < 400 || g.ship.cargo.water < 20 || g.ship.fuel < 12
+    expect(lost).toBe(true)
+  })
+
+  it('the engineering watch patches hull every day underway', () => {
+    const g = newGame({ commanderName: 'Test', seed: 406 })
+    g.ship.type = 'grasshopper'
+    g.ship.crew = ['sol'] // engineer 9
+    g.ship.hull = 10
+    expect(crewRepairPerDay(g)).toBeGreaterThan(0)
+    advanceDay(g)
+    expect(g.ship.hull).toBeGreaterThan(10)
+  })
+
+  it('running repairs never overshoot the hull maximum', () => {
+    const g = newGame({ commanderName: 'Test', seed: 407 })
+    g.ship.type = 'grasshopper'
+    g.ship.crew = ['sol']
+    g.ship.hull = maxHull(g.ship)
+    advanceDay(g)
+    expect(g.ship.hull).toBe(maxHull(g.ship))
+  })
+})
+
+describe('robot crew', () => {
+  it('costs like a ship, draws no wage, and stands a watch', () => {
+    const g = newGame({ commanderName: 'Test', seed: 410 })
+    g.ship.type = 'grasshopper'
+    g.credits = 200000
+    g.systems[g.currentSystem].techLevel = 7
+    const before = g.credits
+
+    expect(buyRobot(g, 'spark').ok).toBe(true)
+    expect(shipRobots(g)).toEqual(['spark'])
+    expect(g.credits).toBeLessThan(before)
+    expect(crewWages(g)).toBe(0) // androids are never paid
+    // The power-systems unit takes the post it was built for.
+    expect(assignRoles(g).electrician.hand?.id).toBe('spark')
+  })
+
+  it('burns fuel every day instead of wages', () => {
+    const g = newGame({ commanderName: 'Test', seed: 411 })
+    g.ship.type = 'grasshopper'
+    g.ship.robots = ['wrench']
+    g.ship.fuel = 10
+    for (let i = 0; i < 3; i++) advanceDay(g)
+    expect(g.ship.fuel).toBeLessThan(10)
+  })
+
+  it('goes dormant on a dry tank and stops standing its watch', () => {
+    const g = newGame({ commanderName: 'Test', seed: 412 })
+    g.ship.type = 'grasshopper'
+    g.ship.robots = ['helm'] // pilot 10
+    g.ship.fuel = 5
+    expect(robotsPowered(g)).toBe(true)
+    expect(effectiveSkills(g).pilot).toBe(10)
+
+    g.ship.fuel = 0
+    expect(robotsPowered(g)).toBe(false)
+    expect(crewCount(g)).toBe(1) // the commander alone
+    expect(effectiveSkills(g).pilot).toBeLessThan(10)
+    // The berth stays occupied even while the unit is asleep.
+    expect(berthsUsed(g)).toBe(2)
+  })
+
+  it('takes a berth like any other hand', () => {
+    const g = newGame({ commanderName: 'Test', seed: 413 })
+    g.ship.type = 'gnat' // two berths: commander + one
+    g.credits = 200000
+    g.systems[g.currentSystem].techLevel = 7
+    expect(buyRobot(g, 'utility').ok).toBe(true)
+    expect(freeQuarters(g.ship)).toBe(0)
+    g.systems[g.currentSystem].mercenaryIds = ['pax']
+    expect(hireMercenary(g, 'pax').ok).toBe(false) // no room left
+  })
+})
+
+describe('hiring hall', () => {
+  it('offers several hands, each advertising a trade', () => {
+    const g = newGame({ commanderName: 'Test', seed: 420 })
+    const roster = generateCrewRoster(g, new Rng(2))
+    expect(roster.length).toBeGreaterThan(0)
+    for (const id of roster) {
+      expect(MERCENARIES[id]).toBeDefined()
+      expect(PROFESSIONS).toContain(MERCENARIES[id].profession)
+    }
+    // No duplicates in one hall.
+    expect(new Set(roster).size).toBe(roster.length)
+  })
+
+  it('never offers someone already in your crew', () => {
+    const g = newGame({ commanderName: 'Test', seed: 421 })
+    g.ship.crew = ['nox', 'orin']
+    for (let seed = 1; seed < 20; seed++) {
+      const roster = generateCrewRoster(g, new Rng(seed))
+      expect(roster).not.toContain('nox')
+      expect(roster).not.toContain('orin')
+    }
+  })
+
+  it('covers every profession across the roster', () => {
+    const seen = new Set(MERCENARY_IDS.map((id) => MERCENARIES[id].profession))
+    for (const p of PROFESSIONS) expect(seen).toContain(p)
+  })
+
+  it('a dismissed hand goes back into the local hall', () => {
+    const g = newGame({ commanderName: 'Test', seed: 422 })
+    g.ship.type = 'grasshopper'
+    g.systems[g.currentSystem].mercenaryIds = ['pax', 'mira']
+    expect(hireMercenary(g, 'pax').ok).toBe(true)
+    expect(g.systems[g.currentSystem].mercenaryIds).not.toContain('pax')
+    expect(fireMercenary(g, 'pax').ok).toBe(true)
+    expect(g.systems[g.currentSystem].mercenaryIds).toContain('pax')
   })
 })
 

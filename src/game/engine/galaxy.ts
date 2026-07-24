@@ -110,16 +110,21 @@ export function generateGalaxy(seed: number): SolarSystem[] {
       sellPrice: emptyGoodRecord() as SolarSystem['sellPrice'],
       visited: false,
       wormholeTo: null,
-      mercenaryId: null,
+      mercenaryIds: [],
       questBoard: []
     })
   }
 
-  // Distribute mercenaries across distinct systems.
-  const mercPool = [...MERCENARY_IDS].sort(() => rng.next() - 0.5)
-  const sysPool = [...systems].sort(() => rng.next() - 0.5)
-  for (let i = 0; i < mercPool.length && i < sysPool.length; i++) {
-    sysPool[i].mercenaryId = mercPool[i]
+  // Seed each hiring hall. Rosters are refreshed properly on every arrival;
+  // this just means an unvisited system is never empty when first reached.
+  for (const sys of systems) {
+    const size = rng.int(1, 3)
+    const hall: string[] = []
+    while (hall.length < size) {
+      const id = rng.pick(MERCENARY_IDS)
+      if (!hall.includes(id)) hall.push(id)
+    }
+    sys.mercenaryIds = hall
   }
 
   // Create a few wormholes linking distant systems.

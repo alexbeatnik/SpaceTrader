@@ -19,6 +19,9 @@ import {
   sellGadget,
   hireMercenary,
   fireMercenary,
+  buyRobot,
+  sellRobot,
+  generateCrewRoster,
   getLoan,
   payDebt,
   buyInsurance,
@@ -58,7 +61,8 @@ import {
   type NewGameOptions,
   type WarpResult,
   type MineKind,
-  type EscortRun
+  type EscortRun,
+  type CrewIncident
 } from '@game/index'
 import { renderMessage } from '@i18n/index'
 
@@ -110,6 +114,8 @@ interface GameStore {
   mining: MiningSession | null
   /** A resolved convoy run being replayed by the escort overlay. */
   escort: EscortRun | null
+  /** A mishap caused by an undermanned station, shown once and dismissed. */
+  incident: CrewIncident | null
   /** A just-handed-in quest, shown in the reward modal until dismissed. */
   questReward: Quest | null
   screen: Screen
@@ -149,6 +155,8 @@ interface GameStore {
   // crew
   hireMercenary: (id: string) => void
   fireMercenary: (id: string) => void
+  buyRobot: (id: string) => void
+  sellRobot: (index: number) => void
 
   // bank
   getLoan: (amount: number) => void
@@ -169,6 +177,7 @@ interface GameStore {
   tradeSellToTrader: (good: GoodId, amount: number) => void
   dismissEncounter: () => void
   dismissEvent: () => void
+  dismissIncident: () => void
   acceptQuestOffer: () => void
   acceptQuestOfferBuying: () => void
   declineQuestOffer: () => void
@@ -190,12 +199,20 @@ function clone<T>(v: T): T {
   return structuredClone(v)
 }
 
-/** Ensure the current system has a job board (fresh game / legacy save). */
+/**
+ * Ensure the current system has a job board and a hiring hall (fresh game, or
+ * a save written before either existed).
+ */
 function ensureBoard(game: GameState): void {
   const sys = game.systems[game.currentSystem]
+  const rng = new Rng((game.seed ^ (game.day * 2654435761)) >>> 0)
   if (!sys.questBoard || sys.questBoard.length === 0) {
-    sys.questBoard = generateQuestBoard(game, new Rng((game.seed ^ (game.day * 2654435761)) >>> 0))
+    sys.questBoard = generateQuestBoard(game, rng)
   }
+  if (!sys.mercenaryIds) sys.mercenaryIds = generateCrewRoster(game, rng)
+  // Legacy saves predate robots and the electrician trade.
+  if (!game.ship.robots) game.ship.robots = []
+  if (game.skills.electrician === undefined) game.skills.electrician = game.skills.engineer
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
@@ -240,6 +257,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     questReward: null,
     mining: null,
     escort: null,
+    incident: null,
     screen: 'menu',
     toast: null,
     gameOver: false,
@@ -258,6 +276,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         questReward: null,
         mining: null,
         escort: null,
+        incident: null,
         gameOver: false,
         toast: null,
         travel: null
@@ -273,7 +292,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         const game = JSON.parse(data) as GameState
         ensureBoard(game)
         pendingWarp = null
-        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, gameOver: false, travel: null })
+        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, gameOver: false, travel: null })
         return true
       } catch {
         // Corrupt save file or a failed read — tell the player instead of
@@ -297,7 +316,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     quitToMenu: () => {
       pendingWarp = null
-      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, travel: null })
+      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, travel: null })
     },
 
     buy: (good, amount) => withGame((g) => applyResult(g, buyGood(g, good, amount))),
@@ -326,6 +345,8 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     hireMercenary: (id) => withGame((g) => applyResult(g, hireMercenary(g, id))),
     fireMercenary: (id) => withGame((g) => applyResult(g, fireMercenary(g, id))),
+    buyRobot: (id) => withGame((g) => applyResult(g, buyRobot(g, id))),
+    sellRobot: (index) => withGame((g) => applyResult(g, sellRobot(g, index))),
 
     getLoan: (amount) => withGame((g) => applyResult(g, getLoan(g, amount))),
     payDebt: (amount) => withGame((g) => applyResult(g, payDebt(g, amount))),
@@ -376,6 +397,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         travel: null,
         encounter: result?.encounter ? clone(result.encounter) : null,
         event: result?.event ? clone(result.event) : null,
+        incident: result?.incident ? clone(result.incident) : null,
         questOffer: result?.questOffer ? clone(result.questOffer) : null,
         // Prompt the player to hand in any quest that's ready here.
         toast: ready.length
@@ -422,6 +444,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         }
         set({
           game: clone(g),
+          incident: res.incident ? clone(res.incident) : null,
           toast: {
             id: ++toastCounter,
             type: 'info',
@@ -507,6 +530,8 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     dismissEvent: () => set({ event: null }),
+
+    dismissIncident: () => set({ incident: null }),
 
     acceptQuestOffer: () =>
       withGame((g) => {

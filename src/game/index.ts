@@ -11,6 +11,7 @@ export * from './engine/quests'
 export * from './engine/mining'
 export * from './engine/reputation'
 export * from './engine/escort'
+export * from './engine/crew'
 export { Rng, randomSeed } from './engine/rng'
 
 export { TRADE_GOODS, GOOD_IDS, SPECIAL_GOOD_IDS, isSpecialGood } from './data/goods'
@@ -27,4 +28,6 @@ export {
   EXTRA_CARGO_BAYS
 } from './data/equipment'
 export { MERCENARIES, MERCENARY_IDS, mercenaryWorth } from './data/mercenaries'
+export { ROBOTS, ROBOT_IDS } from './data/robots'
+export { CREW_TABLE, crewFor } from './data/ships'
 export { TECH_LEVEL_IDS, SHIP_SIZES, SHIP_CLASSES } from './engine/types'

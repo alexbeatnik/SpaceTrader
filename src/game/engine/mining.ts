@@ -11,6 +11,7 @@ import {
 } from './game'
 import { SHIP_TYPES } from '../data/ships'
 import { spawnPirates, type Encounter } from './combat'
+import type { CrewIncident } from './crew'
 
 export interface MineResult {
   ok: boolean
@@ -22,6 +23,8 @@ export interface MineResult {
   bonus?: GoodId
   /** Raiders that jumped the operation, if any. */
   encounter?: Encounter | null
+  /** Anything that went wrong aboard during the day's work. */
+  incident?: CrewIncident | null
 }
 
 /**
@@ -40,7 +43,7 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
     return { ok: false, error: 'error.holdFull' }
   }
 
-  advanceDay(state)
+  const incident = advanceDay(state, rng)
 
   const yieldPerDay =
     SHIP_TYPES[state.ship.type].shipClass === 'industrial' ? INDUSTRIAL_MINING_YIELD : 1
@@ -73,5 +76,5 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
 
   // Raiders sometimes pounce on an exposed mining operation.
   const encounter = rng.chance(0.12) ? spawnPirates(state, rng) : null
-  return { ok: true, resource: site.resource, amount, bonus, encounter }
+  return { ok: true, resource: site.resource, amount, bonus, encounter, incident }
 }

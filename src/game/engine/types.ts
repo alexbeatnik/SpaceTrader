@@ -215,7 +215,14 @@ export interface ShipType {
   weaponSlots: number
   shieldSlots: number
   gadgetSlots: number
+  /** Berths aboard, including the commander's own. */
   crewQuarters: number
+  /**
+   * Hands the hull needs to run properly, commander included. Only the Flea is
+   * built for a single pilot; anything larger is undercrewed without help, and
+   * an overloaded crew invites incidents.
+   */
+  minCrew: number
   fuelTanks: number // max range in parsecs
   hullStrength: number
   fuelCostPerParsec: number
@@ -275,8 +282,11 @@ export interface SolarSystem {
   visited: boolean
   /** Optional wormhole destination system id. */
   wormholeTo: number | null
-  /** Mercenary currently available for hire here, if any. */
-  mercenaryId: string | null
+  /**
+   * Hands looking for a berth at this planet's hiring hall, refreshed on
+   * arrival. Optional so saves written before hiring halls existed still load.
+   */
+  mercenaryIds?: string[]
   /** Assignments posted on this planet's job board (refreshed on arrival). */
   questBoard: Quest[]
   /** A mineable site in this system, if any. */
@@ -295,6 +305,8 @@ export interface Ship {
   shieldPoints: number[] // current charge per shield
   gadgets: GadgetId[]
   crew: string[] // mercenary ids occupying quarters (excluding commander)
+  /** Robot ids aboard. They take berths like any crew member. */
+  robots?: string[]
   escapePod: boolean
 }
 
@@ -303,14 +315,55 @@ export interface Skills {
   fighter: number
   trader: number
   engineer: number
+  /** Power systems, life support and wiring — the electrician's trade. */
+  electrician: number
 }
+
+/**
+ * Stations that have to be manned aboard a ship. Each maps to the skill its
+ * holder is judged on; an unmanned station is covered by whoever is free, at a
+ * penalty, and neglected stations are what cause crew incidents.
+ */
+export type CrewRole = 'pilot' | 'gunner' | 'mechanic' | 'electrician'
+export const CREW_ROLES = ['pilot', 'gunner', 'mechanic', 'electrician'] as const
+
+/**
+ * The trade a hand advertises at the hiring hall. Four match a shipboard
+ * station; traders are hired for the markets, and generalists are the
+ * jacks-of-all-trades who fill a berth without excelling anywhere.
+ */
+export type Profession = CrewRole | 'trader' | 'generalist'
+export const PROFESSIONS = [
+  'pilot',
+  'gunner',
+  'mechanic',
+  'electrician',
+  'trader',
+  'generalist'
+] as const
 
 /** A hireable crew member with fixed skills and a daily wage. */
 export interface Mercenary {
   id: string
+  /** The trade they advertise — what you hire them for. */
+  profession: Profession
   skills: Skills
   /** Daily wage in credits. */
   wage: number
+}
+
+/**
+ * An android crew member. Costs as much as a decent ship and draws no wage,
+ * but its power cells burn fuel every day — and a dry tank puts it to sleep.
+ */
+export interface Robot {
+  id: string
+  /** The station this model is built for. */
+  profession: Profession
+  skills: Skills
+  price: number
+  /** Minimum system tech level for a shipyard to sell this unit. */
+  minTechLevel: TechLevel
 }
 
 export interface PlayerRecord {
@@ -344,6 +397,11 @@ export interface GameState {
    * Optional: saves written before this existed simply have nothing to exclude.
    */
   sourcedHere?: Record<GoodId, number>
+  /**
+   * Fractional fuel a ship's robots have drawn but not yet paid for. Robots
+   * burn less than a whole unit a day, so the remainder is carried over.
+   */
+  robotDrain?: number
   /** Log of notable events, newest first (ids + params resolved in UI). */
   log: LogEntry[]
   /** Quest / event progress flags keyed by id. */

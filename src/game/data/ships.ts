@@ -58,19 +58,42 @@ export const SIZE_RANK: Record<ShipSize, number> = {
   capital: 3
 }
 
+/**
+ * Berths, and the hands a hull needs to run properly (commander included).
+ * Bigger hulls have more systems than one person can nurse: fly one short and
+ * the stations go unmanned, which is where crew incidents come from.
+ */
+export const CREW_TABLE: Record<ShipSize, { quarters: number; minCrew: number }> = {
+  small: { quarters: 2, minCrew: 2 },
+  medium: { quarters: 4, minCrew: 3 },
+  large: { quarters: 7, minCrew: 5 },
+  capital: { quarters: 10, minCrew: 7 }
+}
+
+/** Standard berthing for a hull size. */
+export function crewFor(size: ShipSize): { crewQuarters: number; minCrew: number } {
+  const c = CREW_TABLE[size]
+  return { crewQuarters: c.quarters, minCrew: c.minCrew }
+}
+
+/** The Flea is the one hull built to be flown single-handed. */
+export const SOLO_CREW = { crewQuarters: 1, minCrew: 1 }
+
 // Ship roster based on the original documentation's described capabilities.
 // Slot counts are derived from the SLOT_TABLE above (size × shipClass).
 export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
   flea: {
+    // The only hull certified for single-handed flight, which makes it both the
+    // starting ship and what an escape pod drops you into.
     id: 'flea',
     size: 'small',
     shipClass: 'trade',
     price: 2000,
     cargoBays: 10,
     ...slotsFor('small', 'trade'),       // W1 S1 G2
-    crewQuarters: 1,
+    ...SOLO_CREW,
     fuelTanks: 20,
-    hullStrength: 25,
+    hullStrength: 60,
     fuelCostPerParsec: 1,
     repairCostPerUnit: 1,
     minTechLevel: 4
@@ -82,7 +105,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 10000,
     cargoBays: 15,
     ...slotsFor('small', 'civilian'),     // W1 S1 G1
-    crewQuarters: 1,
+    ...crewFor('small'),
     fuelTanks: 14,
     hullStrength: 100,
     fuelCostPerParsec: 2,
@@ -97,7 +120,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 14000,
     cargoBays: 20,
     ...slotsFor('small', 'industrial'),   // W1 S2 G1
-    crewQuarters: 1,
+    ...crewFor('small'),
     fuelTanks: 14,
     hullStrength: 90,
     fuelCostPerParsec: 3,
@@ -112,7 +135,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 16000,
     cargoBays: 12,
     ...slotsFor('small', 'explorer'),     // W1 S1 G3
-    crewQuarters: 1,
+    ...crewFor('small'),
     fuelTanks: 20,
     hullStrength: 70,
     fuelCostPerParsec: 2,
@@ -127,7 +150,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 20000,
     cargoBays: 12,
     ...slotsFor('small', 'military'),     // W2 S1 G1
-    crewQuarters: 1,
+    ...crewFor('small'),
     fuelTanks: 13,
     hullStrength: 110,
     fuelCostPerParsec: 3,
@@ -141,7 +164,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 25000,
     cargoBays: 20,
     ...slotsFor('medium', 'trade'),       // W1 S2 G3
-    crewQuarters: 1,
+    ...crewFor('medium'),
     fuelTanks: 17,
     hullStrength: 100,
     fuelCostPerParsec: 3,
@@ -155,7 +178,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 30000,
     cargoBays: 15,
     ...slotsFor('medium', 'military'),    // W3 S2 G1
-    crewQuarters: 1,
+    ...crewFor('medium'),
     fuelTanks: 13,
     hullStrength: 100,
     fuelCostPerParsec: 5,
@@ -170,7 +193,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 40000,
     cargoBays: 35,
     ...slotsFor('medium', 'industrial'),  // W1 S3 G2
-    crewQuarters: 2,
+    ...crewFor('medium'),
     fuelTanks: 13,
     hullStrength: 120,
     fuelCostPerParsec: 7,
@@ -185,7 +208,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 45000,
     cargoBays: 45,
     ...slotsFor('medium', 'trade'),       // W1 S2 G3
-    crewQuarters: 2,
+    ...crewFor('medium'),
     fuelTanks: 15,
     hullStrength: 80,
     fuelCostPerParsec: 8,
@@ -200,7 +223,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 55000,
     cargoBays: 15,
     ...slotsFor('medium', 'explorer'),    // W1 S2 G4
-    crewQuarters: 2,
+    ...crewFor('medium'),
     fuelTanks: 21,
     hullStrength: 90,
     fuelCostPerParsec: 4,
@@ -214,7 +237,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 60000,
     cargoBays: 20,
     ...slotsFor('medium', 'civilian'),    // W2 S2 G2
-    crewQuarters: 2,
+    ...crewFor('medium'),
     fuelTanks: 15,
     hullStrength: 100,
     fuelCostPerParsec: 7,
@@ -228,7 +251,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 80000,
     cargoBays: 50,
     ...slotsFor('medium', 'trade'),       // W1 S2 G3
-    crewQuarters: 3,
+    ...crewFor('medium'),
     fuelTanks: 14,
     hullStrength: 50,
     fuelCostPerParsec: 10,
@@ -243,7 +266,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 95000,
     cargoBays: 18,
     ...slotsFor('large', 'military'),     // W4 S3 G2
-    crewQuarters: 2,
+    ...crewFor('large'),
     fuelTanks: 16,
     hullStrength: 140,
     fuelCostPerParsec: 12,
@@ -257,7 +280,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 100000,
     cargoBays: 20,
     ...slotsFor('large', 'military'),     // W4 S3 G2
-    crewQuarters: 2,
+    ...crewFor('large'),
     fuelTanks: 16,
     hullStrength: 150,
     fuelCostPerParsec: 15,
@@ -272,7 +295,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 140000,
     cargoBays: 25,
     ...slotsFor('large', 'explorer'),     // W2 S2 G5
-    crewQuarters: 3,
+    ...crewFor('large'),
     fuelTanks: 22,
     hullStrength: 130,
     fuelCostPerParsec: 9,
@@ -286,7 +309,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 150000,
     cargoBays: 30,
     ...slotsFor('large', 'civilian'),     // W2 S3 G3
-    crewQuarters: 3,
+    ...crewFor('large'),
     fuelTanks: 15,
     hullStrength: 150,
     fuelCostPerParsec: 15,
@@ -301,7 +324,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 180000,
     cargoBays: 75,
     ...slotsFor('large', 'trade'),        // W2 S2 G4
-    crewQuarters: 4,
+    ...crewFor('large'),
     fuelTanks: 14,
     hullStrength: 160,
     fuelCostPerParsec: 18,
@@ -316,7 +339,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 225000,
     cargoBays: 60,
     ...slotsFor('large', 'industrial'),   // W2 S4 G3
-    crewQuarters: 3,
+    ...crewFor('large'),
     fuelTanks: 13,
     hullStrength: 200,
     fuelCostPerParsec: 20,
@@ -331,7 +354,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 260000,
     cargoBays: 25,
     ...slotsFor('capital', 'military'),   // W5 S4 G2
-    crewQuarters: 3,
+    ...crewFor('capital'),
     fuelTanks: 15,
     hullStrength: 220,
     fuelCostPerParsec: 20,
@@ -345,7 +368,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 300000,
     cargoBays: 35,
     ...slotsFor('capital', 'civilian'),   // W3 S4 G4
-    crewQuarters: 3,
+    ...crewFor('capital'),
     fuelTanks: 14,
     hullStrength: 200,
     fuelCostPerParsec: 20,
@@ -360,7 +383,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 320000,
     cargoBays: 90,
     ...slotsFor('capital', 'industrial'), // W2 S5 G4
-    crewQuarters: 4,
+    ...crewFor('capital'),
     fuelTanks: 12,
     hullStrength: 260,
     fuelCostPerParsec: 22,
@@ -375,7 +398,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 350000,
     cargoBays: 100,
     ...slotsFor('capital', 'trade'),      // W2 S3 G5
-    crewQuarters: 4,
+    ...crewFor('capital'),
     fuelTanks: 13,
     hullStrength: 220,
     fuelCostPerParsec: 24,
@@ -390,7 +413,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 360000,
     cargoBays: 30,
     ...slotsFor('capital', 'explorer'),   // W2 S3 G6
-    crewQuarters: 3,
+    ...crewFor('capital'),
     fuelTanks: 24,
     hullStrength: 210,
     fuelCostPerParsec: 16,
@@ -405,7 +428,7 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
     price: 380000,
     cargoBays: 30,
     ...slotsFor('capital', 'civilian'),   // W3 S4 G4
-    crewQuarters: 3,
+    ...crewFor('capital'),
     fuelTanks: 18,
     hullStrength: 240,
     fuelCostPerParsec: 18,

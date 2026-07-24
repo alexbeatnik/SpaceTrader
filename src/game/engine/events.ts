@@ -160,8 +160,9 @@ const EVENTS: EventDef[] = [
       const trainable = [
         { skill: 'pilot', flag: 'trainedPilot' },
         { skill: 'fighter', flag: 'trainedFighter' },
-        { skill: 'trader', flag: 'trainedTrader' }
-      ] as Array<{ skill: 'pilot' | 'fighter' | 'trader'; flag: string }>
+        { skill: 'trader', flag: 'trainedTrader' },
+        { skill: 'electrician', flag: 'trainedElectrician' }
+      ] as Array<{ skill: 'pilot' | 'fighter' | 'trader' | 'electrician'; flag: string }>
       const options = trainable.filter(
         (o) => (state.flags[o.flag] ?? 0) < 1 && state.skills[o.skill] < MAX_SKILL
       )

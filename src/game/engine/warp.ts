@@ -8,6 +8,7 @@ import { pushLog, refuelFull, advanceDay, clearLocalSourcing } from './game'
 import { rollEncounter, createBountyEncounter, type Encounter } from './combat'
 import { maybeTriggerEvent, type GameEvent } from './events'
 import { questsReadyToTurnIn, generateQuestOffer, generateQuestBoard, hasActiveBounty } from './quests'
+import { generateCrewRoster, type CrewIncident } from './crew'
 
 export interface WarpResult {
   ok: boolean
@@ -17,6 +18,8 @@ export interface WarpResult {
   questOffer?: Quest | null
   /** Active quests that can now be handed in at the destination. */
   questsReady?: Quest[]
+  /** Anything that went wrong aboard on the way over. */
+  incident?: CrewIncident | null
 }
 
 /**
@@ -38,8 +41,10 @@ export function settleArrival(state: GameState, rng: Rng): void {
     const res = refuelFull(state)
     if (res.ok && res.info) pushLog(state, 'log.autoRefuel', res.info.params)
   }
-  // Post a fresh set of jobs on this planet's board.
+  // Post a fresh set of jobs on this planet's board, and see who is looking
+  // for a berth at the hiring hall today.
   target.questBoard = generateQuestBoard(state, rng)
+  target.mercenaryIds = generateCrewRoster(state, rng)
 }
 
 /**
@@ -70,7 +75,7 @@ export function warp(state: GameState, targetId: number): WarpResult {
 
   // Encounter roll uses destination government characteristics.
   state.currentSystem = targetId
-  advanceDay(state)
+  const incident = advanceDay(state, rng)
 
   let encounter = rollEncounter(state, rng)
 
@@ -102,7 +107,7 @@ export function warp(state: GameState, targetId: number): WarpResult {
   const event = encounter ? null : maybeTriggerEvent(state, rng)
   const questOffer = !encounter && !event ? generateQuestOffer(state, rng) : null
 
-  return { ok: true, encounter, event, questOffer, questsReady }
+  return { ok: true, encounter, event, questOffer, questsReady, incident }
 }
 
 export function wormholeTax(state: GameState): number {

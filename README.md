@@ -11,7 +11,7 @@ localization (English by default, Ukrainian included).
 
 ## Gameplay
 
-You start with a second-hand **Gnat**, one pulse laser, and 1000 credits. Trade
+You start alone in a second-hand **Flea**, one pulse laser, and 1000 credits. Trade
 goods between solar systems, exploit local shortages and special resources, dodge
 (or fight) pirates and police, upgrade your ship, and grow your fortune.
 
@@ -61,9 +61,22 @@ Core systems implemented:
   — *or* leave a bank loan unpaid — and hunters are hired to collect, better
   armed the bigger the payday. Buy the record clean with a **large fine** at the
   bank (the bank calls its own collectors off only when the debt is paid).
-- **Crew & mercenaries** — hire from a roster of **26 named mercenaries** spread
-  across system personnel offices; each takes over duties in their best skill and
-  draws a daily wage.
+- **Crew, stations & incidents** — you start alone in a **Flea**, the only hull
+  certified for single-handed flight; everything bigger needs a real crew, up to
+  **10 hands on a capital ship**. Four stations must be manned — **helm, guns,
+  engineering and power** — and the crew sorts itself onto the posts it is best
+  at. Leave one unmanned and somebody works **double duty** at half effect, which
+  is when things start going wrong: an **electrical fire** costs a day adrift,
+  burnt cargo and hull plate; a loose mounting chews through the hull; a sloppy
+  plot wastes fuel; an unattended gun bay fires into your own frame. A
+  well-manned engineering watch **patches the hull every day** you fly.
+- **Crew & mercenaries** — every planet's **hiring hall** lists several of the
+  **26 named mercenaries**, each advertising a trade (pilot, gunner, mechanic,
+  electrician, trader or generalist) so you can hire the specialist you are
+  missing. Each draws a daily wage.
+- **Android crew** — five robot models that cost as much as a good ship and
+  never ask to be paid, but whose power cells **burn fuel every day** — run the
+  tank dry and they go dormant mid-flight.
 - **Quests & job board** — every planet has a **job board** of assignments in
   varied sizes (small runs to bulk freighter contracts) across **seven types**:
   courier deliveries, relief missions, bounty hunts, VIP **passenger** transport,

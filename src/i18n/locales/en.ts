@@ -89,15 +89,84 @@ export const en = {
   crew: {
     title: 'Crew',
     wages: 'Daily wages',
-    quarters: 'Free quarters',
-    hired: 'Hired crew',
-    noneHired: 'No crew hired',
+    quarters: 'Free berths',
+    hired: 'Aboard',
+    noneHired: 'Nobody aboard but you',
     commanderSkills: 'Effective skills (with crew)',
-    roster: 'Personnel roster',
-    noneAvailable: 'No mercenaries available here',
+    roster: 'Hiring hall',
+    noneAvailable: 'Nobody is looking for a berth here',
     hire: 'Hire',
     fire: 'Dismiss',
-    noQuarters: 'No free crew quarters'
+    noQuarters: 'No free berths',
+    aboard: 'Hands aboard',
+    minimum: 'minimum',
+    recommended: 'recommended',
+    stations: 'Watch bill',
+    station: 'Station',
+    manning: 'Manned by',
+    strength: 'Rating',
+    commander: 'You',
+    unmanned: 'Nobody',
+    doubleDuty: 'double duty',
+    dormant: 'dormant',
+    noWage: 'no wage',
+    repair: 'Running repairs',
+    repairRate: 'Running repairs: {hp} hull/day',
+    hpPerDay: 'hull/day',
+    wellManned: 'Every station is manned. The crew keeps the ship patched up as you fly.',
+    undercrewed:
+      'Short-handed: each hand is carrying {load}× a normal watch. Expect things to go wrong.',
+    robotDealer: 'Android crew',
+    noRobots: 'No androids sold at this tech level',
+    robotHint:
+      'Androids never draw a wage, but their cells burn {fuel} fuel a day each — and a dry tank leaves them dormant.',
+    risk: {
+      title: 'Risk',
+      low: 'low',
+      medium: 'watch it',
+      high: 'high'
+    },
+    incident: {
+      blame: 'Cause: the {role} station was not properly manned.',
+      fire: {
+        title: 'Electrical fire',
+        body: 'A power conduit went up. You spent a day adrift fighting the fire: {qty} × {good} burned and the hull took {dmg} damage.',
+        bodyNoCargo: 'A power conduit went up. You spent a day adrift fighting the fire; the hull took {dmg} damage.'
+      },
+      breakdown: {
+        title: 'Mechanical failure',
+        body: 'A mounting worked loose and chewed through {dmg} points of hull before anyone noticed.'
+      },
+      misjump: {
+        title: 'Sloppy plot',
+        body: 'A botched course correction wasted {lost} pc of fuel.'
+      },
+      misfire: {
+        title: 'Weapon misfire',
+        body: 'An unattended weapon bay discharged into your own frame: {dmg} hull damage and the shields are flat.'
+      }
+    }
+  },
+  role: {
+    pilot: 'Helm',
+    gunner: 'Guns',
+    mechanic: 'Engineering',
+    electrician: 'Power'
+  },
+  profession: {
+    pilot: 'Pilot',
+    gunner: 'Gunner',
+    mechanic: 'Mechanic',
+    electrician: 'Electrician',
+    trader: 'Trader',
+    generalist: 'Generalist'
+  },
+  robot: {
+    helm: 'Helm android',
+    gunner: 'Gunnery android',
+    wrench: 'Maintenance android',
+    spark: 'Power-systems android',
+    utility: 'Utility android'
   },
   merc: {
     alyssa: 'Alyssa', bran: 'Bran', cyra: 'Cyra', dex: 'Dex', elin: 'Elin',
@@ -530,6 +599,7 @@ export const en = {
     wormhole: 'Wormhole jump to {system} (tax {tax} cr).',
     plunderedTrader: 'You plundered a trader ({qty} units).',
     crewLeft: 'You could not pay your crew — they left you.',
+    crewLeftBehind: '{count} of your crew had no berth on the new ship and stayed behind.',
     mined: 'Mined 1 {good}.',
     minedFuel: 'Scooped 1 pc of fuel.',
     minedBonus: 'Struck a rare find: {good}!',
@@ -551,6 +621,8 @@ export const en = {
     shipBought: 'New ship purchased.',
     mercHired: '{name} joined your crew.',
     mercFired: '{name} left your crew.',
+    robotBought: 'An android was brought aboard for {cost} cr.',
+    robotSold: 'The android was sold on.',
     loanTaken: 'Loan of {amount} cr received.',
     debtPaid: 'Paid off {amount} cr of debt.',
     insuranceBought: 'Insurance purchased.',
@@ -595,6 +667,7 @@ export const en = {
     escortNeedsMilitary: 'Escort work needs a military-class hull.',
     escortNeedsWeapons: 'Escort work needs at least two weapons fitted.',
     escortNeedsShield: 'Escort work needs at least one shield fitted.',
+    robotNotHere: 'No such android is sold here.',
     escortNotHere: 'The convoy forms up at the system that posted the contract.',
     noMineSite: 'There is nothing to mine here.',
     holdFull: 'The cargo hold is full.',

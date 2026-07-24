@@ -80,6 +80,32 @@ surface a pirate `Encounter` (which clears `mining` and mounts `<CombatModal>`).
 Keep the extraction/economy logic in the engine (`mining.ts`); the overlay only
 owns the timer, progress bar, and stop button.
 
+### Crew: stations, manning and incidents
+
+`crew.ts` owns everything about who is aboard. Four stations (`CREW_ROLES`:
+helm, guns, engineering, power) map to skills via `ROLE_SKILL`; `Skills` gained
+an `electrician` field for the fourth. `assignRoles` greedily seats the best
+hand at each station and any station left over is worked **double duty** by the
+best qualified person at a penalty that eases the closer the ship is to its
+`minCrew` — which is why a solo Flea pilot loses nothing (the hull's minimum is
+1) while a solo Atlas pilot is crippled. `effectiveSkills` now reads straight
+off those station ratings, so combat and repairs reflect the watch bill; only
+`trader` is still a plain best-of-crew.
+
+`crewLoad` (= `minCrew / crewCount`) drives `roleRisk`, and `rollCrewIncident`
+turns a neglected station into a mishap — the electrical fire that costs a day,
+some cargo and hull plate is the electrician's. `advanceDay(state, rng)` rolls
+for one **only when given an rng**: pass it for days spent underway (warp,
+mining), omit it for time that merely passes (`serveSentence`). It also applies
+`crewRepairPerDay` (the engineering watch patching hull) and robot fuel draw.
+
+Robots (`data/robots.ts`) are crew that cost like a ship, draw no wage, and
+burn `ROBOT_FUEL_PER_DAY` each; on a dry tank `robotsPowered` is false and they
+drop out of `crewHands` entirely while still holding their berth. Mercenaries
+and robots both advertise a `profession`, and each planet's hiring hall
+(`SolarSystem.mercenaryIds`, refreshed in `settleArrival` like the job board)
+lists several candidates so a captain can hire the trade they are missing.
+
 ### Convoy escort contracts
 
 `escort.ts` is the odd one out: the player makes **no** decisions during the

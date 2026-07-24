@@ -19,11 +19,20 @@ import {
   SHIELDS,
   GADGETS,
   EXTRA_CARGO_BAYS,
-  EXTRA_FUEL_TANKS,
-  GADGET_SKILL_BONUS
+  EXTRA_FUEL_TANKS
 } from '../data/equipment'
 import { MERCENARIES } from '../data/mercenaries'
+import { ROBOTS } from '../data/robots'
 import { economyOf } from '../data/economies'
+import {
+  assignRoles,
+  crewHands,
+  crewRepairPerDay,
+  rollCrewIncident,
+  shipRobots,
+  ROBOT_FUEL_PER_DAY,
+  type CrewIncident
+} from './crew'
 
 export const GAME_VERSION = 1
 export const STARTING_CREDITS = 1000
@@ -122,23 +131,22 @@ export function shipValue(ship: Ship): number {
   return value
 }
 
-/** Effective skill = best of commander and crew, plus gadget bonuses. */
+/**
+ * What the ship can actually do right now. The four shipboard skills come from
+ * whoever is standing that station (see `crew.ts`) — an unmanned post is worked
+ * at a penalty — while trading is negotiated by the best talker aboard.
+ */
 export function effectiveSkills(state: GameState): Skills {
-  const s = { ...state.skills }
-  // Crew: take the best skill value available across commander + all crew.
-  for (const id of state.ship.crew) {
-    const merc = MERCENARIES[id]
-    if (!merc) continue
-    s.pilot = Math.max(s.pilot, merc.skills.pilot)
-    s.fighter = Math.max(s.fighter, merc.skills.fighter)
-    s.trader = Math.max(s.trader, merc.skills.trader)
-    s.engineer = Math.max(s.engineer, merc.skills.engineer)
+  const posts = assignRoles(state)
+  let trader = state.skills.trader
+  for (const hand of crewHands(state)) trader = Math.max(trader, hand.skills.trader)
+  return {
+    pilot: posts.pilot.strength,
+    fighter: posts.gunner.strength,
+    engineer: posts.mechanic.strength,
+    electrician: posts.electrician.strength,
+    trader
   }
-  const g = state.ship.gadgets
-  if (g.includes('navigation')) s.pilot += GADGET_SKILL_BONUS
-  if (g.includes('targeting')) s.fighter += GADGET_SKILL_BONUS
-  if (g.includes('autoRepair')) s.engineer += GADGET_SKILL_BONUS
-  return s
 }
 
 /** Maximum fuel capacity including fuelCompactor gadgets and the explorer perk. */
@@ -159,14 +167,14 @@ export function fuelPricePerParsec(state: GameState): number {
   return Math.max(1, Math.round(base * mul))
 }
 
-/** Total daily wages owed to hired crew. */
+/** Total daily wages owed to hired crew. Robots draw fuel instead of pay. */
 export function crewWages(state: GameState): number {
   return state.ship.crew.reduce((sum, id) => sum + (MERCENARIES[id]?.wage ?? 0), 0)
 }
 
-/** Free crew quarters (excluding the commander's own seat). */
+/** Free berths, counting the commander's own and any robots aboard. */
 export function freeQuarters(ship: Ship): number {
-  return SHIP_TYPES[ship.type].crewQuarters - 1 - ship.crew.length
+  return SHIP_TYPES[ship.type].crewQuarters - 1 - ship.crew.length - (ship.robots?.length ?? 0)
 }
 
 export function maxHull(ship: Ship): number {
@@ -209,7 +217,7 @@ export function newGame(opts: NewGameOptions): GameState {
 
   // Start the player in a mid-tech, relatively safe system that has at least one
   // neighbour within the starting ship's range (so they are never stranded).
-  const startRange = SHIP_TYPES.gnat.fuelTanks
+  const startRange = SHIP_TYPES.flea.fuelTanks
   const hasNeighbour = (s: SolarSystem): boolean =>
     systems.some((o) => o.id !== s.id && distance(s, o) <= startRange)
   const startId =
@@ -218,21 +226,30 @@ export function newGame(opts: NewGameOptions): GameState {
     systems.find((s) => s.techLevel >= 4 && s.techLevel <= 6)?.id ??
     0
 
+  // The Flea is the only hull certified for single-handed flight, so that is
+  // where a commander with no crew and no credits necessarily starts.
   const ship: Ship = {
-    type: 'gnat',
-    hull: SHIP_TYPES.gnat.hullStrength,
+    type: 'flea',
+    hull: SHIP_TYPES.flea.hullStrength,
     hullUpgrades: 0,
-    fuel: SHIP_TYPES.gnat.fuelTanks,
+    fuel: SHIP_TYPES.flea.fuelTanks,
     cargo: emptyGoods(),
     weapons: ['pulse'],
     shields: [],
     shieldPoints: [],
     gadgets: [],
     crew: [],
+    robots: [],
     escapePod: false
   }
 
-  const skills: Skills = opts.skills ?? { pilot: 5, fighter: 5, trader: 5, engineer: 5 }
+  const skills: Skills = opts.skills ?? {
+    pilot: 5,
+    fighter: 5,
+    trader: 5,
+    engineer: 5,
+    electrician: 5
+  }
 
   const state: GameState = {
     seed,
@@ -438,6 +455,14 @@ export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
   if (state.credits < net) return fail('error.notEnoughCredits')
 
   const keepPod = state.ship.escapePod
+  // The crew comes across with you, as far as the new hull has berths for
+  // them — being dumped back to a solo watch on a bigger ship would be absurd.
+  const berths = SHIP_TYPES[target].crewQuarters - 1
+  const crew = state.ship.crew.slice(0, berths)
+  const robots = (state.ship.robots ?? []).slice(0, Math.max(0, berths - crew.length))
+  const leftBehind =
+    state.ship.crew.length - crew.length + (state.ship.robots?.length ?? 0) - robots.length
+
   state.credits -= net
   state.ship = {
     type: target,
@@ -449,9 +474,11 @@ export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
     shields: [],
     shieldPoints: [],
     gadgets: [],
-    crew: [],
+    crew,
+    robots,
     escapePod: keepPod
   }
+  if (leftBehind > 0) pushLog(state, 'log.crewLeftBehind', { count: leftBehind })
   return okInfo('info.shipBought', { ship: target })
 }
 
@@ -488,12 +515,12 @@ export function sellGadget(state: GameState, index: number): ActionResult {
 // --- Crew / mercenaries ------------------------------------------------------
 export function hireMercenary(state: GameState, id: string): ActionResult {
   const sys = currentSystem(state)
-  if (sys.mercenaryId !== id) return fail('error.mercNotHere')
-  if (!MERCENARIES[id]) return fail('error.mercNotHere')
+  const roster = sys.mercenaryIds ?? []
+  if (!roster.includes(id) || !MERCENARIES[id]) return fail('error.mercNotHere')
   if (freeQuarters(state.ship) <= 0) return fail('error.noQuarters')
   if (state.ship.crew.includes(id)) return fail('error.alreadyHired')
   state.ship.crew.push(id)
-  sys.mercenaryId = null
+  sys.mercenaryIds = roster.filter((m) => m !== id)
   return okInfo('info.mercHired', { name: id })
 }
 
@@ -501,10 +528,40 @@ export function fireMercenary(state: GameState, id: string): ActionResult {
   const idx = state.ship.crew.indexOf(id)
   if (idx < 0) return fail('error.notInCrew')
   state.ship.crew.splice(idx, 1)
-  // Dropped-off mercenary waits in the current system (if a slot is free).
+  // A dismissed hand goes back into the local hiring hall.
   const sys = currentSystem(state)
-  if (sys.mercenaryId === null) sys.mercenaryId = id
+  sys.mercenaryIds = [...(sys.mercenaryIds ?? []), id]
   return okInfo('info.mercFired', { name: id })
+}
+
+// --- Robots ------------------------------------------------------------------
+/** Robot models a shipyard at the current system will sell. */
+export function robotsForSale(state: GameState): string[] {
+  const tech = currentSystem(state).techLevel
+  return Object.keys(ROBOTS).filter((id) => ROBOTS[id].minTechLevel <= tech)
+}
+
+/** Buy an android crew member. No wages, but it draws fuel every day. */
+export function buyRobot(state: GameState, id: string): ActionResult {
+  const robot = ROBOTS[id]
+  if (!robot) return fail('error.robotNotHere')
+  if (!robotsForSale(state).includes(id)) return fail('error.robotNotHere')
+  if (freeQuarters(state.ship) <= 0) return fail('error.noQuarters')
+  const price = traderPrice(state, robot.price)
+  if (state.credits < price) return fail('error.notEnoughCredits')
+  state.credits -= price
+  state.ship.robots = [...(state.ship.robots ?? []), id]
+  return okInfo('info.robotBought', { robot: id, cost: price })
+}
+
+/** Sell a robot back at the usual 75% of list. */
+export function sellRobot(state: GameState, index: number): ActionResult {
+  const robots = state.ship.robots ?? []
+  const id = robots[index]
+  if (!id || !ROBOTS[id]) return fail('error.nothingToRemove')
+  state.ship.robots = robots.filter((_, i) => i !== index)
+  state.credits += Math.round(ROBOTS[id].price * 0.75)
+  return okInfo('info.robotSold', { robot: id })
 }
 
 // --- Bank --------------------------------------------------------------------
@@ -550,8 +607,13 @@ function shipInsuranceValue(state: GameState): number {
   return SHIP_TYPES[state.ship.type].price
 }
 
-/** Advance the calendar one day and apply daily finances (debt, wages, insurance). */
-export function advanceDay(state: GameState): void {
+/**
+ * Advance the calendar one day and apply daily upkeep: debt, wages, insurance,
+ * robot power draw, and the crew's running repairs. Pass an `rng` for days
+ * spent underway, where an undermanned station can turn into an incident;
+ * leave it out for time that simply passes (a prison sentence).
+ */
+export function advanceDay(state: GameState, rng?: Rng): CrewIncident | null {
   state.day++
 
   // Daily loan interest (10%).
@@ -583,6 +645,28 @@ export function advanceDay(state: GameState): void {
     state.credits = Math.max(0, state.credits - premium)
     state.noClaim++
   }
+
+  // Robots draw on the tank. A dry tank leaves them dormant (see `crew.ts`),
+  // which is the price of a crew that never asks to be paid.
+  const robots = shipRobots(state).length
+  if (robots > 0) {
+    state.robotDrain = (state.robotDrain ?? 0) + robots * ROBOT_FUEL_PER_DAY
+    while (state.robotDrain >= 1 && state.ship.fuel > 0) {
+      state.ship.fuel--
+      state.robotDrain--
+    }
+    if (state.ship.fuel <= 0) state.robotDrain = 0
+  }
+
+  // The engineering watch patches hull plate as a matter of routine.
+  const patched = Math.min(crewRepairPerDay(state), maxHull(state.ship) - state.ship.hull)
+  if (patched > 0) state.ship.hull += patched
+
+  // A station nobody is really minding is where the day goes wrong.
+  if (!rng) return null
+  const incident = rollCrewIncident(state, rng)
+  if (incident) pushLog(state, incident.bodyKey, incident.params)
+  return incident
 }
 
 // --- Result helpers ----------------------------------------------------------
