@@ -1,4 +1,4 @@
-import type { GameState, GoodId } from './types'
+import type { GameState, GoodId, Quest } from './types'
 import { GOOD_IDS } from '../data/goods'
 
 /**
@@ -54,4 +54,33 @@ export function releaseLocalSourcing(state: GameState, good: GoodId, qty: number
  */
 export function deliverableUnits(state: GameState, good: GoodId): number {
   return Math.max(0, state.ship.cargo[good] - (state.sourcedHere?.[good] ?? 0))
+}
+
+/** The goods a cargo-backed quest requires the player to carry, or null. */
+export function questSupply(quest: Quest): { good: GoodId; amount: number } | null {
+  if (
+    (quest.type === 'relief' || quest.type === 'smuggle' || quest.type === 'fetch') &&
+    quest.good &&
+    quest.amount
+  ) {
+    return { good: quest.good, amount: quest.amount }
+  }
+  return null
+}
+
+/**
+ * True when this planet will not sell `good` because the player is under
+ * contract to deliver it *here*.
+ *
+ * A planet that has put out a contract for a commodity is, by the story the
+ * contract tells, short of it — so it has none to sell. Mechanically this closes
+ * a trap: local purchases are excluded from hand-ins (`deliverableUnits`), so
+ * buying the goods on the delivery planet spent the player's money on cargo that
+ * could never settle the job, with nothing on screen explaining why.
+ */
+export function isContractEmbargoed(state: GameState, good: GoodId): boolean {
+  return state.quests.some((q) => {
+    if (q.status !== 'active' || q.targetSystem !== state.currentSystem) return false
+    return questSupply(q)?.good === good
+  })
 }

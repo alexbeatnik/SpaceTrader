@@ -699,3 +699,32 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
   margin-bottom: 2px;
 }
 .side-label.player { color: var(--accent); }
+
+/* --- About screen --- */
+.about-section h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.about-section p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.about-link {
+  display: inline-flex;
+  margin: 14px 0 6px;
+  text-decoration: none;
+}
+.about-disclaimer {
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  padding: 4px 20px 8px;
+}
+.update-line { font-size: 13px; margin-top: 10px; font-weight: 600; }
+.update-actions { margin-top: 12px; }
+.warn-text { color: var(--warn); font-size: 12px; }

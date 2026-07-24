@@ -45,7 +45,10 @@ A modern desktop remake of the classic *Space Trader* game, built with
   paths.
   `advanceDay(state)` (in `game.ts`) is the shared daily tick used by both `warp`
   and `mine` — reuse it rather than re-implementing wages/interest/insurance.
-- `src/i18n/` — locale dictionaries and helpers. `en` is the default locale.
+- `src/i18n/` — locale dictionaries and helpers. **English is the primary
+  locale**: the default on a fresh install, the first entry in `LOCALES` (which
+  is the order the toggle offers), and the fallback for any key a translation
+  is missing. `uk.ts` must mirror its key structure exactly.
 - `src/renderer/src/store/gameStore.ts` — the **only** bridge between UI and
   engine. Components call store actions; the store calls engine functions,
   `structuredClone`s the mutated `GameState` to trigger React updates, and turns
@@ -53,11 +56,38 @@ A modern desktop remake of the classic *Space Trader* game, built with
   the autosave slot on every successful action** — don't add a state-changing
   path that skips it, or the change lives only in memory until the next jump and
   is lost on quit.
-- `src/main/` + `src/preload/` — Electron shell and the save-slot IPC
-  (`window.api.saveGame/loadGame/listSaves/deleteSave`, all slot-addressed).
+- `src/main/` + `src/preload/` — Electron shell, the save-slot IPC
+  (`window.api.saveGame/loadGame/listSaves/deleteSave`, all slot-addressed) and
+  the self-updater (`src/main/updater.ts`).
+
 - `src/shared/` — code both processes need. Today that is `saves.ts`, the
   on-disk save format. It imports nothing from the engine on purpose: main has
   to list and validate slots without understanding a `GameState`.
+
+### Releases and self-update
+
+`.github/workflows/release.yml` builds on every push to main and publishes a
+GitHub Release when `package.json`'s version has no tag yet — so **shipping is
+just bumping the version**. `ci.yml` is the typecheck + test gate for everything
+else.
+
+`src/main/updater.ts` reads that release through electron-updater: it downloads
+in the background and installs on quit, so a jump is never interrupted. Three
+things are load-bearing and easy to break:
+
+- **`latest.yml` must be uploaded with the installer.** It is generated from
+  `build.publish` in package.json (not by `--publish`, which only controls
+  uploading) and is the only thing the updater reads to find a new version.
+- **The artifact name must not contain a space.** GitHub rewrites spaces in
+  asset names, so `Star Trader-...exe` would never resolve against the name
+  recorded in `latest.yml`; hence `StarTrader-${version}-setup.${ext}`. The
+  release job asserts the two match before publishing.
+- **`allowScripts` in package.json** approves Electron's and esbuild's install
+  scripts. npm 11 skips unapproved install scripts, and without them CI never
+  downloads the Electron binary.
+
+`setupUpdater` no-ops when `!app.isPackaged` (electron-updater throws rather
+than skipping), so a dev run reports `unsupported` instead of failing.
 
 ### Save slots
 
@@ -183,6 +213,16 @@ so a contract can never be settled by shopping at its own delivery point (which
 otherwise made `fetch` quests, whose target *is* the giver, free money). The
 field is optional for save compatibility — always read it through
 `deliverableUnits`.
+
+**A planet awaiting a delivery has none to sell.** While an *active* contract's
+`questSupply().good` is due at the current system, `isContractEmbargoed` reports
+it and the market refuses to sell it (`marketBuyPrice` → 0, `buyGood` →
+`error.contractEmbargo`, the row shows "needed here"). It is the story the
+contract tells — the planet is short of the stuff — and it closes a trap the
+ledger alone created: buying the goods at the delivery point spent real money on
+cargo that could never settle the job. The ledger still matters, because a
+player can buy *before* accepting the contract; the embargo only covers what is
+already signed.
 
 The ledger lives in **`engine/sourcing.ts`**, not `game.ts`: `crew.ts` has to
 keep it straight too (its electrical fire burns cargo) and `game.ts` imports

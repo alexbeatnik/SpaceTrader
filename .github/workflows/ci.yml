@@ -1,0 +1,46 @@
+name: CI
+
+# Quality gate: types and the unit suite must both pass. Runs on every push to a
+# working branch (fast feedback before a PR even exists) and as the merge gate on
+# pull requests into main. Runs on Linux — the engine, the i18n dictionaries and
+# the save format are all pure logic needing no Electron binary, so its download
+# is skipped to keep the job fast; typecheck resolves types from the npm package.
+on:
+  push:
+    # main lands via already-checked PRs and is handled by release.yml.
+    branches-ignore: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Supersede in-flight runs for the same ref instead of piling them up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # npm 11 only runs the install scripts approved in package.json's
+      # allowScripts. We skip Electron's binary download entirely: nothing here
+      # launches the app, and typecheck resolves types from the npm package.
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

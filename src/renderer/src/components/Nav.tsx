@@ -12,7 +12,10 @@ const ITEMS: { screen: Screen; icon: string; key: string }[] = [
   { screen: 'chart', icon: '🗺️', key: 'nav.chart' },
   { screen: 'ship', icon: '🚀', key: 'nav.ship' },
   { screen: 'log', icon: '📜', key: 'nav.log' },
-  { screen: 'saves', icon: '💾', key: 'nav.saves' }
+  { screen: 'saves', icon: '💾', key: 'nav.saves' },
+  // Not ℹ️: on Windows it falls back to a plain serif "i" next to the other
+  // tabs' full-colour glyphs.
+  { screen: 'about', icon: '📘', key: 'nav.about' }
 ]
 
 export function Nav(): React.JSX.Element {

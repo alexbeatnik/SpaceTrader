@@ -125,7 +125,12 @@ Core systems implemented:
 Download `Star Trader-<version>-setup.exe` from the
 [Releases](https://github.com/alexbeatnik/SpaceTrader/releases) page and run it.
 
-**Updating to a newer version: just run the new installer.**
+**The game updates itself.** It checks its GitHub releases on start-up,
+downloads a newer version quietly in the background, and installs it the next
+time you quit — nothing to download or reinstall by hand. The **About** tab
+shows what it is doing and can apply a ready update straight away.
+
+If you would rather update manually, just run the new installer:
 
 - **Do not uninstall the old version first.** The installer finds the previous
   install and replaces it in place. Uninstalling first only costs you time.

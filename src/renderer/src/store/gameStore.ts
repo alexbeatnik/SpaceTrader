@@ -86,6 +86,7 @@ export type Screen =
   | 'ship'
   | 'log'
   | 'saves'
+  | 'about'
 
 export interface Toast {
   id: number

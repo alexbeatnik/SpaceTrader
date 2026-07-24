@@ -1,4 +1,5 @@
-// English locale. Mirrors the structure of the Ukrainian locale.
+// English locale — the primary one: the default on a fresh install and the
+// fallback for any key a translation is missing.
 export const en = {
   app: {
     title: 'Star Trader',
@@ -36,7 +37,43 @@ export const en = {
     chart: 'Star Chart',
     ship: 'Ship',
     log: 'Log',
-    saves: 'Saves'
+    saves: 'Saves',
+    about: 'About'
+  },
+  update: {
+    title: 'Updates',
+    blurb:
+      'Star Trader keeps itself up to date from its GitHub releases. A new version downloads quietly in the background and installs the next time you quit — you never have to reinstall anything by hand.',
+    idle: 'Not checked yet.',
+    checking: 'Checking for updates…',
+    current: 'You are on the latest version.',
+    available: 'Version {version} found — downloading…',
+    downloading: 'Downloading… {percent}%',
+    ready: 'Version {version} is ready. It installs when you quit, or restart now.',
+    error: 'Could not check for updates. Check your connection and try again.',
+    unsupported: 'Updates only apply to an installed copy — this build runs from source.',
+    check: 'Check for updates',
+    restart: 'Restart and install'
+  },
+  about: {
+    title: 'About Star Trader',
+    lead: 'Buy low, sell high, dodge pirates, and work your way up from a second-hand Flea to a ship worth fearing.',
+    inspirationTitle: 'What inspired it',
+    inspiration:
+      'The original Space Trader was written by Pieter Spronck for Palm OS, and later ported to Windows by Jay French. Their design is what this project set out to honour: an economy driven by tech levels and local shortages, encounters that can ruin a good run, and the slow climb through better and better hulls.',
+    ownTitle: 'An independent interpretation',
+    own:
+      'This is not a port, and it shares no code with the originals — every system here was written from scratch. It also takes its own liberties: crew stations that go wrong when nobody mans them, warp and mining you sit through in real time, a job board on every planet, convoy escort contracts, and a standing the galaxy files you under, somewhere between outlaw and champion of justice.',
+    freeTitle: 'Free, and free to inspect',
+    free:
+      'Star Trader is free. There is nothing to buy, no accounts, and no telemetry — it runs entirely on your own machine, and your saves never leave it. The full source is published under the Apache-2.0 licence, so anyone can read it, build it, or fork it.',
+    repoTitle: 'Source code',
+    repo: 'Bug reports, ideas and pull requests are all welcome on GitHub.',
+    openRepo: 'Open the repository on GitHub',
+    authorLabel: 'Author',
+    licenseLabel: 'Licence',
+    disclaimer:
+      'A fan project, made for love of the original. Not affiliated with, nor endorsed by, the authors of the games that inspired it.'
   },
   saves: {
     title: 'Saved games',
@@ -307,6 +344,8 @@ export const en = {
     inHold: 'In hold',
     avgPrice: 'Avg price',
     notSold: 'not sold',
+    embargo: 'needed here',
+    embargoHint: 'This planet is waiting on your delivery of it — there is none to buy. Bring it in from elsewhere.',
     notWanted: 'not wanted',
     illegal: 'illegal good',
     emptyHold: 'Your cargo hold is empty',
@@ -696,6 +735,7 @@ export const en = {
     noMineSite: 'There is nothing to mine here.',
     holdFull: 'The cargo hold is full.',
     holdTooSmall: 'Your hold is too small for this contract.',
+    contractEmbargo: 'This planet is short of it — that is why you were hired to bring it. Buy it elsewhere.',
     loadFailed: 'Could not load the save file — it may be corrupted.'
   },
   tech: {

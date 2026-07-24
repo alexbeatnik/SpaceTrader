@@ -9,6 +9,7 @@ import {
   freeCargoBays,
   questDemand,
   marketBuyPrice,
+  isContractEmbargoed,
   type GoodId
 } from '@game/index'
 import { goodName } from '@i18n/index'
@@ -68,6 +69,8 @@ export function MarketScreen(): React.JSX.Element {
               const good = TRADE_GOODS[id]
               const held = game.ship.cargo[id]
               const buyP = unitBuyPrice(id)
+              // This planet is waiting on a delivery of it, so it has none to sell.
+              const embargoed = isContractEmbargoed(game, id)
               const sellP = sys.sellPrice[id]
               const need = demand[id]
               const profit = held > 0 && sellP > 0 ? (sellP - game.buyingPrice[id]) * held : 0
@@ -78,7 +81,17 @@ export function MarketScreen(): React.JSX.Element {
                     {good.illegal && <span className="illegal-tag">{t('market.illegal')}</span>}
                   </td>
                   <td className="num muted">{sys.qty[id] > 0 ? sys.qty[id] : '—'}</td>
-                  <td className="num">{buyP > 0 ? fmt(buyP) : <span className="muted">{t('market.notSold')}</span>}</td>
+                  <td className="num">
+                    {buyP > 0 ? (
+                      fmt(buyP)
+                    ) : embargoed ? (
+                      <span className="warn-text" title={t('market.embargoHint')}>
+                        {t('market.embargo')}
+                      </span>
+                    ) : (
+                      <span className="muted">{t('market.notSold')}</span>
+                    )}
+                  </td>
                   <td className="num">{sellP > 0 ? fmt(sellP) : <span className="muted">{t('market.notWanted')}</span>}</td>
                   <td className="num">{held > 0 ? held : '—'}</td>
                   <td className="num">

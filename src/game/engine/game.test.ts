@@ -72,7 +72,8 @@ import {
   questSupplyUnitPrice,
   questDemand,
   activeQuests,
-  boardQuestProblem
+  boardQuestProblem,
+  isContractEmbargoed
 } from './quests'
 import { runEscort, escortLegs, ESCORT_KILL_BONUS } from './escort'
 import { escortShipProblem, canEscort, buyRobot, freeQuarters } from './game'
@@ -1149,9 +1150,12 @@ describe('contract cargo must be hauled in', () => {
     sys.buyPrice.water = 10
     sys.qty.water = 50
     g.credits = 10000
+
+    // Bought here *before* signing anything, so the delivery embargo does not
+    // apply yet — but the units are still local and cannot settle a job due here.
+    buyGood(g, 'water', 5)
     const q = reliefQuest(g, 5)
 
-    buyGood(g, 'water', 5)
     expect(g.ship.cargo.water).toBe(5) // the hold is full enough…
     expect(deliverableUnits(g, 'water')).toBe(0) // …but none of it was hauled in
     expect(canTurnIn(g, q)).toBe(false)
@@ -1173,17 +1177,20 @@ describe('contract cargo must be hauled in', () => {
     sys.buyPrice.water = 10
     sys.qty.water = 50
     g.credits = 10000
+
+    // Five topped up here before signing, then two contracts taken on.
+    buyGood(g, 'water', 5)
     const first = reliefQuest(g, 5)
     const second = reliefQuest(g, 5)
+    // Plus five that were actually hauled in — enough for one of the two.
+    g.ship.cargo.water += 5
+    expect(deliverableUnits(g, 'water')).toBe(5)
 
-    // Arrived with just enough for one of the two.
-    g.ship.cargo.water = 5
     expect(turnInQuest(g, first.id)).not.toBeNull()
-    expect(g.ship.cargo.water).toBe(0)
 
-    // Topping up from the local market must not settle the second one.
-    buyGood(g, 'water', 5)
+    // The five bought here are still aboard, and still cannot settle anything.
     expect(g.ship.cargo.water).toBe(5)
+    expect(deliverableUnits(g, 'water')).toBe(0)
     expect(canTurnIn(g, second)).toBe(false)
     expect(turnInQuest(g, second.id)).toBeNull()
   })
@@ -1908,5 +1915,74 @@ describe('cargo burnt in an electrical fire', () => {
     // Left unreleased, the ledger kept holding back goods that no longer exist.
     expect(g.sourcedHere?.ore).toBe(g.ship.cargo.ore)
     expect(deliverableUnits(g, 'ore')).toBe(0)
+  })
+})
+
+describe('a planet awaiting a delivery has none to sell', () => {
+  /** Accept a relief contract for `good`, due at the current system. */
+  function contractDueHere(g: ReturnType<typeof newGame>, good: GoodId): Quest {
+    const q: Quest = {
+      id: `due-${good}`,
+      type: 'relief',
+      giverSystem: (g.currentSystem + 1) % g.systems.length,
+      targetSystem: g.currentSystem,
+      reward: 1000,
+      status: 'offered',
+      good,
+      amount: 5
+    }
+    acceptQuest(g, q)
+    return q
+  }
+
+  function stockedGame(): ReturnType<typeof newGame> {
+    const g = newGame({ commanderName: 'Test', seed: 310 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 10
+    sys.qty.water = 50
+    sys.buyPrice.food = 20
+    sys.qty.food = 50
+    g.credits = 10000
+    return g
+  }
+
+  it('takes the contracted good off the shelf', () => {
+    const g = stockedGame()
+    expect(marketBuyPrice(g, 'water')).toBeGreaterThan(0)
+
+    contractDueHere(g, 'water')
+
+    expect(isContractEmbargoed(g, 'water')).toBe(true)
+    expect(marketBuyPrice(g, 'water')).toBe(0)
+    const res = buyGood(g, 'water', 5)
+    expect(res.ok).toBe(false)
+    // Its own reason, not a bare "not sold" — the player needs to know why.
+    expect(res.error).toBe('error.contractEmbargo')
+    expect(g.ship.cargo.water).toBe(0)
+  })
+
+  it('leaves every other commodity alone', () => {
+    const g = stockedGame()
+    contractDueHere(g, 'water')
+    expect(isContractEmbargoed(g, 'food')).toBe(false)
+    expect(buyGood(g, 'food', 3).ok).toBe(true)
+    expect(g.ship.cargo.food).toBe(3)
+  })
+
+  it('does not touch a planet that is not the destination', () => {
+    const g = stockedGame()
+    const q = contractDueHere(g, 'water')
+    q.targetSystem = (g.currentSystem + 1) % g.systems.length
+    expect(isContractEmbargoed(g, 'water')).toBe(false)
+    expect(buyGood(g, 'water', 2).ok).toBe(true)
+  })
+
+  it('lifts once the contract is settled', () => {
+    const g = stockedGame()
+    const q = contractDueHere(g, 'water')
+    g.ship.cargo.water = 5 // hauled in
+    expect(turnInQuest(g, q.id)).not.toBeNull()
+    expect(isContractEmbargoed(g, 'water')).toBe(false)
+    expect(marketBuyPrice(g, 'water')).toBeGreaterThan(0)
   })
 })

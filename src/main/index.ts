@@ -10,6 +10,7 @@ import {
   type SaveSlotId,
   type SaveSlotInfo
 } from '../shared/saves'
+import { setupUpdater } from './updater'
 
 const SAVE_DIR = () => join(app.getPath('userData'), 'saves')
 const slotFile = (slot: SaveSlotId): string => join(SAVE_DIR(), `slot-${slot}.json`)
@@ -39,6 +40,8 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow.show())
+
+  setupUpdater(mainWindow)
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)

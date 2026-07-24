@@ -1,15 +1,19 @@
-import { uk } from './locales/uk'
 import { en } from './locales/en'
+import { uk } from './locales/uk'
 
-export type Locale = 'uk' | 'en'
+export type Locale = 'en' | 'uk'
 export type Dict = Record<string, unknown>
 
-const DICTS: Record<Locale, Dict> = { uk, en }
-export const LOCALES: Locale[] = ['uk', 'en']
+/** English is the primary locale: the default, and the fallback for any key. */
+export const DEFAULT_LOCALE: Locale = 'en'
+
+const DICTS: Record<Locale, Dict> = { en, uk }
+// Order matters: this is the order the language toggle offers them in.
+export const LOCALES: Locale[] = ['en', 'uk']
 const STORAGE_KEY = 'star-trader:locale'
 
 const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
-let current: Locale = LOCALES.includes(stored as Locale) ? (stored as Locale) : 'en'
+let current: Locale = LOCALES.includes(stored as Locale) ? (stored as Locale) : DEFAULT_LOCALE
 
 const listeners = new Set<() => void>()
 

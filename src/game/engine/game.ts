@@ -33,7 +33,12 @@ import {
   ROBOT_FUEL_PER_DAY,
   type CrewIncident
 } from './crew'
-import { emptyGoods, noteLocalSourcing, releaseLocalSourcing } from './sourcing'
+import {
+  emptyGoods,
+  isContractEmbargoed,
+  noteLocalSourcing,
+  releaseLocalSourcing
+} from './sourcing'
 
 // The local-sourcing ledger lives in its own module (`crew.ts` needs it too and
 // cannot import this one), but stays part of this module's public surface.
@@ -285,6 +290,8 @@ export function traderDiscount(state: GameState): number {
 export function marketBuyPrice(state: GameState, good: GoodId): number {
   const listed = currentSystem(state).buyPrice[good]
   if (listed <= 0) return 0
+  // A planet awaiting this commodity under contract has none to spare.
+  if (isContractEmbargoed(state, good)) return 0
   return Math.max(1, Math.round(listed * (1 - traderDiscount(state))))
 }
 
@@ -292,6 +299,9 @@ export function buyGood(state: GameState, good: GoodId, amount: number): ActionR
   const sys = currentSystem(state)
   const price = sys.buyPrice[good]
   if (price <= 0 || sys.qty[good] <= 0) return fail('error.notSold')
+  // Refused with its own reason rather than a bare "not sold": the player has a
+  // contract open for exactly this, and needs to know why the shelf is bare.
+  if (isContractEmbargoed(state, good)) return fail('error.contractEmbargo')
 
   const unit = marketBuyPrice(state, good)
 

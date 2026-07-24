@@ -18,9 +18,24 @@
     "dist": "npm run build && electron-builder",
     "dist:portable": "npm run build && electron-builder --win portable"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexbeatnik/SpaceTrader.git"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.21.5": true
+  },
   "build": {
     "appId": "com.alexbeatnik.startrader",
     "productName": "Star Trader",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "alexbeatnik",
+        "repo": "SpaceTrader"
+      }
+    ],
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -34,7 +49,7 @@
         "nsis"
       ],
       "icon": "build/icon.ico",
-      "artifactName": "${productName}-${version}-setup.${ext}"
+      "artifactName": "StarTrader-${version}-setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -42,15 +57,16 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "artifactName": "${productName}-${version}-setup.${ext}",
+      "artifactName": "StarTrader-${version}-setup.${ext}",
       "include": "build/installer.nsh",
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "StarTrader-${version}-portable.${ext}"
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

@@ -11,6 +11,7 @@ import {
   escortShipProblem,
   type ActionResult
 } from './game'
+import { questSupply } from './sourcing'
 import { systemDistance } from './travel'
 import { standardPrice } from './market'
 import { applyKarma, QUEST_KARMA } from './reputation'
@@ -290,17 +291,11 @@ export function acceptBoardQuest(state: GameState, questId: string): ActionResul
 }
 
 // --- Quest supplies ----------------------------------------------------------
-/** The goods a cargo-backed quest requires the player to carry, or null. */
-export function questSupply(quest: Quest): { good: GoodId; amount: number } | null {
-  if (
-    (quest.type === 'relief' || quest.type === 'smuggle' || quest.type === 'fetch') &&
-    quest.good &&
-    quest.amount
-  ) {
-    return { good: quest.good, amount: quest.amount }
-  }
-  return null
-}
+// `questSupply` lives in `sourcing.ts` alongside the rest of the contract-cargo
+// rules, so `game.ts` can enforce the delivery embargo without importing this
+// module (which imports it, and would make a cycle). Re-exported here because
+// this is where callers look for it.
+export { questSupply, isContractEmbargoed } from './sourcing'
 
 /** Fair per-unit price the quest-giver charges to supply a required good. */
 export function questSupplyUnitPrice(state: GameState, good: GoodId): number {
