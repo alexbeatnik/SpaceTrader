@@ -7,6 +7,7 @@ import {
   freeCargoBays,
   deliverableUnits,
   escortShipProblem,
+  boardQuestProblem,
   escortLegs,
   ESCORT_MIN_WEAPONS,
   ESCORT_MIN_SHIELDS,
@@ -79,6 +80,9 @@ export function QuestsScreen(): React.JSX.Element {
         <div className="grid" style={{ gap: 10 }}>
           {board.map((q) => {
             const need = questSupply(q)
+            // Anything that makes this job impossible for the current ship —
+            // no berth, wrong hull, or a hold that could never take the freight.
+            const problem = boardQuestProblem(game, q)
             return (
               <div className="panel panel-pad" key={q.id}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -102,13 +106,19 @@ export function QuestsScreen(): React.JSX.Element {
                         {escortProblem && <> · {t(escortProblem)}</>}
                       </div>
                     )}
+                    {/* The escort line already carries its own reason. */}
+                    {problem && q.type !== 'escort' && (
+                      <div className="neg" style={{ fontSize: 12, marginTop: 4 }}>
+                        ⚠ {t(problem)}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
                     <button
                       className="btn btn-sm btn-primary"
                       style={{ marginTop: 6 }}
-                      disabled={q.type === 'escort' && escortProblem !== null}
+                      disabled={problem !== null}
                       onClick={() => acceptBoard(q.id)}
                     >
                       {t('quest.accept')}

@@ -695,6 +695,7 @@ export const en = {
     escortNotHere: 'The convoy forms up at the system that posted the contract.',
     noMineSite: 'There is nothing to mine here.',
     holdFull: 'The cargo hold is full.',
+    holdTooSmall: 'Your hold is too small for this contract.',
     loadFailed: 'Could not load the save file — it may be corrupted.'
   },
   tech: {

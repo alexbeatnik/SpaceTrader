@@ -70,7 +70,9 @@ import {
   questSupplyMissing,
   questSupply,
   questSupplyUnitPrice,
-  questDemand
+  questDemand,
+  activeQuests,
+  boardQuestProblem
 } from './quests'
 import { runEscort, escortLegs, ESCORT_KILL_BONUS } from './escort'
 import { escortShipProblem, canEscort, buyRobot, freeQuarters } from './game'
@@ -123,6 +125,7 @@ function testEncounter(kind: EncounterKind, opp: Partial<Opponent> = {}): Encoun
     defeated: 0,
     status: 'ongoing',
     round: 0,
+    seed: 1,
     bribeCost: 0,
     messages: []
   }
@@ -1802,5 +1805,108 @@ describe('quoted market price', () => {
     const before = g.credits
     buyGood(g, 'water', 3)
     expect(before - g.credits).toBe(quoted * 3)
+  })
+})
+
+describe('determinism and per-encounter dice', () => {
+  it('gives each encounter its own seed', () => {
+    // Two fights on one leg used to share (seed, day, round) and so rolled an
+    // identical sequence round for round.
+    const g = newGame({ commanderName: 'T', seed: 77 })
+    const rng = new Rng(4242)
+    const a = spawnPirates(g, rng)
+    const b = spawnPirates(g, rng)
+    expect(a.seed).not.toBe(b.seed)
+  })
+
+  it('replays a seeded game identically', () => {
+    // Quest ids came off the wall clock, so the same seed produced different
+    // ids on every run.
+    const run = (): string[] => {
+      const g = newGame({ commanderName: 'T', seed: 2024 })
+      return generateQuestBoard(g, new Rng(9)).map((q) => q.id)
+    }
+    expect(run()).toEqual(run())
+  })
+
+  it('never reuses a quest id across boards', () => {
+    const g = newGame({ commanderName: 'T', seed: 5 })
+    const ids = [
+      ...generateQuestBoard(g, new Rng(1)).map((q) => q.id),
+      ...generateQuestBoard(g, new Rng(2)).map((q) => q.id),
+      ...generateQuestBoard(g, new Rng(3)).map((q) => q.id)
+    ]
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('board postings the ship cannot take', () => {
+  function boardWith(g: ReturnType<typeof newGame>, quest: Quest): void {
+    g.systems[g.currentSystem].questBoard = [quest]
+  }
+
+  it('refuses freight that would never fit the hold', () => {
+    const g = newGame({ commanderName: 'T', seed: 3 })
+    // The Flea holds ten bays; a bulk contract is simply beyond it.
+    const bulk: Quest = {
+      id: 'bulk',
+      type: 'fetch',
+      giverSystem: g.currentSystem,
+      targetSystem: g.currentSystem,
+      reward: 50000,
+      status: 'offered',
+      good: 'ore',
+      amount: 70
+    }
+    boardWith(g, bulk)
+    expect(boardQuestProblem(g, bulk)).toBe('error.holdTooSmall')
+    const res = acceptBoardQuest(g, 'bulk')
+    expect(res.ok).toBe(false)
+    expect(res.error).toBe('error.holdTooSmall')
+    expect(activeQuests(g)).toHaveLength(0)
+  })
+
+  it('still takes a contract the hold can carry', () => {
+    const g = newGame({ commanderName: 'T', seed: 3 })
+    const small: Quest = {
+      id: 'small',
+      type: 'fetch',
+      giverSystem: g.currentSystem,
+      targetSystem: g.currentSystem,
+      reward: 900,
+      status: 'offered',
+      good: 'ore',
+      amount: 6
+    }
+    boardWith(g, small)
+    expect(boardQuestProblem(g, small)).toBeNull()
+    expect(acceptBoardQuest(g, 'small').ok).toBe(true)
+    expect(activeQuests(g)).toHaveLength(1)
+  })
+})
+
+describe('cargo burnt in an electrical fire', () => {
+  it('comes off the local-sourcing ledger too', () => {
+    const g = newGame({ commanderName: 'T', seed: 405 })
+    g.ship.type = 'atlas' // seven hands needed, flying with one
+    g.skills = { pilot: 1, fighter: 1, trader: 1, engineer: 1, electrician: 1 }
+    // Every unit aboard was mined right here, so the ledger starts equal to the
+    // hold and must stay that way however much of it burns.
+    g.ship.cargo.ore = 40
+    noteLocalSourcing(g, 'ore', 40)
+
+    const rng = new Rng(5)
+    let fire: ReturnType<typeof rollCrewIncident> = null
+    for (let i = 0; i < 500 && !fire; i++) {
+      g.ship.hull = 400 // keep her flyable so incidents keep rolling
+      const incident = rollCrewIncident(g, rng)
+      if (incident?.role === 'electrician') fire = incident
+    }
+
+    expect(fire).not.toBeNull()
+    expect(g.ship.cargo.ore).toBeLessThan(40) // something did burn
+    // Left unreleased, the ledger kept holding back goods that no longer exist.
+    expect(g.sourcedHere?.ore).toBe(g.ship.cargo.ore)
+    expect(deliverableUnits(g, 'ore')).toBe(0)
   })
 })

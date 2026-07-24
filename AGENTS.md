@@ -27,8 +27,13 @@ A modern desktop remake of the classic *Space Trader* game, built with
    a plain `GameState` and returns typed `ActionResult`s. This keeps it testable
    and portable (a web build could reuse it verbatim).
 4. **Determinism matters.** Galaxy generation and any world logic use the seeded
-   `Rng` (`src/game/engine/rng.ts`), never `Math.random`, so games are
-   reproducible and tests are stable.
+   `Rng` (`src/game/engine/rng.ts`), never `Math.random` **and never the wall
+   clock** — `Date.now()` breaks a seeded replay just as thoroughly. Anything
+   needing a unique id counts up in the save instead (see `nextQuestId`, which
+   keeps its sequence in `state.flags.questSeq`).
+   Per-fight dice come from `Encounter.seed`, drawn once when the encounter is
+   built; rounds resolve on `seed ^ round`. Deriving them from the calendar
+   instead made two fights on one leg roll an identical sequence.
 
 ## Architecture
 
@@ -175,10 +180,22 @@ at the current planet — bought at its market (`buyGood`, `buyQuestSupplies`) o
 mined at its site — and `clearLocalSourcing` wipes it on every arrival.
 `deliverableUnits(state, good)` is `cargo − sourcedHere`, and `canTurnIn` uses it
 so a contract can never be settled by shopping at its own delivery point (which
-otherwise made `fetch` quests, whose target *is* the giver, free money). Any new
-code that adds cargo must decide: obtained here → `noteLocalSourcing`; taken in
-space (salvage, plunder, loot) → nothing. The field is optional for save
-compatibility — always read it through `deliverableUnits`.
+otherwise made `fetch` quests, whose target *is* the giver, free money). The
+field is optional for save compatibility — always read it through
+`deliverableUnits`.
+
+The ledger lives in **`engine/sourcing.ts`**, not `game.ts`: `crew.ts` has to
+keep it straight too (its electrical fire burns cargo) and `game.ts` imports
+`crew.ts`, so the helpers sit below both. `game.ts` re-exports them, so
+`@game/index` is unchanged. Any code that **moves cargo** must pick a side:
+
+- obtained here (market, mine) → `noteLocalSourcing`
+- taken in space (salvage, plunder, loot, in-flight trade) → nothing
+- **leaving the hold at this planet** (sold, dumped, seized, burnt) →
+  `releaseLocalSourcing`, which retires the local units first. Skip it and
+  selling back what you just bought silently strands cargo you really did haul
+  in. `turnInQuest` is the exception: it consumes *deliverable* units, so the
+  local ones legitimately stay on the books.
 
 Related quest UX wired to the same engine helpers:
 

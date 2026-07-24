@@ -564,7 +564,9 @@ export const useGameStore = create<GameStore>((set, get) => {
       withGame((g) => {
         const enc = get().encounter
         if (!enc) return
-        const rng = new Rng((g.seed ^ (g.day * 40503) ^ (enc.round * 2654435761)) >>> 0)
+        // Seeded off this encounter, not the calendar: keyed on the day alone,
+        // two fights on the same leg rolled the very same dice round for round.
+        const rng = new Rng((enc.seed ^ (enc.round * 2654435761)) >>> 0)
         resolveRound(g, enc, action, rng)
 
         if (enc.status === 'playerDestroyed') {

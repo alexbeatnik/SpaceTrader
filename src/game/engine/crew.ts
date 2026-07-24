@@ -6,6 +6,7 @@ import { MERCENARIES, MERCENARY_IDS } from '../data/mercenaries'
 import { ROBOTS } from '../data/robots'
 import { GADGET_SKILL_BONUS } from '../data/equipment'
 import { GOOD_IDS } from '../data/goods'
+import { releaseLocalSourcing } from './sourcing'
 
 /**
  * Crew stations.
@@ -281,6 +282,9 @@ function runIncident(state: GameState, role: CrewRole, rng: Rng): CrewIncident {
     if (good) {
       burned = Math.min(state.ship.cargo[good], rng.int(1, 4))
       state.ship.cargo[good] -= burned
+      // Cargo lost is cargo off the local-sourcing ledger too, or a fire while
+      // mining would keep holding back goods that no longer exist.
+      releaseLocalSourcing(state, good, burned)
       if (state.ship.cargo[good] === 0) state.buyingPrice[good] = 0
     }
     state.day++

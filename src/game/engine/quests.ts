@@ -5,6 +5,7 @@ import {
   pushLog,
   freeQuarters,
   freeCargoBays,
+  totalCargoBays,
   deliverableUnits,
   noteLocalSourcing,
   escortShipProblem,
@@ -39,9 +40,17 @@ export function hasActiveBounty(state: GameState): Quest | undefined {
   return state.quests.find((q) => q.status === 'active' && q.type === 'bounty')
 }
 
-let questCounter = 0
-function nextQuestId(): string {
-  return `q${Date.now().toString(36)}${(questCounter++).toString(36)}`
+/**
+ * Quest ids come from a counter carried in the save, not the wall clock: a
+ * seeded game has to replay identically, and `Date.now()` made every run (and
+ * every test) produce different ids. The counter is monotonic across saves, so
+ * an id is never reused — and being far shorter than the old timestamp form, it
+ * can never collide with ids already written into an existing save either.
+ */
+function nextQuestId(state: GameState): string {
+  const seq = (state.flags.questSeq ?? 0) + 1
+  state.flags.questSeq = seq
+  return `q${seq}`
 }
 
 /**
@@ -79,7 +88,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
       const amount = rng.int(3, 8)
       const reward = cargoReward(state, good, amount, systemDistance(here, crisis), rng)
       return {
-        id: nextQuestId(),
+        id: nextQuestId(state),
         type: 'relief',
         giverSystem: here.id,
         targetSystem: crisis.id,
@@ -99,7 +108,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
     // Smuggling is high-risk: extra margin on top of the standard cargo reward.
     const reward = Math.round(cargoReward(state, good, amount, systemDistance(here, target), rng) * 1.2)
     return {
-      id: nextQuestId(),
+      id: nextQuestId(state),
       type: 'smuggle',
       giverSystem: here.id,
       targetSystem: target.id,
@@ -115,7 +124,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
     const target = rng.pick(others)
     const dist = systemDistance(here, target)
     return {
-      id: nextQuestId(),
+      id: nextQuestId(state),
       type: 'passenger',
       giverSystem: here.id,
       targetSystem: target.id,
@@ -129,7 +138,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
   if (roll < 0.7) {
     const target = rng.pick(others)
     return {
-      id: nextQuestId(),
+      id: nextQuestId(state),
       type: 'bounty',
       giverSystem: here.id,
       targetSystem: target.id,
@@ -145,7 +154,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
     const amount = rng.int(3, 8)
     const reward = cargoReward(state, good, amount, 0, rng)
     return {
-      id: nextQuestId(),
+      id: nextQuestId(state),
       type: 'fetch',
       giverSystem: here.id,
       targetSystem: here.id,
@@ -160,7 +169,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
   const target = rng.pick(others)
   const dist = systemDistance(here, target)
   return {
-    id: nextQuestId(),
+    id: nextQuestId(state),
     type: 'delivery',
     giverSystem: here.id,
     targetSystem: target.id,
@@ -194,14 +203,14 @@ function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
     // Fetch: source a commodity elsewhere and bring it back here.
     const good = rng.pick(FETCH_GOODS)
     const reward = cargoReward(state, good, amount, 0, rng)
-    return { id: nextQuestId(), type: 'fetch', giverSystem: here.id, targetSystem: here.id, reward, status: 'offered', good, amount }
+    return { id: nextQuestId(state), type: 'fetch', giverSystem: here.id, targetSystem: here.id, reward, status: 'offered', good, amount }
   }
   if (roll < 0.42) {
     // Smuggle contraband to a distant buyer.
     const target = rng.pick(others)
     const good: GoodId = rng.chance(0.5) ? 'firearms' : 'narcotics'
     const reward = Math.round(cargoReward(state, good, amount, systemDistance(here, target), rng) * 1.2)
-    return { id: nextQuestId(), type: 'smuggle', giverSystem: here.id, targetSystem: target.id, reward, status: 'offered', good, amount }
+    return { id: nextQuestId(state), type: 'smuggle', giverSystem: here.id, targetSystem: target.id, reward, status: 'offered', good, amount }
   }
   if (roll < 0.6) {
     // Relief to a system in crisis (or any system if none is in crisis).
@@ -210,29 +219,29 @@ function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
       rng.pick(others)
     const good: GoodId = crisis.status === 'plague' ? 'medicine' : crisis.status === 'drought' ? 'water' : 'food'
     const reward = cargoReward(state, good, amount, systemDistance(here, crisis), rng)
-    return { id: nextQuestId(), type: 'relief', giverSystem: here.id, targetSystem: crisis.id, reward, status: 'offered', good, amount }
+    return { id: nextQuestId(state), type: 'relief', giverSystem: here.id, targetSystem: crisis.id, reward, status: 'offered', good, amount }
   }
   if (roll < 0.74 && freeQuarters(state.ship) > 0) {
     // Passenger transport (needs a spare berth).
     const target = rng.pick(others)
     const dist = systemDistance(here, target)
-    return { id: nextQuestId(), type: 'passenger', giverSystem: here.id, targetSystem: target.id, reward: 500 + dist * 70 + rng.int(0, 900), status: 'offered', passengerName: rng.pick(PASSENGER_NAMES) }
+    return { id: nextQuestId(state), type: 'passenger', giverSystem: here.id, targetSystem: target.id, reward: 500 + dist * 70 + rng.int(0, 900), status: 'offered', passengerName: rng.pick(PASSENGER_NAMES) }
   }
   if (roll < 0.82) {
     // Bounty hunt for a wanted pirate.
     const target = rng.pick(others)
-    return { id: nextQuestId(), type: 'bounty', giverSystem: here.id, targetSystem: target.id, reward: rng.int(2000, 6000), status: 'offered', bountyName: rng.pick(BOUNTY_NAMES) }
+    return { id: nextQuestId(state), type: 'bounty', giverSystem: here.id, targetSystem: target.id, reward: rng.int(2000, 6000), status: 'offered', bountyName: rng.pick(BOUNTY_NAMES) }
   }
   if (roll < 0.94) {
     // Convoy escort: gun cover on a long haul, for military hulls only.
     const target = rng.pick(others)
     const dist = systemDistance(here, target)
-    return { id: nextQuestId(), type: 'escort', giverSystem: here.id, targetSystem: target.id, reward: 1500 + dist * 120 + rng.int(0, 1500), status: 'offered' }
+    return { id: nextQuestId(state), type: 'escort', giverSystem: here.id, targetSystem: target.id, reward: 1500 + dist * 120 + rng.int(0, 1500), status: 'offered' }
   }
   // Courier delivery.
   const target = rng.pick(others)
   const dist = systemDistance(here, target)
-  return { id: nextQuestId(), type: 'delivery', giverSystem: here.id, targetSystem: target.id, reward: 400 + dist * 60 + rng.int(0, 800), status: 'offered' }
+  return { id: nextQuestId(state), type: 'delivery', giverSystem: here.id, targetSystem: target.id, reward: 400 + dist * 60 + rng.int(0, 800), status: 'offered' }
 }
 
 /** Generate a fresh set of postings for the current planet's job board. */
@@ -246,6 +255,25 @@ export function generateQuestBoard(state: GameState, rng: Rng): Quest[] {
   return board
 }
 
+/**
+ * Why a posting cannot be taken on, or null if it can. Gathers the physical
+ * impossibilities in one place so the job board can grey a card out with the
+ * reason rather than letting the player accept a job and only then discover the
+ * ship cannot do it: a berth for a passenger, a gunship for a convoy, and a
+ * hold big enough for the freight — a 70-unit bulk contract is not going
+ * anywhere in a Flea's ten bays.
+ */
+export function boardQuestProblem(state: GameState, quest: Quest): string | null {
+  if (quest.type === 'passenger' && freeQuarters(state.ship) <= 0) return 'error.noQuarters'
+  // The convoy signs on gunships only — no point taking the job otherwise.
+  if (quest.type === 'escort') return escortShipProblem(state)
+  const need = questSupply(quest)
+  // Judged on the whole hold, not what is free: the player can always sell down
+  // before loading, but no amount of tidying makes a small hull a big one.
+  if (need && need.amount > totalCargoBays(state.ship)) return 'error.holdTooSmall'
+  return null
+}
+
 /** Accept a posting from the current planet's job board. */
 export function acceptBoardQuest(state: GameState, questId: string): ActionResult {
   const sys = currentSystem(state)
@@ -254,12 +282,8 @@ export function acceptBoardQuest(state: GameState, questId: string): ActionResul
   if (idx < 0) return { ok: false, error: 'error.questGone' }
   if (activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, error: 'error.tooManyQuests' }
   const q = board[idx]
-  if (q.type === 'passenger' && freeQuarters(state.ship) <= 0) return { ok: false, error: 'error.noQuarters' }
-  // The convoy signs on gunships only — no point taking the job otherwise.
-  if (q.type === 'escort') {
-    const problem = escortShipProblem(state)
-    if (problem) return { ok: false, error: problem }
-  }
+  const problem = boardQuestProblem(state, q)
+  if (problem) return { ok: false, error: problem }
   board.splice(idx, 1)
   acceptQuest(state, q)
   return { ok: true, info: { key: 'quest.accepted', params: questParams(state, q) } }

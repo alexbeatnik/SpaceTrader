@@ -33,6 +33,16 @@ import {
   ROBOT_FUEL_PER_DAY,
   type CrewIncident
 } from './crew'
+import { emptyGoods, noteLocalSourcing, releaseLocalSourcing } from './sourcing'
+
+// The local-sourcing ledger lives in its own module (`crew.ts` needs it too and
+// cannot import this one), but stays part of this module's public surface.
+export {
+  noteLocalSourcing,
+  clearLocalSourcing,
+  releaseLocalSourcing,
+  deliverableUnits
+} from './sourcing'
 
 export const GAME_VERSION = 1
 export const STARTING_CREDITS = 1000
@@ -50,12 +60,6 @@ export const MILITARY_WEAPON_BONUS = 1.15
 /** Units extracted per mining day by industrial-class hulls (others get 1). */
 export const INDUSTRIAL_MINING_YIELD = 2
 
-function emptyGoods(): Record<GoodId, number> {
-  const rec = {} as Record<GoodId, number>
-  for (const g of GOOD_IDS) rec[g] = 0
-  return rec
-}
-
 // --- Cargo & ship helpers ----------------------------------------------------
 export function totalCargoBays(ship: Ship): number {
   const base = SHIP_TYPES[ship.type].cargoBays
@@ -69,45 +73,6 @@ export function usedCargoBays(ship: Ship): number {
 
 export function freeCargoBays(ship: Ship): number {
   return totalCargoBays(ship) - usedCargoBays(ship)
-}
-
-// --- Local sourcing (contract integrity) -------------------------------------
-/**
- * Record goods obtained at the current planet (bought at its market or mined
- * at its site). A contract may not be settled with cargo picked up at the very
- * planet expecting the delivery, so these units are held back from quest
- * hand-ins until the ship travels again.
- */
-export function noteLocalSourcing(state: GameState, good: GoodId, qty: number): void {
-  if (qty <= 0) return
-  if (!state.sourcedHere) state.sourcedHere = emptyGoods()
-  state.sourcedHere[good] += qty
-}
-
-/** Forget local sourcing — called on arrival, once the cargo has been hauled. */
-export function clearLocalSourcing(state: GameState): void {
-  state.sourcedHere = emptyGoods()
-}
-
-/**
- * Units have left the hold at this planet (sold back, dumped, seized). Retire
- * the locally-sourced ones first: they are the units a contract could not have
- * used anyway, and leaving them on the books would wrongly hold back goods the
- * ship really did haul in — sell the 5 you just bought here and the 10 you
- * arrived with would stop counting.
- */
-export function releaseLocalSourcing(state: GameState, good: GoodId, qty: number): void {
-  if (qty <= 0 || !state.sourcedHere) return
-  state.sourcedHere[good] = Math.max(0, state.sourcedHere[good] - qty)
-}
-
-/**
- * Units of a good that may be used to settle a contract here: everything in
- * the hold except what was obtained at this very planet. Cargo hauled in,
- * salvaged, or plundered in space all counts.
- */
-export function deliverableUnits(state: GameState, good: GoodId): number {
-  return Math.max(0, state.ship.cargo[good] - (state.sourcedHere?.[good] ?? 0))
 }
 
 // --- Escort duty requirements ------------------------------------------------

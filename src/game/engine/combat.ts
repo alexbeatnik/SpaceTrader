@@ -86,6 +86,13 @@ export interface Encounter {
   defeated: number
   status: EncounterStatus
   round: number
+  /**
+   * Seed for this encounter's dice, drawn from the galaxy's own rng when the
+   * encounter is built. Rounds are resolved with `seed ^ round`, so two fights
+   * on one leg no longer roll an identical sequence just because they share a
+   * day and a round number. Not persisted — an encounter never outlives a save.
+   */
+  seed: number
   bribeCost: number
   /** Set while a tractor beam pins the player's ship — no escape until broken. */
   tractorLocked?: boolean
@@ -327,6 +334,7 @@ function makeEncounter(
     defeated: 0,
     status: 'ongoing',
     round: 0,
+    seed: rng.int(0, 0x7fffffff),
     bribeCost,
     demand: kind === 'pirate' ? 'cargo' : kind === 'bountyHunter' ? 'arrest' : undefined,
     hiredBy: kind === 'bountyHunter' ? (hiredBy ?? 'law') : undefined,
