@@ -18,6 +18,21 @@ export function standardPrice(good: TradeGood, sys: SolarSystem): number {
   // Not produced at this tech level -> not available to buy.
   if (sys.techLevel < good.techProduction) return 0
 
+  return marketValue(good, sys)
+}
+
+/**
+ * What a good is worth on a planet, with the production gate left out.
+ *
+ * Selling is judged on this rather than on `standardPrice`: a world below a
+ * good's `techProduction` cannot *make* it but may still be perfectly able to
+ * *use* it (`techUsage`), and hauling goods down the tech ladder to exactly
+ * those buyers is the trade the price tables are built for — narcotics are
+ * produced from tech 5 and usable from tech 0, robots produced from 6 and
+ * usable from 4. Judging the sell price on `standardPrice` made all of those
+ * markets return 0, so the goods could only be sold where they were also made.
+ */
+function marketValue(good: TradeGood, sys: SolarSystem): number {
   let price = good.basePrice + sys.techLevel * good.pricePerTech
 
   if (good.cheapResource && sys.specialResource === good.cheapResource) {
@@ -95,8 +110,8 @@ function sellablePrice(
   if (gov.forbidden.includes(good.id)) return 0
   if (sys.techLevel < good.techUsage) return 0
 
-  const base = standardPrice(good, sys)
-  const reference = buy > 0 ? buy : base
+  // Not what the planet can produce — what it reckons the goods are worth.
+  const reference = buy > 0 ? buy : marketValue(good, sys)
   if (reference <= 0) return 0
 
   // Sellers typically get slightly under buy price, plus fluctuation.

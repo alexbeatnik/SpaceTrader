@@ -111,8 +111,35 @@ Core systems implemented:
   any ship can be outfitted — even the humble Flea.
 - **Ship art** — every hull has its own hand-built SVG silhouette, shown in the
   ship view, shipyard, combat, and the warp animation.
-- **Save/Load** — a single persistent save stored in the app's user-data folder.
+- **Save slots** — **six named slots plus an autosave**. The autosave is
+  rewritten after every action you take, so closing the game (or crashing) never
+  costs more than nothing; the six manual slots are yours to snapshot a run
+  before a risky jump, or to keep several commanders going at once. Each slot
+  card shows the commander, day, credits, ship, system and the time it was
+  written. Save, load and delete from the **Saves** tab in game or from the main
+  menu.
 - **i18n** — English and Ukrainian, switchable at runtime.
+
+## Installing & updating (Windows)
+
+Download `Star Trader-<version>-setup.exe` from the
+[Releases](https://github.com/alexbeatnik/SpaceTrader/releases) page and run it.
+
+**Updating to a newer version: just run the new installer.**
+
+- **Do not uninstall the old version first.** The installer finds the previous
+  install and replaces it in place. Uninstalling first only costs you time.
+- **Your saves are kept.** They live in
+  `%APPDATA%\star-trader\saves\` — your user profile, not the program folder —
+  so updating never touches them. Uninstalling leaves them alone too, which
+  means reinstalling later picks your commander back up.
+- The installer is **per-user** and needs no administrator rights. It installs
+  to `%LOCALAPPDATA%\Programs` by default; you can point it elsewhere.
+- The build is **unsigned** (no code-signing certificate), so Windows
+  SmartScreen may warn on first run — *More info → Run anyway*.
+
+To remove the game, use *Settings → Apps → Star Trader*. If you also want the
+saves gone, delete `%APPDATA%\star-trader\` by hand.
 
 ## Tech stack
 
@@ -129,8 +156,9 @@ Core systems implemented:
 
 ```
 src/
-  main/        Electron main process (window + save/load IPC)
+  main/        Electron main process (window + save-slot IPC)
   preload/     Context-bridge API exposed to the renderer
+  shared/      Save-file format shared by main and renderer
   game/        Pure game engine (no React/Electron imports)
     data/      Static data: goods, ships, equipment, governments, economies, names
     engine/    Types, RNG, galaxy, market, travel, combat, warp, mining,
@@ -141,7 +169,7 @@ src/
       components/  HUD, nav, toast, ship art, warp transition, mining overlay,
                    modals (combat, event, quest offer/complete, amount, game over)
       screens/     Menu, System, Market, Shipyard, Bank, Crew, Quests,
-                   Star Chart, Ship, Log
+                   Star Chart, Ship, Log, Saves
       store/       Zustand store wiring the engine to the UI
 build/         App icon (icon.png / icon.ico) for packaging
 ```
@@ -162,6 +190,11 @@ npm run dist       # package a distributable (electron-builder)
 ```
 
 Requires Node.js 18+.
+
+`npm run dist` produces `release/Star Trader-<version>-setup.exe`. The installer's
+welcome page — the one that tells a returning player not to uninstall the old
+version first — lives in [build/installer.nsh](build/installer.nsh); everything
+else about the installer is the `build.nsis` block of `package.json`.
 
 ## Localization
 

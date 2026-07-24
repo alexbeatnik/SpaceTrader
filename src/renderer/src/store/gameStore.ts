@@ -65,6 +65,14 @@ import {
   type CrewIncident
 } from '@game/index'
 import { renderMessage } from '@i18n/index'
+import {
+  AUTO_SLOT,
+  SAVE_FORMAT,
+  parseSaveFile,
+  type SaveFile,
+  type SaveSlotId,
+  type SaveSlotInfo
+} from '@shared/saves'
 
 export type Screen =
   | 'menu'
@@ -77,6 +85,7 @@ export type Screen =
   | 'chart'
   | 'ship'
   | 'log'
+  | 'saves'
 
 export interface Toast {
   id: number
@@ -132,8 +141,14 @@ interface GameStore {
 
   // lifecycle
   startNewGame: (opts: NewGameOptions) => void
-  loadGame: () => Promise<boolean>
-  saveGame: () => Promise<void>
+  /** Load a slot into play; defaults to the autosave ("Continue"). */
+  loadGame: (slot?: SaveSlotId) => Promise<boolean>
+  /** Write the current game to a slot, silently; defaults to the autosave. */
+  saveGame: (slot?: SaveSlotId) => Promise<boolean>
+  /** Write to a manual slot and report the outcome to the player. */
+  saveToSlot: (slot: SaveSlotId) => Promise<boolean>
+  listSaves: () => Promise<SaveSlotInfo[]>
+  deleteSave: (slot: SaveSlotId) => Promise<boolean>
   setScreen: (s: Screen) => void
   quitToMenu: () => void
 
@@ -292,12 +307,14 @@ export const useGameStore = create<GameStore>((set, get) => {
       void get().saveGame()
     },
 
-    loadGame: async () => {
+    loadGame: async (slot = AUTO_SLOT) => {
       if (typeof window === 'undefined' || !window.api) return false
       try {
-        const data = await window.api.loadGame()
+        const data = await window.api.loadGame(slot)
         if (!data) return false
-        const game = JSON.parse(data) as GameState
+        const file = parseSaveFile(data)
+        if (!file) throw new Error('unreadable save file')
+        const game = file.state as GameState
         ensureBoard(game)
         pendingWarp = null
         set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, gameOver: false, travel: null })
@@ -310,13 +327,58 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
     },
 
-    saveGame: async () => {
+    saveGame: async (slot = AUTO_SLOT) => {
       const g = get().game
-      if (!g || typeof window === 'undefined' || !window.api) return
+      if (!g || typeof window === 'undefined' || !window.api) return false
       try {
-        await window.api.saveGame(JSON.stringify(g))
+        // The summary is written alongside the state so the slot list can be
+        // built without the main process ever understanding a GameState.
+        const file: SaveFile<GameState> = {
+          format: SAVE_FORMAT,
+          meta: {
+            commanderName: g.commanderName,
+            day: g.day,
+            credits: g.credits,
+            shipType: g.ship.type,
+            systemName: currentSystem(g).nameId,
+            savedAt: Date.now()
+          },
+          state: g
+        }
+        return await window.api.saveGame(slot, JSON.stringify(file))
       } catch {
         // A failed save must not crash the game; the next auto-save retries.
+        return false
+      }
+    },
+
+    saveToSlot: async (slot) => {
+      const ok = await get().saveGame(slot)
+      set({
+        toast: {
+          id: ++toastCounter,
+          type: ok ? 'info' : 'error',
+          text: ok ? renderMessage('saves.saved', { slot }) : renderMessage('saves.saveFailed')
+        }
+      })
+      return ok
+    },
+
+    listSaves: async () => {
+      if (typeof window === 'undefined' || !window.api) return []
+      try {
+        return await window.api.listSaves()
+      } catch {
+        return []
+      }
+    },
+
+    deleteSave: async (slot) => {
+      if (typeof window === 'undefined' || !window.api) return false
+      try {
+        return await window.api.deleteSave(slot)
+      } catch {
+        return false
       }
     },
 

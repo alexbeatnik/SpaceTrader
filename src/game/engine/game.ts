@@ -90,6 +90,18 @@ export function clearLocalSourcing(state: GameState): void {
 }
 
 /**
+ * Units have left the hold at this planet (sold back, dumped, seized). Retire
+ * the locally-sourced ones first: they are the units a contract could not have
+ * used anyway, and leaving them on the books would wrongly hold back goods the
+ * ship really did haul in — sell the 5 you just bought here and the 10 you
+ * arrived with would stop counting.
+ */
+export function releaseLocalSourcing(state: GameState, good: GoodId, qty: number): void {
+  if (qty <= 0 || !state.sourcedHere) return
+  state.sourcedHere[good] = Math.max(0, state.sourcedHere[good] - qty)
+}
+
+/**
  * Units of a good that may be used to settle a contract here: everything in
  * the hold except what was obtained at this very planet. Cargo hauled in,
  * salvaged, or plundered in space all counts.
@@ -295,13 +307,28 @@ export interface ActionResult {
   info?: { key: string; params?: Record<string, string | number> }
 }
 
+/** Fraction knocked off a listed price by the best negotiator aboard (0–0.1). */
+export function traderDiscount(state: GameState): number {
+  return Math.min(0.1, effectiveSkills(state).trader * 0.01)
+}
+
+/**
+ * What a unit of `good` actually costs here, after the Trader-skill discount —
+ * the figure the market screen must quote, or it bills the player one price and
+ * charges another.
+ */
+export function marketBuyPrice(state: GameState, good: GoodId): number {
+  const listed = currentSystem(state).buyPrice[good]
+  if (listed <= 0) return 0
+  return Math.max(1, Math.round(listed * (1 - traderDiscount(state))))
+}
+
 export function buyGood(state: GameState, good: GoodId, amount: number): ActionResult {
   const sys = currentSystem(state)
   const price = sys.buyPrice[good]
   if (price <= 0 || sys.qty[good] <= 0) return fail('error.notSold')
 
-  const traderBonus = Math.min(0.1, effectiveSkills(state).trader * 0.01)
-  const unit = Math.max(1, Math.round(price * (1 - traderBonus)))
+  const unit = marketBuyPrice(state, good)
 
   const maxByCredits = Math.floor(state.credits / unit)
   const maxByCargo = freeCargoBays(state.ship)
@@ -337,6 +364,7 @@ export function sellGood(state: GameState, good: GoodId, amount: number): Action
 
   state.ship.cargo[good] -= qty
   state.credits += revenue
+  releaseLocalSourcing(state, good, qty)
   if (state.ship.cargo[good] === 0) state.buyingPrice[good] = 0
 
   return okInfo('info.sold', { qty, good, revenue })
@@ -348,6 +376,7 @@ export function dumpGood(state: GameState, good: GoodId, amount: number): Action
   if (have <= 0) return fail('error.nothingToDump')
   const qty = Math.min(amount, have)
   state.ship.cargo[good] -= qty
+  releaseLocalSourcing(state, good, qty)
   if (state.ship.cargo[good] === 0) state.buyingPrice[good] = 0
   return okInfo('info.dumped', { qty, good })
 }
@@ -400,8 +429,7 @@ export function buyHullUpgrade(state: GameState): ActionResult {
 
 // --- Equipment purchases -----------------------------------------------------
 function traderPrice(state: GameState, base: number): number {
-  const bonus = Math.min(0.1, effectiveSkills(state).trader * 0.01)
-  return Math.round(base * (1 - bonus))
+  return Math.round(base * (1 - traderDiscount(state)))
 }
 
 export function buyWeapon(state: GameState, id: WeaponId): ActionResult {

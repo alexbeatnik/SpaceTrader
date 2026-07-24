@@ -44,11 +44,37 @@ A modern desktop remake of the classic *Space Trader* game, built with
 - `src/renderer/src/store/gameStore.ts` — the **only** bridge between UI and
   engine. Components call store actions; the store calls engine functions,
   `structuredClone`s the mutated `GameState` to trigger React updates, and turns
-  `ActionResult`s into toasts via `renderMessage`. `applyResult` **persists on
-  every successful action** — don't add a state-changing path that skips it, or
-  the change lives only in memory until the next jump and is lost on quit.
-- `src/main/` + `src/preload/` — Electron shell and the save/load IPC
-  (`window.api.saveGame/loadGame/hasSave`).
+  `ActionResult`s into toasts via `renderMessage`. `applyResult` **persists to
+  the autosave slot on every successful action** — don't add a state-changing
+  path that skips it, or the change lives only in memory until the next jump and
+  is lost on quit.
+- `src/main/` + `src/preload/` — Electron shell and the save-slot IPC
+  (`window.api.saveGame/loadGame/listSaves/deleteSave`, all slot-addressed).
+- `src/shared/` — code both processes need. Today that is `saves.ts`, the
+  on-disk save format. It imports nothing from the engine on purpose: main has
+  to list and validate slots without understanding a `GameState`.
+
+### Save slots
+
+Seven files in `userData/saves/` — `slot-auto.json` plus `slot-1..6.json`.
+The **autosave** is the one the game writes itself (every `applyResult`, every
+`warpTo`, every mine tick); the six **manual** slots are only ever written when
+the player asks, which is what makes them snapshots. Loading a manual slot does
+*not* redirect the autosave — it keeps going to `auto` — so a loaded snapshot
+stays intact while you play on.
+
+Each file is a `SaveFile` envelope: `{ format, meta, state }`, where `state` is
+the serialized `GameState` and `meta` is the summary the slot list renders.
+The envelope exists so `save:list` can build the menu without the main process
+parsing a galaxy into anything meaningful. **Always read a slot through
+`parseSaveFile`** — it also accepts the legacy pre-slots shape (a bare
+`GameState`, which main migrates from `savegame.json` into the auto slot on
+first launch) and returns null instead of throwing on junk.
+
+Slot ids cross the IPC boundary from the renderer, so they are untrusted: main
+validates every one with `isSaveSlotId` before it reaches a path. Writes go
+through a temp file and a rename, because the autosave fires constantly and a
+half-written file must never replace a good save.
 
 ### Travel animation (deferred encounters)
 
@@ -258,7 +284,9 @@ imports tidy.
 ## Conventions
 
 - Money is integer credits; format for display with `src/renderer/src/util/format.ts`.
-- Prefer the `@game`, `@i18n`, and `@` path aliases over long relative imports.
+- Prefer the `@game`, `@i18n`, `@shared`, and `@` path aliases over long
+  relative imports — in the renderer. `main`/`preload` are bundled without alias
+  config, so they reach `src/shared/` by relative path.
 - Ship/good/government identifiers are lowercase camelCase string literal unions;
   keep new ids consistent and add matching locale keys.
 - Every ship hull mounts at least one weapon, shield and gadget slot (a

@@ -20,6 +20,9 @@ import {
   advanceDay,
   weaponPower,
   deliverableUnits,
+  dumpGood,
+  noteLocalSourcing,
+  marketBuyPrice,
   EXPLORER_RANGE_BONUS,
   INDUSTRIAL_MINING_YIELD
 } from './game'
@@ -87,7 +90,7 @@ import {
 } from './crew'
 import { CREW_ROLES, PROFESSIONS } from './types'
 import { Rng } from './rng'
-import type { Quest, GoodId } from './types'
+import type { Quest, GoodId, TechLevel } from './types'
 
 // --- Test helpers ------------------------------------------------------------
 function emptyCargo(): Record<GoodId, number> {
@@ -1683,5 +1686,121 @@ describe('travel and warp', () => {
     expect(res.ok).toBe(true)
     // The jump burned fuel, but auto-refuel refilled the tank on arrival.
     expect(g.ship.fuel).toBe(maxFuel(g.ship))
+  })
+})
+
+// --- Regression tests for reviewed defects ----------------------------------
+describe('selling below a good\'s production tech', () => {
+  /** A planet that can use a good but is too primitive to make it. */
+  function consumerWorld(techLevel: TechLevel): ReturnType<typeof generateGalaxy>[number] {
+    const sys = generateGalaxy(4242)[0]
+    sys.techLevel = techLevel
+    sys.politics = 'anarchy' // forbids nothing, so only tech gates the sale
+    sys.specialResource = 'none'
+    sys.status = 'uneventful'
+    return sys
+  }
+
+  it('pays for goods it can use but not produce', () => {
+    // Narcotics are made from tech 5 up and usable from tech 0: hauling them
+    // down the tech ladder is the trade. This returned 0 before the fix, so
+    // contraband could only be sold where it was also produced.
+    const sys = consumerWorld(2)
+    refreshMarket(sys, new Rng(7))
+    expect(sys.buyPrice.narcotics).toBe(0)
+    expect(sys.sellPrice.narcotics).toBeGreaterThan(0)
+  })
+
+  it('still refuses goods the planet is too primitive to use', () => {
+    // Robots need tech 4 to use; tech 3 must not buy them at any price.
+    const sys = consumerWorld(3)
+    refreshMarket(sys, new Rng(7))
+    expect(sys.sellPrice.robots).toBe(0)
+  })
+
+  it('still refuses goods the government bans', () => {
+    const sys = consumerWorld(2)
+    sys.politics = 'theocracy' // bans firearms and narcotics
+    refreshMarket(sys, new Rng(7))
+    expect(sys.sellPrice.narcotics).toBe(0)
+  })
+
+  it('leaves the produced-here case alone', () => {
+    const sys = consumerWorld(6)
+    refreshMarket(sys, new Rng(7))
+    expect(sys.buyPrice.narcotics).toBeGreaterThan(0)
+    expect(sys.sellPrice.narcotics).toBeGreaterThan(0)
+  })
+})
+
+describe('local sourcing follows cargo out of the hold', () => {
+  it('selling locally-bought goods does not strand hauled-in cargo', () => {
+    const g = newGame({ commanderName: 'T', seed: 99 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 10
+    sys.sellPrice.water = 8
+    sys.qty.water = 100
+    g.credits = 10000
+    // Four units flown in, so all four may settle a contract here. (The Flea
+    // holds ten bays, so this leaves room to buy more.)
+    g.ship.cargo.water = 4
+    expect(deliverableUnits(g, 'water')).toBe(4)
+
+    buyGood(g, 'water', 3) // three bought here — those three may not
+    expect(g.ship.cargo.water).toBe(7)
+    expect(deliverableUnits(g, 'water')).toBe(4)
+
+    // Selling the three back must not eat into the hauled-in four.
+    sellGood(g, 'water', 3)
+    expect(g.ship.cargo.water).toBe(4)
+    expect(deliverableUnits(g, 'water')).toBe(4)
+  })
+
+  it('dumping locally-bought goods behaves the same way', () => {
+    const g = newGame({ commanderName: 'T', seed: 99 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 10
+    sys.qty.water = 100
+    g.credits = 10000
+    g.ship.cargo.water = 4
+    buyGood(g, 'water', 3)
+    dumpGood(g, 'water', 3)
+    expect(deliverableUnits(g, 'water')).toBe(4)
+  })
+})
+
+describe('contraband seizure at an inspection', () => {
+  it('clears the price paid along with the cargo', () => {
+    const g = newGame({ commanderName: 'T', seed: 5 })
+    g.ship.cargo.narcotics = 4
+    g.buyingPrice.narcotics = 900
+    noteLocalSourcing(g, 'narcotics', 4)
+
+    const enc = testEncounter('police')
+    resolveRound(g, enc, 'submit', new Rng(3))
+
+    expect(g.ship.cargo.narcotics).toBe(0)
+    // Left stale, the market screen kept quoting a cost for goods long gone.
+    expect(g.buyingPrice.narcotics).toBe(0)
+    expect(g.sourcedHere?.narcotics ?? 0).toBe(0)
+  })
+})
+
+describe('quoted market price', () => {
+  it('matches what buying actually costs', () => {
+    const g = newGame({ commanderName: 'T', seed: 11 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 100
+    sys.qty.water = 50
+    g.credits = 100000
+    // A trained trader pays under the shelf price; the screen must quote that.
+    g.skills.trader = 10
+
+    const quoted = marketBuyPrice(g, 'water')
+    expect(quoted).toBeLessThan(sys.buyPrice.water)
+
+    const before = g.credits
+    buyGood(g, 'water', 3)
+    expect(before - g.credits).toBe(quoted * 3)
   })
 })

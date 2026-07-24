@@ -11,7 +11,8 @@ const ITEMS: { screen: Screen; icon: string; key: string }[] = [
   { screen: 'quests', icon: '📋', key: 'nav.quests' },
   { screen: 'chart', icon: '🗺️', key: 'nav.chart' },
   { screen: 'ship', icon: '🚀', key: 'nav.ship' },
-  { screen: 'log', icon: '📜', key: 'nav.log' }
+  { screen: 'log', icon: '📜', key: 'nav.log' },
+  { screen: 'saves', icon: '💾', key: 'nav.saves' }
 ]
 
 export function Nav(): React.JSX.Element {

@@ -23,6 +23,7 @@ import { QuestsScreen } from './screens/QuestsScreen'
 import { ChartScreen } from './screens/ChartScreen'
 import { ShipScreen } from './screens/ShipScreen'
 import { LogScreen } from './screens/LogScreen'
+import { SavesScreen } from './screens/SavesScreen'
 
 export function App(): React.JSX.Element {
   const game = useGameStore((s) => s.game)
@@ -65,6 +66,7 @@ export function App(): React.JSX.Element {
           {screen === 'chart' && <ChartScreen />}
           {screen === 'ship' && <ShipScreen />}
           {screen === 'log' && <LogScreen />}
+          {screen === 'saves' && <SavesScreen />}
         </div>
       </div>
       {travel && <WarpTransition />}

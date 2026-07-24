@@ -12,6 +12,7 @@ import {
   totalCargoBays,
   maxHull,
   pushLog,
+  releaseLocalSourcing,
   type ActionResult
 } from './game'
 import { completeBounty } from './quests'
@@ -613,8 +614,14 @@ export function resolveRound(
       return
     }
     if (illegal > 0) {
-      state.ship.cargo.firearms = 0
-      state.ship.cargo.narcotics = 0
+      // Seize it the same way a sentence does: the hold, the price paid for it
+      // (or the profit column keeps quoting a cost for goods that are gone),
+      // and its local-sourcing record all go together.
+      for (const g of ['firearms', 'narcotics'] as const) {
+        releaseLocalSourcing(state, g, state.ship.cargo[g])
+        state.ship.cargo[g] = 0
+        state.buyingPrice[g] = 0
+      }
       const fine = 500 + illegal * 50
       state.credits = Math.max(0, state.credits - fine)
       applyKarma(state, -3)

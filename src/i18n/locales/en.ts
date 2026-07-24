@@ -35,7 +35,30 @@ export const en = {
     quests: 'Quests',
     chart: 'Star Chart',
     ship: 'Ship',
-    log: 'Log'
+    log: 'Log',
+    saves: 'Saves'
+  },
+  saves: {
+    title: 'Saved games',
+    subtitle: 'Six slots of your own, plus the autosave the game keeps for you.',
+    loadGame: 'Load game',
+    autoSlot: 'Autosave',
+    autoHint: 'Kept up to date automatically as you play.',
+    slot: 'Slot {n}',
+    empty: 'Empty',
+    corrupt: 'Damaged save file',
+    loading: 'Reading saves…',
+    save: 'Save',
+    load: 'Load',
+    delete: 'Delete',
+    saved: 'Game saved to slot {slot}.',
+    saveFailed: 'Could not write the save file.',
+    unknownTime: 'date unknown',
+    confirm: {
+      save: 'Overwrite?',
+      load: 'Load this save?',
+      delete: 'Delete this save?'
+    }
   },
   quest: {
     title: 'Quests',
@@ -495,6 +518,7 @@ export const en = {
       bountyHunter: 'Bounty hunter',
       alien: 'Alien'
     },
+    you: 'You',
     trader: {
       appear: 'You meet a trader flying a {ship}.',
       caravan: 'A trader caravan of {count} ships crosses your path.',

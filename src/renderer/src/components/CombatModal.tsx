@@ -8,15 +8,28 @@ import {
   totalShieldPower,
   currentShieldCharge,
   freeCargoBays,
-  SHIP_TYPES,
   GOOD_IDS,
-  type GoodId
+  type GoodId,
+  type EncounterKind
 } from '@game/index'
 import { fmt } from '../util/format'
 import { ShipArt } from './ShipArt'
 import { AmountModal } from './AmountModal'
 
 type TradeDialog = { mode: 'buy' | 'sell'; good: GoodId } | null
+
+/**
+ * Every opponent is tinted by its kind, so an enemy hull never comes out in the
+ * same colours as yours — which used to make an identical ship type on both
+ * sides impossible to tell apart. Your own ship keeps its native palette.
+ */
+const OPPONENT_ACCENT: Record<EncounterKind, string> = {
+  alien: '#b06bff',
+  pirate: '#ff5d6c',
+  bountyHunter: '#ff7a3c',
+  police: '#ffc04a',
+  trader: '#38e08a'
+}
 
 export function CombatModal(): React.JSX.Element | null {
   const game = useGameStore((s) => s.game)!
@@ -31,7 +44,6 @@ export function CombatModal(): React.JSX.Element | null {
 
   if (!enc) return null
   const opp = enc.opponent
-  const oppType = SHIP_TYPES[opp.shipType]
   const ship = game.ship
   const terminal = enc.status !== 'ongoing'
   const canTrade = enc.kind === 'trader' && !terminal && !!enc.trade
@@ -48,16 +60,7 @@ export function CombatModal(): React.JSX.Element | null {
       : enc.kind === 'police' || enc.kind === 'bountyHunter'
         ? 'warn'
         : ''
-  const oppAccent =
-    enc.kind === 'alien'
-      ? '#b06bff'
-      : enc.kind === 'pirate'
-        ? '#ff5d6c'
-        : enc.kind === 'bountyHunter'
-          ? '#ff7a3c'
-          : enc.kind === 'police'
-            ? '#ffc04a'
-            : undefined
+  const oppAccent = OPPONENT_ACCENT[enc.kind]
 
   return (
     <div className="overlay">
@@ -91,15 +94,24 @@ export function CombatModal(): React.JSX.Element | null {
         )}
 
         {/* Opponent status */}
-        <div className="ship-visual" style={{ marginBottom: 12 }}>
+        <div
+          className="ship-visual side-opponent"
+          style={{ marginBottom: 12, borderLeftColor: oppAccent }}
+        >
           <ShipArt type={opp.shipType} size={64} flip accent={oppAccent} />
           <div style={{ flex: 1 }}>
+            <div className="side-label" style={{ color: oppAccent }}>
+              ⚔ {t(`encounter.kind.${enc.kind}`)}
+            </div>
             <div className="kv">
               <span className="k">{shipName(opp.shipType)}</span>
-              <span className="v">{t('ship.hull')}: {Math.max(0, opp.hull)}/{oppType.hullStrength}</span>
+              {/* Against the opponent's own maximum, not the hull's base
+                  rating: aliens and bounty hunters fly reinforced ships, which
+                  used to read as "90/60" on a bar pinned past full. */}
+              <span className="v">{t('ship.hull')}: {Math.max(0, opp.hull)}/{opp.maxHull}</span>
             </div>
             <div className="meter">
-              <div className="meter-fill hull" style={{ width: `${Math.max(0, (opp.hull / oppType.hullStrength) * 100)}%` }} />
+              <div className="meter-fill hull" style={{ width: `${Math.max(0, (opp.hull / opp.maxHull) * 100)}%` }} />
             </div>
             {opp.maxShield > 0 && (
               <div className="meter" style={{ marginTop: 4 }}>
@@ -110,9 +122,12 @@ export function CombatModal(): React.JSX.Element | null {
         </div>
 
         {/* Player status */}
-        <div className="ship-visual" style={{ marginBottom: 12 }}>
+        <div className="ship-visual side-player" style={{ marginBottom: 12 }}>
           <ShipArt type={ship.type} size={64} />
           <div style={{ flex: 1 }}>
+            <div className="side-label player">
+              👤 {t('encounter.you')} · {game.commanderName}
+            </div>
             <div className="kv">
               <span className="k">{shipName(ship.type)}</span>
               <span className="v">{t('ship.hull')}: {Math.max(0, ship.hull)}/{maxHull(ship)}</span>

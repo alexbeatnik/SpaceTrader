@@ -25,7 +25,8 @@ export default defineConfig({
       alias: {
         '@': resolve('src/renderer/src'),
         '@game': resolve('src/game'),
-        '@i18n': resolve('src/i18n')
+        '@i18n': resolve('src/i18n'),
+        '@shared': resolve('src/shared')
       }
     },
     plugins: [react()],

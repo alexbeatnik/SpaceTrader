@@ -8,6 +8,7 @@ import {
   isSpecialGood,
   freeCargoBays,
   questDemand,
+  marketBuyPrice,
   type GoodId
 } from '@game/index'
 import { goodName } from '@i18n/index'
@@ -26,8 +27,13 @@ export function MarketScreen(): React.JSX.Element {
   // What the active contracts still want, so the player can stock up here.
   const demand = questDemand(game)
 
+  // Quote the price the engine will actually charge, not the shelf price: the
+  // Trader skill discounts it, so the two must be read from the same helper or
+  // the totals shown here do not match what leaves the account.
+  const unitBuyPrice = (id: GoodId): number => marketBuyPrice(game, id)
+
   const maxBuy = (id: GoodId): number => {
-    const price = sys.buyPrice[id]
+    const price = unitBuyPrice(id)
     if (price <= 0) return 0
     return Math.min(sys.qty[id], freeCargoBays(game.ship), Math.floor(game.credits / price))
   }
@@ -61,7 +67,7 @@ export function MarketScreen(): React.JSX.Element {
             ).map((id) => {
               const good = TRADE_GOODS[id]
               const held = game.ship.cargo[id]
-              const buyP = sys.buyPrice[id]
+              const buyP = unitBuyPrice(id)
               const sellP = sys.sellPrice[id]
               const need = demand[id]
               const profit = held > 0 && sellP > 0 ? (sellP - game.buyingPrice[id]) * held : 0
@@ -134,7 +140,7 @@ export function MarketScreen(): React.JSX.Element {
               : game.ship.cargo[dialog.good]
           }
           unitPrice={
-            dialog.mode === 'buy' ? sys.buyPrice[dialog.good] : sys.sellPrice[dialog.good]
+            dialog.mode === 'buy' ? unitBuyPrice(dialog.good) : sys.sellPrice[dialog.good]
           }
           confirmLabel={dialog.mode === 'buy' ? t('common.buy') : t('common.sell')}
           onConfirm={(amount) => {

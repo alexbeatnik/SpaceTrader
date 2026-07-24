@@ -17,13 +17,15 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@game/*": ["src/game/*"]
+      "@game/*": ["src/game/*"],
+      "@shared/*": ["src/shared/*"]
     }
   },
   "include": [
     "electron.vite.config.ts",
     "src/main/**/*",
     "src/preload/**/*",
-    "src/game/**/*"
+    "src/game/**/*",
+    "src/shared/**/*"
   ]
 }

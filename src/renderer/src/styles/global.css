@@ -660,3 +660,42 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
 }
 .log-entry .day { color: var(--accent); font-weight: 600; min-width: 54px; }
 .log-entry .text { color: var(--text-dim); }
+
+/* --- Save slots --- */
+.saves-list { display: flex; flex-direction: column; gap: 8px; }
+.save-slot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.save-slot.empty { background: transparent; border-style: dashed; }
+.save-slot-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.save-slot-name { font-size: 13px; font-weight: 700; letter-spacing: 0.4px; }
+.save-slot-line {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.save-slot-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.save-slot-confirm { font-size: 12px; color: var(--warn); margin-right: 2px; }
+
+/* --- Combat: telling the two sides apart ---
+   Identical hull types on both sides used to be indistinguishable, so each
+   side is marked three ways over: a coloured edge, a labelled row, and (for the
+   opponent) a hull tinted by encounter kind. */
+.ship-visual.side-player { border-left: 3px solid var(--accent); }
+.ship-visual.side-opponent { border-left: 3px solid var(--bad); }
+.side-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.side-label.player { color: var(--accent); }

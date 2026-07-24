@@ -25,6 +25,10 @@ export function MiningOverlay(): React.JSX.Element | null {
   useEffect(() => {
     if (!mining) return
     setProgress(0)
+    // A new operation starts from nothing: without this the tally carried over
+    // and the second site opened claiming the first one's haul.
+    countRef.current = 0
+    setCount(0)
     let raf = 0
     let start = performance.now()
     let cancelled = false
