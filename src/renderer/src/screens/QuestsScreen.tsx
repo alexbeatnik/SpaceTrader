@@ -6,6 +6,10 @@ import {
   questSupply,
   freeCargoBays,
   deliverableUnits,
+  escortShipProblem,
+  escortLegs,
+  ESCORT_MIN_WEAPONS,
+  ESCORT_MIN_SHIELDS,
   type Quest
 } from '@game/index'
 import { goodName } from '@i18n/index'
@@ -18,7 +22,8 @@ const ICON: Record<string, string> = {
   bounty: '🎯',
   passenger: '🧳',
   smuggle: '🕶️',
-  fetch: '📥'
+  fetch: '📥',
+  escort: '🛡️'
 }
 
 export function QuestsScreen(): React.JSX.Element {
@@ -26,8 +31,16 @@ export function QuestsScreen(): React.JSX.Element {
   const acceptBoard = useGameStore((s) => s.acceptBoardQuest)
   const abandon = useGameStore((s) => s.abandonQuest)
   const turnIn = useGameStore((s) => s.turnInQuest)
+  const startEscort = useGameStore((s) => s.startEscort)
   const buy = useGameStore((s) => s.buy)
   const { t } = useI18n()
+
+  // Escort contracts only take a military hull with guns and a shield fitted.
+  const escortProblem = escortShipProblem(game)
+  const escortRequirement = t('quest.escortRequirements', {
+    weapons: ESCORT_MIN_WEAPONS,
+    shields: ESCORT_MIN_SHIELDS
+  })
 
   const here = currentSystem(game)
   const board = here.questBoard ?? []
@@ -80,12 +93,22 @@ export function QuestsScreen(): React.JSX.Element {
                       )}
                     </div>
                     <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
+                    {q.type === 'escort' && (
+                      <div
+                        className={escortProblem ? 'neg' : 'muted'}
+                        style={{ fontSize: 12, marginTop: 4 }}
+                      >
+                        ⚔ {escortRequirement}
+                        {escortProblem && <> · {t(escortProblem)}</>}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
                     <button
                       className="btn btn-sm btn-primary"
                       style={{ marginTop: 6 }}
+                      disabled={q.type === 'escort' && escortProblem !== null}
                       onClick={() => acceptBoard(q.id)}
                     >
                       {t('quest.accept')}
@@ -132,7 +155,16 @@ export function QuestsScreen(): React.JSX.Element {
                       📍 {t('quest.takenAt', { system: game.systems[q.giverSystem]?.nameId ?? '—' })}
                       {' · '}🎯 {game.systems[q.targetSystem]?.nameId ?? '—'}
                       {need && <> · <Progress q={q} /></>}
+                      {q.type === 'escort' && <> · 🚀 {t('escort.legs', { legs: escortLegs(game, q) })}</>}
                     </div>
+                    {q.type === 'escort' && (
+                      <div
+                        className={escortProblem ? 'neg' : 'muted'}
+                        style={{ fontSize: 12, marginTop: 4 }}
+                      >
+                        {escortProblem ? `⚔ ${t(escortProblem)}` : `🛡 ${t('quest.escortHint')}`}
+                      </div>
+                    )}
                     {need && missing > 0 && !atTarget && (
                       <button
                         className="btn btn-sm"
@@ -154,6 +186,21 @@ export function QuestsScreen(): React.JSX.Element {
                     <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
                       {q.type === 'bounty' ? (
                         <div className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>{t('quest.viaCombat')}</div>
+                      ) : q.type === 'escort' ? (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          disabled={escortProblem !== null || q.giverSystem !== game.currentSystem}
+                          title={
+                            escortProblem
+                              ? t(escortProblem)
+                              : q.giverSystem !== game.currentSystem
+                                ? t('error.escortNotHere')
+                                : undefined
+                          }
+                          onClick={() => startEscort(q.id)}
+                        >
+                          🛡 {t('quest.beginEscort')}
+                        </button>
                       ) : (
                         <button
                           className="btn btn-sm btn-primary"

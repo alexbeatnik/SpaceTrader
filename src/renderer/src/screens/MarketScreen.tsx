@@ -7,6 +7,7 @@ import {
   GOOD_IDS,
   isSpecialGood,
   freeCargoBays,
+  questDemand,
   type GoodId
 } from '@game/index'
 import { goodName } from '@i18n/index'
@@ -22,6 +23,8 @@ export function MarketScreen(): React.JSX.Element {
   const { t } = useI18n()
   const [dialog, setDialog] = useState<Dialog>(null)
   const sys = currentSystem(game)
+  // What the active contracts still want, so the player can stock up here.
+  const demand = questDemand(game)
 
   const maxBuy = (id: GoodId): number => {
     const price = sys.buyPrice[id]
@@ -43,6 +46,7 @@ export function MarketScreen(): React.JSX.Element {
               <th className="num">{t('market.buyPrice')}</th>
               <th className="num">{t('market.sellPrice')}</th>
               <th className="num">{t('market.inHold')}</th>
+              <th className="num" title={t('market.questNeedHint')}>{t('market.questNeed')}</th>
               <th className="num">{t('common.profit')}</th>
               <th></th>
             </tr>
@@ -59,6 +63,7 @@ export function MarketScreen(): React.JSX.Element {
               const held = game.ship.cargo[id]
               const buyP = sys.buyPrice[id]
               const sellP = sys.sellPrice[id]
+              const need = demand[id]
               const profit = held > 0 && sellP > 0 ? (sellP - game.buyingPrice[id]) * held : 0
               return (
                 <tr key={id} className="row-hover">
@@ -70,6 +75,24 @@ export function MarketScreen(): React.JSX.Element {
                   <td className="num">{buyP > 0 ? fmt(buyP) : <span className="muted">{t('market.notSold')}</span>}</td>
                   <td className="num">{sellP > 0 ? fmt(sellP) : <span className="muted">{t('market.notWanted')}</span>}</td>
                   <td className="num">{held > 0 ? held : '—'}</td>
+                  <td className="num">
+                    {need ? (
+                      <span
+                        className={need.missing > 0 ? 'neg' : 'pos'}
+                        style={{ fontWeight: 600 }}
+                        title={t('market.questNeedFor', {
+                          systems: need.targets
+                            .map((id) => game.systems[id]?.nameId ?? '')
+                            .filter(Boolean)
+                            .join(', ')
+                        })}
+                      >
+                        {need.have}/{need.required}
+                      </span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
                   <td className={`num ${profit > 0 ? 'pos' : profit < 0 ? 'neg' : 'muted'}`}>
                     {held > 0 && sellP > 0 ? (profit >= 0 ? '+' : '') + fmt(profit) : '—'}
                   </td>

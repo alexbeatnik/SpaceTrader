@@ -86,5 +86,8 @@ export function renderMessage(
   if (typeof mapped.standing === 'string' && mapped.standing.startsWith('standing.')) {
     mapped.standing = t(mapped.standing)
   }
+  if (typeof mapped.kind === 'string' && mapped.kind.startsWith('encounter.kind.')) {
+    mapped.kind = t(mapped.kind)
+  }
   return t(key, mapped)
 }

@@ -48,6 +48,7 @@ export type StandingId = (typeof STANDING_IDS)[number]
 export const QUEST_KARMA: Record<QuestType, number> = {
   relief: 2,
   bounty: 3,
+  escort: 1,
   smuggle: -3,
   delivery: 0,
   fetch: 0,

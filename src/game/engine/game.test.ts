@@ -66,8 +66,11 @@ import {
   buyQuestSupplies,
   questSupplyMissing,
   questSupply,
-  questSupplyUnitPrice
+  questSupplyUnitPrice,
+  questDemand
 } from './quests'
+import { runEscort, escortLegs, ESCORT_KILL_BONUS } from './escort'
+import { escortShipProblem, canEscort } from './game'
 import { Rng } from './rng'
 import type { Quest, GoodId } from './types'
 
@@ -712,6 +715,187 @@ describe('encounter kinds', () => {
     // The engine keeps the pod flag set; the store reads it to grant survival.
     expect(g.ship.escapePod).toBe(true)
     expect(enc.messages.some((m) => m.key === 'encounter.escapePod')).toBe(true)
+  })
+})
+
+describe('convoy escort contracts', () => {
+  /** Kit the player out with a hull the convoy will actually sign on. */
+  function militaryEscort(g: ReturnType<typeof newGame>): void {
+    g.ship.type = 'mosquito' // medium military hull
+    g.ship.weapons = ['military', 'military']
+    g.ship.shields = ['energy']
+    g.ship.shieldPoints = [0] // the convoy tender tops these up between legs
+    g.ship.hull = 5000 // survive the run comfortably
+    g.skills.fighter = 13
+  }
+
+  function escortQuest(g: ReturnType<typeof newGame>): Quest {
+    const q: Quest = {
+      id: 'esc1',
+      type: 'escort',
+      giverSystem: g.currentSystem,
+      targetSystem: (g.currentSystem + 1) % g.systems.length,
+      reward: 3000,
+      status: 'offered'
+    }
+    acceptQuest(g, q)
+    return q
+  }
+
+  it('turns away a hull that is not a gunship', () => {
+    const g = newGame({ commanderName: 'Test', seed: 300 })
+    const q = escortQuest(g)
+    // A Gnat is civilian with a single pulse laser.
+    expect(escortShipProblem(g)).toBe('error.escortNeedsMilitary')
+    expect(runEscort(g, q.id, new Rng(1)).ok).toBe(false)
+
+    g.ship.type = 'mosquito'
+    expect(escortShipProblem(g)).toBe('error.escortNeedsWeapons')
+
+    g.ship.weapons = ['pulse', 'pulse']
+    expect(escortShipProblem(g)).toBe('error.escortNeedsShield')
+
+    g.ship.shields = ['energy']
+    g.ship.shieldPoints = [0]
+    expect(escortShipProblem(g)).toBeNull()
+    expect(canEscort(g)).toBe(true)
+  })
+
+  it('forms up only at the system that posted the contract', () => {
+    const g = newGame({ commanderName: 'Test', seed: 301 })
+    militaryEscort(g)
+    const q = escortQuest(g)
+    g.currentSystem = q.targetSystem
+    const res = runEscort(g, q.id, new Rng(1))
+    expect(res.ok).toBe(false)
+    expect(res.error).toBe('error.escortNotHere')
+  })
+
+  it('runs the convoy through, docks it and pays out', () => {
+    const g = newGame({ commanderName: 'Test', seed: 302 })
+    militaryEscort(g)
+    const q = escortQuest(g)
+    const creditsBefore = g.credits
+    const dayBefore = g.day
+
+    const res = runEscort(g, q.id, new Rng(7))
+    expect(res.ok).toBe(true)
+    const run = res.run!
+    expect(run.destroyed).toBe(false)
+    expect(run.legs.length).toBe(escortLegs(g, q))
+    // One day per leg, and the convoy ends up at its destination.
+    expect(g.day).toBe(dayBefore + run.legs.length)
+    expect(g.currentSystem).toBe(q.targetSystem)
+    expect(g.systems[q.targetSystem].visited).toBe(true)
+    // Contract fee plus danger pay for anything shot down on the way.
+    expect(run.dangerPay).toBe(run.kills * ESCORT_KILL_BONUS)
+    expect(g.credits).toBe(creditsBefore + q.reward + run.dangerPay)
+    expect(g.quests.find((x) => x.id === q.id)?.status).toBe('completed')
+  })
+
+  it('logs every leg, and command decides each engagement', () => {
+    const g = newGame({ commanderName: 'Test', seed: 303 })
+    militaryEscort(g)
+    const q = escortQuest(g)
+    const run = runEscort(g, q.id, new Rng(11)).run!
+
+    for (const leg of run.legs) expect(leg.messages.length).toBeGreaterThan(0)
+    // Every contact carries an order; the player is never asked to choose.
+    for (const leg of run.legs.filter((l) => l.kind)) {
+      expect(leg.order).toBeDefined()
+      expect(leg.messages.some((m) => m.key.startsWith('escort.order.'))).toBe(true)
+    }
+    // Traders and patrols are waved past rather than shot at.
+    for (const leg of run.legs.filter((l) => l.kind === 'trader')) {
+      expect(leg.order).toBe('holdFire')
+      expect(leg.kills).toBe(0)
+    }
+    for (const leg of run.legs.filter((l) => l.kind === 'police')) {
+      expect(leg.order).toBe('standDown')
+    }
+  })
+
+  it('escort contracts are never handed in over the counter', () => {
+    const g = newGame({ commanderName: 'Test', seed: 304 })
+    militaryEscort(g)
+    const q = escortQuest(g)
+    g.currentSystem = q.targetSystem
+    expect(canTurnIn(g, q)).toBe(false)
+    expect(turnInQuest(g, q.id)).toBeNull()
+  })
+
+  it('a run ends the moment the escort is destroyed, unpaid', () => {
+    // Search seeds for a run where the (paper-thin) escort actually dies.
+    for (let seed = 1; seed < 60; seed++) {
+      const g = newGame({ commanderName: 'Test', seed: 305 })
+      militaryEscort(g)
+      g.ship.hull = 1 // a single hit finishes the ship
+      g.skills.pilot = 0
+      const q = escortQuest(g)
+      const creditsBefore = g.credits
+
+      const run = runEscort(g, q.id, new Rng(seed)).run!
+      if (!run.destroyed) continue
+
+      expect(g.currentSystem).toBe(q.giverSystem) // never made port
+      expect(g.credits).toBe(creditsBefore) // and never got paid
+      expect(g.quests.find((x) => x.id === q.id)?.status).toBe('active')
+      expect(run.dangerPay).toBe(0)
+      expect(run.legs[run.legs.length - 1].messages.some((m) => m.key === 'escort.lost')).toBe(true)
+      return
+    }
+    throw new Error('no seed produced a destroyed escort run')
+  })
+})
+
+describe('market contract hints', () => {
+  it('adds up what active contracts want and what is already aboard', () => {
+    const g = newGame({ commanderName: 'Test', seed: 310 })
+    const other = (g.currentSystem + 1) % g.systems.length
+    acceptQuest(g, {
+      id: 'r1',
+      type: 'relief',
+      giverSystem: g.currentSystem,
+      targetSystem: other,
+      reward: 500,
+      status: 'offered',
+      good: 'water',
+      amount: 5
+    })
+    acceptQuest(g, {
+      id: 'r2',
+      type: 'relief',
+      giverSystem: g.currentSystem,
+      targetSystem: other,
+      reward: 500,
+      status: 'offered',
+      good: 'water',
+      amount: 3
+    })
+    g.ship.cargo.water = 2
+
+    const demand = questDemand(g)
+    expect(demand.water).toEqual({ required: 8, have: 2, missing: 6, targets: [other] })
+    // Goods no contract asks for are absent entirely.
+    expect(demand.robots).toBeUndefined()
+  })
+
+  it('never counts more cargo than the contracts call for', () => {
+    const g = newGame({ commanderName: 'Test', seed: 311 })
+    acceptQuest(g, {
+      id: 'f1',
+      type: 'fetch',
+      giverSystem: g.currentSystem,
+      targetSystem: g.currentSystem,
+      reward: 500,
+      status: 'offered',
+      good: 'ore',
+      amount: 4
+    })
+    g.ship.cargo.ore = 10
+    const demand = questDemand(g)
+    expect(demand.ore?.have).toBe(4)
+    expect(demand.ore?.missing).toBe(0)
   })
 })
 

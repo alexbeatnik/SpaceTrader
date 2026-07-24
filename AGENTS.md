@@ -80,6 +80,19 @@ surface a pirate `Encounter` (which clears `mining` and mounts `<CombatModal>`).
 Keep the extraction/economy logic in the engine (`mining.ts`); the overlay only
 owns the timer, progress bar, and stop button.
 
+### Convoy escort contracts
+
+`escort.ts` is the odd one out: the player makes **no** decisions during the
+run. `runEscort` resolves the whole contract in one call — days, contacts,
+auto-fought engagements (driving `resolveRound` with `'attack'`), arrival via
+`settleArrival`, and payout via `completeEscort` — and returns an `EscortRun`
+whose `legs[]` the `<EscortOverlay>` merely *replays* on a timer. Resolving
+atomically (rather than per tick like mining) means a mid-run quit can never
+strand the player between systems. Ship requirements live in `game.ts`
+(`escortShipProblem`, military hull + `ESCORT_MIN_WEAPONS`/`ESCORT_MIN_SHIELDS`)
+so `acceptBoardQuest` can gate on them without importing `escort.ts` — that
+direction would be a cycle, since `escort.ts` imports `quests.ts`.
+
 ### Quests: job board + manual turn-in
 
 Each `SolarSystem` carries a `questBoard: Quest[]`, regenerated on arrival
@@ -163,6 +176,10 @@ npm run typecheck  # tsc for both the node (main/preload/engine) and web project
 npm test           # Vitest engine tests (headless, always runnable)
 npm run build      # production build into out/
 ```
+
+`npm test` also runs `src/i18n/locales.test.ts`, which fails if `en.ts` and
+`uk.ts` drift apart — either a missing key or a `{param}` that exists on only one
+side. That is the enforcement behind golden rule 2.
 
 Always run `npm run typecheck` and `npm test` before considering a change done.
 `tsconfig.node.json` covers `main`/`preload`/`game`; `tsconfig.web.json` covers

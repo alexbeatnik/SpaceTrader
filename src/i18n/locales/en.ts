@@ -58,13 +58,17 @@ export const en = {
     viaCombat: 'destroy in combat',
     sourceElsewhere:
       'Contract cargo must be hauled in — goods bought on this planet do not count towards the delivery.',
+    beginEscort: 'Take up escort station',
+    escortRequirements: 'Military hull, {weapons} weapons and {shields} shield fitted.',
+    escortHint: 'Convoy command runs the engagements — you fly the guns.',
     type: {
       delivery: 'Courier delivery',
       relief: 'Relief mission',
       bounty: 'Bounty hunt',
       passenger: 'Passenger transport',
       smuggle: 'Smuggling run',
-      fetch: 'Supply contract'
+      fetch: 'Supply contract',
+      escort: 'Convoy escort'
     },
     desc: {
       delivery: 'Deliver a package to the {system} system.',
@@ -72,7 +76,8 @@ export const en = {
       bounty: 'Track down and destroy the pirate {bounty} (headed for {system}).',
       passenger: 'Transport {passenger} safely to the {system} system.',
       smuggle: 'Smuggle {amount} × {good} past the patrols to {system}.',
-      fetch: 'Source {amount} × {good} and bring it back to {system}.'
+      fetch: 'Source {amount} × {good} and bring it back to {system}.',
+      escort: 'Fly gun cover for a convoy bound for {system}.'
     },
     accepted: 'Assignment accepted — reward {reward} cr.',
     abandoned: 'Assignment abandoned.',
@@ -214,7 +219,10 @@ export const en = {
     illegal: 'illegal good',
     emptyHold: 'Your cargo hold is empty',
     buyAmount: 'How much {good} to buy?',
-    sellAmount: 'How much {good} to sell?'
+    sellAmount: 'How much {good} to sell?',
+    questNeed: 'Contracts',
+    questNeedHint: 'Units your active contracts call for, and how many you already carry.',
+    questNeedFor: 'Wanted at: {systems}'
   },
   shipyard: {
     title: 'Shipyard',
@@ -302,6 +310,25 @@ export const en = {
   warp: {
     jumping: 'Warp jump in progress',
     skip: 'Skip'
+  },
+  escort: {
+    title: 'Convoy escort',
+    leg: 'Leg {leg}/{total}',
+    legs: '{legs} legs',
+    kills: 'Attackers destroyed',
+    damage: 'Hull damage taken',
+    legQuiet: 'Leg {leg}: empty space. The convoy holds formation.',
+    contact: 'Leg {leg}: contact — {kind}.',
+    order: {
+      engage: 'Convoy command: "Escort, break and engage!"',
+      holdFire: 'Convoy command: "Hold fire — they are just traders."',
+      standDown: 'Convoy command: "Patrol check. Stand down, the convoy has clearance."'
+    },
+    shieldsRecharged: 'The convoy tender tops your shields back up.',
+    arrived: 'The convoy docks at {system}. Contract fulfilled.',
+    dangerPay: 'Danger pay: {amount} cr.',
+    lost: 'Your ship is gone. The convoy scatters without its escort.',
+    failed: 'The convoy escort to {system} ended in disaster.'
   },
   mining: {
     start: 'Mine',
@@ -565,6 +592,10 @@ export const en = {
     tooManyQuests: 'You are juggling too many assignments already.',
     questGone: 'That posting is no longer available.',
     recordClean: 'Your record is already clean.',
+    escortNeedsMilitary: 'Escort work needs a military-class hull.',
+    escortNeedsWeapons: 'Escort work needs at least two weapons fitted.',
+    escortNeedsShield: 'Escort work needs at least one shield fitted.',
+    escortNotHere: 'The convoy forms up at the system that posted the contract.',
     noMineSite: 'There is nothing to mine here.',
     holdFull: 'The cargo hold is full.',
     loadFailed: 'Could not load the save file — it may be corrupted.'

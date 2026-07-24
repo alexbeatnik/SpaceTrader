@@ -7,6 +7,7 @@ import {
   freeCargoBays,
   deliverableUnits,
   noteLocalSourcing,
+  escortShipProblem,
   type ActionResult
 } from './game'
 import { systemDistance } from './travel'
@@ -217,10 +218,16 @@ function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
     const dist = systemDistance(here, target)
     return { id: nextQuestId(), type: 'passenger', giverSystem: here.id, targetSystem: target.id, reward: 500 + dist * 70 + rng.int(0, 900), status: 'offered', passengerName: rng.pick(PASSENGER_NAMES) }
   }
-  if (roll < 0.88) {
+  if (roll < 0.82) {
     // Bounty hunt for a wanted pirate.
     const target = rng.pick(others)
     return { id: nextQuestId(), type: 'bounty', giverSystem: here.id, targetSystem: target.id, reward: rng.int(2000, 6000), status: 'offered', bountyName: rng.pick(BOUNTY_NAMES) }
+  }
+  if (roll < 0.94) {
+    // Convoy escort: gun cover on a long haul, for military hulls only.
+    const target = rng.pick(others)
+    const dist = systemDistance(here, target)
+    return { id: nextQuestId(), type: 'escort', giverSystem: here.id, targetSystem: target.id, reward: 1500 + dist * 120 + rng.int(0, 1500), status: 'offered' }
   }
   // Courier delivery.
   const target = rng.pick(others)
@@ -248,6 +255,11 @@ export function acceptBoardQuest(state: GameState, questId: string): ActionResul
   if (activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, error: 'error.tooManyQuests' }
   const q = board[idx]
   if (q.type === 'passenger' && freeQuarters(state.ship) <= 0) return { ok: false, error: 'error.noQuarters' }
+  // The convoy signs on gunships only — no point taking the job otherwise.
+  if (q.type === 'escort') {
+    const problem = escortShipProblem(state)
+    if (problem) return { ok: false, error: problem }
+  }
   board.splice(idx, 1)
   acceptQuest(state, q)
   return { ok: true, info: { key: 'quest.accepted', params: questParams(state, q) } }
@@ -315,7 +327,8 @@ export function buyQuestSupplies(state: GameState, quest: Quest): ActionResult {
  */
 export function canTurnIn(state: GameState, quest: Quest): boolean {
   if (quest.status !== 'active') return false
-  if (quest.type === 'bounty') return false
+  // Bounties resolve in combat and escorts on the convoy run itself.
+  if (quest.type === 'bounty' || quest.type === 'escort') return false
   if (quest.targetSystem !== state.currentSystem) return false
   // A delivery is never handed in at the system that issued it.
   if (quest.type === 'delivery' && state.currentSystem === quest.giverSystem) return false
@@ -324,6 +337,41 @@ export function canTurnIn(state: GameState, quest: Quest): boolean {
   const need = questSupply(quest)
   if (need && deliverableUnits(state, need.good) < need.amount) return false
   return true
+}
+
+/** What the player's active contracts want of one commodity. */
+export interface QuestDemand {
+  /** Total units all active contracts call for. */
+  required: number
+  /** Units already in the hold (across the whole requirement). */
+  have: number
+  /** Units still to buy. */
+  missing: number
+  /** Systems the contracts wanting this good are bound for. */
+  targets: number[]
+}
+
+/**
+ * Commodity requirements across all active cargo contracts, keyed by good —
+ * what the market screen shows so the player knows what to stock up on.
+ */
+export function questDemand(state: GameState): Partial<Record<GoodId, QuestDemand>> {
+  const demand: Partial<Record<GoodId, QuestDemand>> = {}
+  for (const q of activeQuests(state)) {
+    const need = questSupply(q)
+    if (!need) continue
+    const entry = demand[need.good] ?? { required: 0, have: 0, missing: 0, targets: [] }
+    entry.required += need.amount
+    if (!entry.targets.includes(q.targetSystem)) entry.targets.push(q.targetSystem)
+    demand[need.good] = entry
+  }
+  // Fill in holdings once per good, so two contracts don't double-count cargo.
+  for (const good of Object.keys(demand) as GoodId[]) {
+    const entry = demand[good]!
+    entry.have = Math.min(state.ship.cargo[good], entry.required)
+    entry.missing = Math.max(0, entry.required - state.ship.cargo[good])
+  }
+  return demand
 }
 
 /**
@@ -368,6 +416,24 @@ export function abandonQuest(state: GameState, questId: string): ActionResult {
   const [q] = state.quests.splice(idx, 1)
   pushLog(state, 'quest.abandoned', questParams(state, q))
   return { ok: true, info: { key: 'quest.abandoned', params: questParams(state, q) } }
+}
+
+/**
+ * Mark an escort contract complete (called when the convoy makes port). Danger
+ * pay for attackers destroyed is settled on top of the contract fee.
+ */
+export function completeEscort(state: GameState, questId: string, dangerPay: number): Quest | null {
+  const q = state.quests.find(
+    (x) => x.id === questId && x.status === 'active' && x.type === 'escort'
+  )
+  if (!q) return null
+  state.record.reputation += 2
+  if (dangerPay > 0) {
+    state.credits += dangerPay
+    pushLog(state, 'escort.dangerPay', { amount: dangerPay })
+  }
+  finishQuest(state, q)
+  return q
 }
 
 /** Mark a bounty quest complete (called from combat when the target dies). */

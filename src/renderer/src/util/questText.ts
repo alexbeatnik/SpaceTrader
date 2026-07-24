@@ -29,6 +29,8 @@ export function questDescription(q: Quest, game: GameState): string {
         good: goodName(q.good ?? ''),
         system
       })
+    case 'escort':
+      return t('quest.desc.escort', { system })
   }
 }
 

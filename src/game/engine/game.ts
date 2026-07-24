@@ -89,6 +89,29 @@ export function deliverableUnits(state: GameState, good: GoodId): number {
   return Math.max(0, state.ship.cargo[good] - (state.sourcedHere?.[good] ?? 0))
 }
 
+// --- Escort duty requirements ------------------------------------------------
+/** Weapons a hull must have mounted to be signed on as a convoy escort. */
+export const ESCORT_MIN_WEAPONS = 2
+/** Shields a hull must have mounted to be signed on as a convoy escort. */
+export const ESCORT_MIN_SHIELDS = 1
+
+/**
+ * Why the current ship cannot take escort work, or null if it can. Escorts fly
+ * gun cover, so a convoy only signs on a military hull with real teeth. Lives
+ * here rather than in `escort.ts` so the quest layer can gate on it too.
+ */
+export function escortShipProblem(state: GameState): string | null {
+  if (SHIP_TYPES[state.ship.type].shipClass !== 'military') return 'error.escortNeedsMilitary'
+  if (state.ship.weapons.length < ESCORT_MIN_WEAPONS) return 'error.escortNeedsWeapons'
+  if (state.ship.shields.length < ESCORT_MIN_SHIELDS) return 'error.escortNeedsShield'
+  return null
+}
+
+/** Whether the current ship qualifies for escort work. */
+export function canEscort(state: GameState): boolean {
+  return escortShipProblem(state) === null
+}
+
 export function shipValue(ship: Ship): number {
   const type = SHIP_TYPES[ship.type]
   let value = Math.round(type.price * 0.75)

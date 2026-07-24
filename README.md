@@ -65,15 +65,25 @@ Core systems implemented:
   across system personnel offices; each takes over duties in their best skill and
   draws a daily wage.
 - **Quests & job board** — every planet has a **job board** of assignments in
-  varied sizes (small runs to bulk freighter contracts) across **six types**:
+  varied sizes (small runs to bulk freighter contracts) across **seven types**:
   courier deliveries, relief missions, bounty hunts, VIP **passenger** transport,
-  high-risk **smuggling** runs, and **supply contracts**. Buy the required goods
+  high-risk **smuggling** runs, **supply contracts**, and **convoy escort** duty.
+  Contract cargo must be **hauled in** — buying it at the delivery point does not
+  count. Buy the required goods
   on the spot when accepting (or later, via the **buy-supplies shortcut** on the
   job card — active wherever the goods are actually sold), track coloured
   have/need progress, then **hand jobs in manually** at the destination for a
   reward that always beats plain trading. A **badge on the Quests tab** counts
   the jobs you can hand in right here, and any assignment can be **abandoned**
   at any time.
+- **Convoy escort** — sign on as gun cover for a merchant convoy (military hull
+  with two weapons and a shield required). It plays as one long haul: convoy
+  command decides every engagement — raiders get engaged, patrols waved through,
+  traders left alone — while you watch the run unfold leg by leg and collect a
+  contract fee plus danger pay for everything you shoot down.
+- **Market contract hints** — the commodity table shows what your active
+  contracts still need and how much of it you already carry, so you can stock up
+  before you leave.
 - **Special events** — one-off events on quiet arrivals: derelicts, fuel leaks,
   micrometeorites, ion storms, tolls, lotteries, news tips, veteran instructors,
   friendly convoys, refugees, colony rewards, and ancient alien probes.

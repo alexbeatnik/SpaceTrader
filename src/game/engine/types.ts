@@ -367,6 +367,7 @@ export type QuestType =
   | 'passenger'
   | 'smuggle'
   | 'fetch'
+  | 'escort'
 export type QuestStatus = 'offered' | 'active' | 'completed'
 
 export interface Quest {

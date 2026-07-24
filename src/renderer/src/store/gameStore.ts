@@ -35,6 +35,7 @@ import {
   buyQuestSupplies,
   turnInQuest,
   generateQuestBoard,
+  runEscort,
   mineOnce,
   currentSystem,
   pushLog,
@@ -56,7 +57,8 @@ import {
   type GadgetId,
   type NewGameOptions,
   type WarpResult,
-  type MineKind
+  type MineKind,
+  type EscortRun
 } from '@game/index'
 import { renderMessage } from '@i18n/index'
 
@@ -106,6 +108,8 @@ interface GameStore {
   questOffer: Quest | null
   /** Active mining session; while set, the mining overlay runs. */
   mining: MiningSession | null
+  /** A resolved convoy run being replayed by the escort overlay. */
+  escort: EscortRun | null
   /** A just-handed-in quest, shown in the reward modal until dismissed. */
   questReward: Quest | null
   screen: Screen
@@ -171,6 +175,8 @@ interface GameStore {
   acceptBoardQuest: (questId: string) => void
   abandonQuest: (questId: string) => void
   turnInQuest: (questId: string) => void
+  startEscort: (questId: string) => void
+  finishEscort: () => void
   dismissQuestReward: () => void
 }
 
@@ -233,6 +239,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     questOffer: null,
     questReward: null,
     mining: null,
+    escort: null,
     screen: 'menu',
     toast: null,
     gameOver: false,
@@ -250,6 +257,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         questOffer: null,
         questReward: null,
         mining: null,
+        escort: null,
         gameOver: false,
         toast: null,
         travel: null
@@ -265,7 +273,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         const game = JSON.parse(data) as GameState
         ensureBoard(game)
         pendingWarp = null
-        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, gameOver: false, travel: null })
+        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, gameOver: false, travel: null })
         return true
       } catch {
         // Corrupt save file or a failed read — tell the player instead of
@@ -289,7 +297,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     quitToMenu: () => {
       pendingWarp = null
-      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, travel: null })
+      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, travel: null })
     },
 
     buy: (good, amount) => withGame((g) => applyResult(g, buyGood(g, good, amount))),
@@ -542,6 +550,44 @@ export const useGameStore = create<GameStore>((set, get) => {
         set({ game: clone(g), questReward: clone(q) })
         void get().saveGame()
       }),
+
+    // The whole convoy run resolves in one engine call; the overlay then
+    // replays it leg by leg so the player watches it unfold.
+    startEscort: (questId) =>
+      withGame((g) => {
+        const rng = new Rng((g.seed ^ (g.day * 2654435761) ^ 0x5c07) >>> 0)
+        const res = runEscort(g, questId, rng)
+        if (!res.ok || !res.run) {
+          set({
+            toast: {
+              id: ++toastCounter,
+              type: 'error',
+              text: renderMessage(res.error ?? 'error.questGone')
+            }
+          })
+          return
+        }
+        set({ game: clone(g), escort: clone(res.run), screen: 'system' })
+        void get().saveGame()
+      }),
+
+    finishEscort: () => {
+      const run = get().escort
+      const g = get().game
+      set({ escort: null })
+      if (!run || !g) return
+      if (run.destroyed) {
+        // Losing the ship on contract is resolved exactly as in combat.
+        const survives = g.ship.escapePod
+        handleDestruction(g)
+        set({ game: clone(g), gameOver: !survives })
+        void get().saveGame()
+        return
+      }
+      const quest = g.quests.find((q) => q.id === run.questId)
+      set({ questReward: quest ? clone(quest) : null })
+      void get().saveGame()
+    },
 
     dismissQuestReward: () => set({ questReward: null })
   }

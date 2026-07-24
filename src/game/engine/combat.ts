@@ -67,6 +67,12 @@ export interface TradeOffer {
   buys: Partial<Record<GoodId, number>>
 }
 
+/** A combat-log line: an i18n key plus its interpolation params. */
+export interface EncounterMessage {
+  key: string
+  params?: Record<string, string | number>
+}
+
 export interface Encounter {
   kind: EncounterKind
   /** The ship currently engaged. */
@@ -92,7 +98,7 @@ export interface Encounter {
   /** Trader-only: random goods/prices the player can trade with. */
   trade?: TradeOffer
   /** Rounds log keyed for i18n. */
-  messages: { key: string; params?: Record<string, string | number> }[]
+  messages: EncounterMessage[]
 }
 
 export type CombatAction =
@@ -461,6 +467,19 @@ export function tradeSell(
 /** Spawn a pirate encounter (e.g. raiders that jump a mining operation). */
 export function spawnPirates(state: GameState, rng: Rng): Encounter {
   return makeEncounter('pirate', state, rng)
+}
+
+/**
+ * Spawn an encounter of a given kind, for flows that pick the opposition
+ * themselves rather than rolling for it (convoy escort duty, scripted events).
+ */
+export function spawnEncounter(
+  kind: EncounterKind,
+  state: GameState,
+  rng: Rng,
+  hiredBy?: 'law' | 'bank'
+): Encounter {
+  return makeEncounter(kind, state, rng, hiredBy)
 }
 
 /** Build a tough pirate encounter for a bounty quest target. */

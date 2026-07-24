@@ -19,8 +19,11 @@ export interface WarpResult {
   questsReady?: Quest[]
 }
 
-/** Recharge shields fully (as when docking) and top up hull slightly. */
-function onArrival(state: GameState, rng: Rng): void {
+/**
+ * Dock at the current system: recharge shields, refresh the market and job
+ * board, and clear local sourcing. Shared by ordinary jumps and convoy runs.
+ */
+export function settleArrival(state: GameState, rng: Rng): void {
   const target = state.systems[state.currentSystem]
   target.visited = true
   // Whatever is in the hold was hauled here, so it may settle contracts; only
@@ -84,7 +87,7 @@ export function warp(state: GameState, targetId: number): WarpResult {
   }
 
   // If no encounter (or a benign one), finalise arrival immediately.
-  onArrival(state, rng)
+  settleArrival(state, rng)
 
   pushLog(state, 'log.arrived', {
     system: target.nameId,
