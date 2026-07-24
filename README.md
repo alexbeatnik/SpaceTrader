@@ -32,8 +32,9 @@ Core systems implemented:
   timed operation (asteroids yield ore + rare gems, ice yields water, gas giants
   scoop fuel straight into the tank) — but raiders may jump an exposed operation.
 - **Travel** — fuel-limited warp jumps across an interactive star chart, plus
-  wormhole shortcuts. Each jump plays an animated, skippable **warp transition**
-  (streaking stars, your ship, distance and day) so travel isn't instantaneous.
+  wormhole shortcuts. Each jump plays an animated **warp transition** you sit
+  through — no skipping — with streaking stars, your ship, the distance and the
+  day, so travel is never instantaneous.
 - **Star chart** — interactive map with a fuel-range ring, wormhole links, and
   **pulsing markers on active quest destinations** (with where each job was taken
   and its reward). A marker glows **dim** while you lack the goods needed for

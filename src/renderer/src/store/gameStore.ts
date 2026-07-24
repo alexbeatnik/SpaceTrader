@@ -95,6 +95,12 @@ export interface TravelAnim {
   shipType: ShipTypeId
   /** Animation duration in milliseconds. */
   durationMs: number
+  /**
+   * Points along the leg (0 = the moment you light the drive, 1 = arrival) at
+   * which something cuts across your course, ascending — one per encounter. The
+   * jump halts at each, the fight plays out, and the rest is flown after.
+   */
+  interceptPoints: number[]
 }
 
 /** Active real-time mining operation at the current system. */
@@ -167,6 +173,8 @@ interface GameStore {
 
   // travel & combat
   warpTo: (targetId: number) => void
+  /** Surfaces the next en-route encounter; false when there was none left. */
+  interceptTravel: () => boolean
   finishTravel: () => void
   startMining: () => void
   mineTick: () => void
@@ -373,10 +381,18 @@ export const useGameStore = create<GameStore>((set, get) => {
 
         // Defer surfacing encounter/event/offer until the travel animation ends.
         pendingWarp = result
-        // A long, skippable jump: ~10s (wormhole / short hop) up to ~30s far.
+        // A long jump: ~10s (wormhole / short hop) up to ~30s far.
         const durationMs = viaWormhole
           ? 10000
           : Math.min(30000, Math.max(10000, distance * 900))
+
+        // Whoever is out there does not politely wait at the destination: scatter
+        // each meeting anywhere along the leg, from the drive lighting up to the
+        // moment you make port.
+        const rng = new Rng((g.seed ^ (g.day * 668265263) ^ targetId) >>> 0)
+        const interceptPoints = (result.encounters ?? [])
+          .map(() => rng.next())
+          .sort((a, b) => a - b)
 
         set({
           game: clone(g),
@@ -384,10 +400,31 @@ export const useGameStore = create<GameStore>((set, get) => {
           event: null,
           questOffer: null,
           screen: 'system',
-          travel: { fromId: fromSys.id, toId: targetId, fromName, toName, distance, viaWormhole, shipType, durationMs }
+          travel: {
+            fromId: fromSys.id,
+            toId: targetId,
+            fromName,
+            toName,
+            distance,
+            viaWormhole,
+            shipType,
+            durationMs,
+            interceptPoints
+          }
         })
         void get().saveGame()
       }),
+
+    // Something cuts across the course mid-jump: surface the next encounter in
+    // the queue and leave the rest of the arrival for when the leg is finished.
+    interceptTravel: () => {
+      const queue = pendingWarp?.encounters ?? []
+      if (!pendingWarp || queue.length === 0) return false
+      const [next, ...rest] = queue
+      pendingWarp = { ...pendingWarp, encounters: rest }
+      set({ encounter: clone(next) })
+      return true
+    },
 
     finishTravel: () => {
       const result = pendingWarp
@@ -395,7 +432,9 @@ export const useGameStore = create<GameStore>((set, get) => {
       const ready = result?.questsReady ?? []
       set({
         travel: null,
-        encounter: result?.encounter ? clone(result.encounter) : null,
+        // Normally every encounter has already been met en route; anything left
+        // (a throttled animation cut short) is surfaced rather than dropped.
+        encounter: result?.encounters?.length ? clone(result.encounters[0]) : null,
         event: result?.event ? clone(result.event) : null,
         incident: result?.incident ? clone(result.incident) : null,
         questOffer: result?.questOffer ? clone(result.questOffer) : null,

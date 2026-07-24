@@ -70,7 +70,8 @@ export function App(): React.JSX.Element {
       {travel && <WarpTransition />}
       {escort && !travel && <EscortOverlay />}
       {mining && !encounter && !escort && <MiningOverlay />}
-      {!travel && !mining && !escort && encounter && !gameOver && <CombatModal />}
+      {/* Combat may interrupt a jump, so this one renders over the warp too. */}
+      {!mining && !escort && encounter && !gameOver && <CombatModal />}
       {!travel && !mining && !escort && !encounter && !gameOver && <CrewIncidentModal />}
       {!travel && !mining && !escort && !encounter && !incident && !gameOver && <EventModal />}
       {!travel && !mining && !escort && !encounter && !incident && !gameOver && <QuestOfferModal />}

@@ -10,10 +10,16 @@ import { maybeTriggerEvent, type GameEvent } from './events'
 import { questsReadyToTurnIn, generateQuestOffer, generateQuestBoard, hasActiveBounty } from './quests'
 import { generateCrewRoster, type CrewIncident } from './crew'
 
+/** Encounter rolls made on a leg — a longer haul means more chances to meet someone. */
+export function encounterRolls(distance: number): number {
+  return Math.max(1, Math.min(3, 1 + Math.floor(distance / 6)))
+}
+
 export interface WarpResult {
   ok: boolean
   error?: string
-  encounter?: Encounter | null
+  /** Everyone met en route, in the order they cut across your course. */
+  encounters?: Encounter[]
   event?: GameEvent | null
   questOffer?: Quest | null
   /** Active quests that can now be handed in at the destination. */
@@ -77,17 +83,24 @@ export function warp(state: GameState, targetId: number): WarpResult {
   state.currentSystem = targetId
   const incident = advanceDay(state, rng)
 
-  let encounter = rollEncounter(state, rng)
+  // A leg is not one meeting: roll several times over the distance flown.
+  const encounters: Encounter[] = []
+  const rolls = encounterRolls(viaWormhole ? 0 : systemDistance(here, target))
+  for (let i = 0; i < rolls; i++) {
+    const rolled = rollEncounter(state, rng)
+    if (rolled) encounters.push(rolled)
+  }
 
   // Bounty targets: tag a rolled pirate, or occasionally ambush on a quiet leg.
   const bounty = hasActiveBounty(state)
   if (bounty && bounty.bountyName) {
-    if (encounter && encounter.kind === 'pirate') {
-      encounter.bountyQuestId = bounty.id
-      encounter.bountyName = bounty.bountyName
-      encounter.messages = [{ key: 'encounter.bounty.appear', params: { bounty: bounty.bountyName } }]
-    } else if (!encounter && rng.chance(0.35)) {
-      encounter = createBountyEncounter(state, bounty.id, bounty.bountyName, rng)
+    const pirate = encounters.find((e) => e.kind === 'pirate')
+    if (pirate) {
+      pirate.bountyQuestId = bounty.id
+      pirate.bountyName = bounty.bountyName
+      pirate.messages = [{ key: 'encounter.bounty.appear', params: { bounty: bounty.bountyName } }]
+    } else if (encounters.length === 0 && rng.chance(0.35)) {
+      encounters.push(createBountyEncounter(state, bounty.id, bounty.bountyName, rng))
     }
   }
 
@@ -104,10 +117,11 @@ export function warp(state: GameState, targetId: number): WarpResult {
   const questsReady = questsReadyToTurnIn(state)
 
   // Special events and new offers only occur on otherwise-quiet arrivals.
-  const event = encounter ? null : maybeTriggerEvent(state, rng)
-  const questOffer = !encounter && !event ? generateQuestOffer(state, rng) : null
+  const quiet = encounters.length === 0
+  const event = quiet ? maybeTriggerEvent(state, rng) : null
+  const questOffer = quiet && !event ? generateQuestOffer(state, rng) : null
 
-  return { ok: true, encounter, event, questOffer, questsReady, incident }
+  return { ok: true, encounters, event, questOffer, questsReady, incident }
 }
 
 export function wormholeTax(state: GameState): number {

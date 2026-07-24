@@ -23,7 +23,7 @@ import {
   EXPLORER_RANGE_BONUS,
   INDUSTRIAL_MINING_YIELD
 } from './game'
-import { warp } from './warp'
+import { warp, encounterRolls } from './warp'
 import {
   resolveRound,
   tradeBuy,
@@ -1618,6 +1618,46 @@ describe('travel and warp', () => {
     expect(g.day).toBe(dayBefore + 1)
     expect(g.ship.fuel).toBeLessThan(fuelBefore)
     expect(g.currentSystem).toBe(target)
+  })
+
+  it('a leg can turn up several meetings, and always reports a list', () => {
+    const g = newGame({ commanderName: 'Test', seed: 500 })
+    const target = nearestTo(g, g.currentSystem)
+    g.ship.fuel = 999
+    const res = warp(g, target)
+    expect(res.ok).toBe(true)
+    expect(Array.isArray(res.encounters)).toBe(true)
+
+    // Over many jumps in pirate country, more than one meeting does happen.
+    let most = 0
+    for (let seed = 1; seed < 120 && most < 2; seed++) {
+      const run = newGame({ commanderName: 'Test', seed })
+      run.ship.fuel = 999
+      run.record.policeRecord = -12 // wanted: hunters are drawn in too
+      const to = nearestTo(run, run.currentSystem)
+      most = Math.max(most, warp(run, to).encounters?.length ?? 0)
+    }
+    expect(most).toBeGreaterThanOrEqual(2)
+  })
+
+  it('longer hauls get more chances to run into somebody', () => {
+    expect(encounterRolls(0)).toBe(1) // a wormhole hop is one roll
+    expect(encounterRolls(2)).toBe(1)
+    expect(encounterRolls(12)).toBeGreaterThan(encounterRolls(2))
+    // However far you go, the leg is capped so it never becomes a gauntlet.
+    expect(encounterRolls(999)).toBe(3)
+  })
+
+  it('events and offers only happen on a leg where nobody turned up', () => {
+    for (let seed = 1; seed < 60; seed++) {
+      const g = newGame({ commanderName: 'Test', seed })
+      g.ship.fuel = 999
+      const res = warp(g, nearestTo(g, g.currentSystem))
+      if (res.encounters?.length) {
+        expect(res.event).toBeNull()
+        expect(res.questOffer).toBeNull()
+      }
+    }
   })
 
   it('auto-refuel tops the tank back up on arrival when enabled', () => {

@@ -60,21 +60,36 @@ phases:
 - `warpTo(targetId)` runs `warp()`, stashes the result in a module-level
   `pendingWarp`, and sets a `travel: TravelAnim` descriptor **instead of**
   surfacing the encounter/event/offer.
-- `<WarpTransition>` renders while `travel` is set (a skippable, timed overlay),
-  then calls `finishTravel()`, which moves `pendingWarp` into the reactive
-  `encounter`/`event`/`questOffer` fields and clears `travel`.
+- `<WarpTransition>` renders while `travel` is set (a timed overlay the player
+  cannot skip — a jump takes as long as it takes), then calls `finishTravel()`,
+  which moves `pendingWarp` into the reactive `event`/`questOffer` fields and
+  clears `travel`.
 
-So the combat/event/offer modals only mount **after** the animation. When adding
-flow that runs on arrival, thread it through `WarpResult` → `pendingWarp` →
-`finishTravel`, not directly out of `warpTo`. Note: `pendingWarp` lives outside
-reactive state and is not persisted, so a hard close mid-animation drops that
-one pending encounter (acceptable).
+**A leg can hold several encounters, and they interrupt the jump rather than
+waiting at the far end.** `warp()` rolls `encounterRolls(distance)` times (1–3,
+longer hauls get more) and returns `WarpResult.encounters` — always a list, so
+never reach for a singular `encounter`. `warpTo` gives each one a random point
+along the leg (`TravelAnim.interceptPoints`, anywhere in 0…1, sorted). When the
+animation reaches the next point the overlay calls `interceptTravel()`, which
+shifts one encounter off `pendingWarp` and surfaces it; the flight loop tears
+down, and once that fight is dismissed it picks the leg back up from
+`progressRef` and flies on to the next point. `interceptTravel` returns false
+when the queue is empty and the loop keeps flying on false — without that, a
+mismatch between points and encounters would freeze the jump forever.
+`<CombatModal>` is therefore the one modal App renders **without** a `!travel`
+guard, and `.overlay` sits above `.warp-overlay` so it shows over the streaks.
+
+Everything else (events, quest offers, the ready-to-hand-in toast) still waits
+for `finishTravel`. When adding flow that runs on arrival, thread it through
+`WarpResult` → `pendingWarp` → `finishTravel`, not directly out of `warpTo`.
+Note: `pendingWarp` lives outside reactive state and is not persisted, so a hard
+close mid-animation drops that one pending encounter (acceptable).
 
 ### Timed overlays (warp, mining)
 
 Long real-time activities are driven by a `requestAnimationFrame` loop in an
 overlay component, not by the engine. `<WarpTransition>` runs once per jump
-(~10–30 s, skippable). `<MiningOverlay>` loops: every ~30 s it calls
+(~10–30 s, not skippable). `<MiningOverlay>` loops: every ~30 s it calls
 `mineTick()`, which extracts one unit via the pure `mineOnce(state, rng)` and may
 surface a pirate `Encounter` (which clears `mining` and mounts `<CombatModal>`).
 Keep the extraction/economy logic in the engine (`mining.ts`); the overlay only
