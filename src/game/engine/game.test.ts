@@ -23,8 +23,29 @@ import {
   INDUSTRIAL_MINING_YIELD
 } from './game'
 import { warp } from './warp'
-import { resolveRound, tradeBuy, tradeSell } from './combat'
+import {
+  resolveRound,
+  tradeBuy,
+  tradeSell,
+  tractorChance,
+  fleeChance,
+  spawnPirates,
+  rollEncounter
+} from './combat'
 import type { Encounter, EncounterKind, Opponent } from './combat'
+import {
+  applyKarma,
+  fineToClear,
+  hunterChance,
+  notoriety,
+  payFine,
+  sentenceDays,
+  serveSentence,
+  standing,
+  wantedByBank,
+  BANK_BOUNTY_DEBT,
+  QUEST_KARMA
+} from './reputation'
 import { generateGalaxy, SYSTEM_COUNT } from './galaxy'
 import { standardPrice, refreshMarket } from './market'
 import { TRADE_GOODS, GOOD_IDS } from '../data/goods'
@@ -586,13 +607,31 @@ describe('data integrity', () => {
 })
 
 describe('encounter kinds', () => {
-  it('surrendering to a bounty hunter costs a ransom but ends the fight', () => {
+  it('standing down to a bounty hunter means prison, not a ransom', () => {
     const g = newGame({ commanderName: 'Test', seed: 72 })
     g.credits = 10000
+    g.record.policeRecord = -4 // notoriety 4
+    g.ship.cargo.narcotics = 3
+    const dayBefore = g.day
     const enc = testEncounter('bountyHunter')
     resolveRound(g, enc, 'surrender', new Rng(1))
+
+    expect(enc.status).toBe('playerArrested')
+    // Sentence: 5 base + 2 per notoriety point; fine 1000 + 500 per point.
+    expect(g.day).toBe(dayBefore + 13)
+    expect(g.credits).toBe(10000 - 3000)
+    expect(g.ship.cargo.narcotics).toBe(0) // contraband seized on booking
+    expect(g.record.policeRecord).toBe(0) // time served wipes the record
+  })
+
+  it('surrendering to pirates costs the cargo but leaves the ship flying', () => {
+    const g = newGame({ commanderName: 'Test', seed: 78 })
+    g.ship.cargo.furs = 4
+    const enc = testEncounter('pirate')
+    resolveRound(g, enc, 'surrender', new Rng(1))
     expect(enc.status).toBe('playerSurrendered')
-    expect(g.credits).toBe(6500) // max(500, round(10000 * 0.35)) = 3500 taken
+    expect(g.ship.cargo.furs).toBe(0)
+    expect(enc.messages.some((m) => m.key === 'encounter.pirate.released')).toBe(true)
   })
 
   it('a corruptible bounty hunter can be bribed', () => {
@@ -672,6 +711,238 @@ describe('encounter kinds', () => {
     // The engine keeps the pod flag set; the store reads it to grant survival.
     expect(g.ship.escapePod).toBe(true)
     expect(enc.messages.some((m) => m.key === 'encounter.escapePod')).toBe(true)
+  })
+})
+
+describe('tractor beams and escape', () => {
+  it('only heavier hulls can get a lock, and a pack locks on more readily', () => {
+    const g = newGame({ commanderName: 'Test', seed: 90 })
+    g.ship.type = 'flea' // small hull
+    g.skills.pilot = 0 // keep the pilot bonus out of the comparison
+
+    const lone = testEncounter('pirate', { shipType: 'atlas' }) // capital, alone
+    const pack = testEncounter('pirate', { shipType: 'atlas' })
+    pack.reserves = [testEncounter('pirate', { shipType: 'atlas' }).opponent]
+    pack.fleetSize = 2
+
+    expect(tractorChance(g, pack)).toBeGreaterThan(tractorChance(g, lone))
+
+    // Same size or smaller: nothing to tow with.
+    const peer = testEncounter('pirate', { shipType: 'flea' })
+    peer.reserves = [testEncounter('pirate', { shipType: 'flea' }).opponent]
+    expect(tractorChance(g, peer)).toBe(0)
+
+    // A big ship being chased by small ones is never the one getting towed.
+    g.ship.type = 'atlas'
+    expect(tractorChance(g, pack)).toBe(0)
+  })
+
+  it('traders and police never deploy a tractor beam', () => {
+    const g = newGame({ commanderName: 'Test', seed: 91 })
+    g.ship.type = 'flea'
+    for (const kind of ['trader', 'police'] as EncounterKind[]) {
+      const enc = testEncounter(kind, { shipType: 'atlas' })
+      enc.reserves = [testEncounter(kind, { shipType: 'atlas' }).opponent]
+      expect(tractorChance(g, enc)).toBe(0)
+    }
+  })
+
+  it('a lock must be broken before the player can run', () => {
+    const g = newGame({ commanderName: 'Test', seed: 92 })
+    g.ship.type = 'flea'
+    g.ship.hull = 500 // survive the free shots taken while pinned
+    const enc = testEncounter('pirate', { shipType: 'atlas', weaponPower: 0 })
+    enc.tractorLocked = true
+
+    const rng = new Rng(11)
+    let guard = 0
+    while (enc.status === 'ongoing' && guard++ < 300) {
+      const lockedBefore = enc.tractorLocked
+      resolveRound(g, enc, 'flee', rng)
+      // No escape can happen on a round where the beam still had hold.
+      if (lockedBefore && enc.tractorLocked) expect(enc.status).toBe('ongoing')
+    }
+    expect(enc.status).toBe('playerFled')
+    expect(enc.messages.some((m) => m.key === 'encounter.tractor.broke')).toBe(true)
+  })
+
+  it('small hulls outrun big ones more easily than the other way round', () => {
+    const g = newGame({ commanderName: 'Test', seed: 93 })
+    const heavy = testEncounter('pirate', { shipType: 'atlas' })
+    const light = testEncounter('pirate', { shipType: 'flea' })
+
+    g.ship.type = 'flea'
+    const smallFleeingBig = fleeChance(g, heavy, g.skills.pilot)
+    g.ship.type = 'atlas'
+    const bigFleeingSmall = fleeChance(g, light, g.skills.pilot)
+
+    expect(smallFleeingBig).toBeGreaterThan(bigFleeingSmall)
+  })
+})
+
+describe('combat log detail', () => {
+  it('reports critical hits, shield saves and a crippled hull', () => {
+    const g = newGame({ commanderName: 'Test', seed: 94 })
+    g.skills.fighter = 13 // near-certain hits, high crit rate
+    g.ship.hull = 5000
+    // A punchbag with shields deep enough to soak some volleys outright.
+    const enc = testEncounter('pirate', {
+      hull: 4000,
+      maxHull: 4000,
+      shieldPoints: 200,
+      maxShield: 200,
+      weaponPower: 0,
+      pilot: 0
+    })
+
+    const rng = new Rng(21)
+    for (let i = 0; i < 200 && enc.status === 'ongoing'; i++) resolveRound(g, enc, 'attack', rng)
+
+    const keys = enc.messages.map((m) => m.key)
+    expect(keys).toContain('encounter.playerCrit')
+    expect(keys).toContain('encounter.oppShieldsHeld')
+    expect(keys).toContain('encounter.oppShieldDown')
+  })
+
+  it('a critical hit lands harder than a normal one', () => {
+    const g = newGame({ commanderName: 'Test', seed: 95 })
+    g.skills.fighter = 13
+    g.ship.hull = 5000
+    const enc = testEncounter('pirate', {
+      hull: 9000,
+      maxHull: 9000,
+      weaponPower: 0,
+      pilot: 0
+    })
+    const rng = new Rng(22)
+    for (let i = 0; i < 120 && enc.status === 'ongoing'; i++) resolveRound(g, enc, 'attack', rng)
+
+    const dmg = (key: string): number[] =>
+      enc.messages.filter((m) => m.key === key).map((m) => Number(m.params?.dmg))
+    const crits = dmg('encounter.playerCrit')
+    const normals = dmg('encounter.playerHit')
+    expect(crits.length).toBeGreaterThan(0)
+    expect(Math.min(...crits)).toBeGreaterThan(Math.max(...normals))
+  })
+
+  it('pirates open by naming the cargo they came for', () => {
+    const g = newGame({ commanderName: 'Test', seed: 96 })
+    g.ship.cargo.robots = 5 // by far the most valuable thing aboard
+    const enc = spawnPirates(g, new Rng(4))
+    expect(enc.demand).toBe('cargo')
+    const demand = enc.messages.find((m) => m.key.startsWith('encounter.pirate.demand'))
+    expect(demand).toBeDefined()
+    expect(demand?.params?.good).toBe('robots')
+  })
+
+  it('pirates facing an empty hold threaten the ship instead', () => {
+    const g = newGame({ commanderName: 'Test', seed: 97 })
+    const enc = spawnPirates(g, new Rng(4))
+    expect(enc.messages.some((m) => m.key === 'encounter.pirate.demandEmpty')).toBe(true)
+  })
+})
+
+describe('standing and hired hunters', () => {
+  it('smuggling builds a criminal name; aid and bounties build a defender one', () => {
+    expect(QUEST_KARMA.smuggle).toBeLessThan(0)
+    expect(QUEST_KARMA.relief).toBeGreaterThan(0)
+    expect(QUEST_KARMA.bounty).toBeGreaterThan(0)
+
+    const g = newGame({ commanderName: 'Test', seed: 100 })
+    expect(standing(g)).toBe('citizen')
+    applyKarma(g, QUEST_KARMA.smuggle * 2)
+    expect(notoriety(g)).toBe(6)
+    expect(standing(g)).toBe('criminal')
+    applyKarma(g, 16)
+    expect(notoriety(g)).toBe(0)
+    expect(standing(g)).toBe('champion')
+  })
+
+  it('logs a line whenever the player crosses into a new standing tier', () => {
+    const g = newGame({ commanderName: 'Test', seed: 101 })
+    applyKarma(g, -6)
+    const entry = g.log.find((l) => l.key === 'log.standingChanged')
+    expect(entry?.params?.standing).toBe('standing.criminal')
+  })
+
+  it('handing in a smuggling run marks the record', () => {
+    const g = newGame({ commanderName: 'Test', seed: 102 })
+    const quest: Quest = {
+      id: 'smug1',
+      type: 'smuggle',
+      giverSystem: g.currentSystem,
+      targetSystem: (g.currentSystem + 1) % g.systems.length,
+      reward: 1000,
+      status: 'offered',
+      good: 'narcotics',
+      amount: 2
+    }
+    acceptQuest(g, quest)
+    g.currentSystem = quest.targetSystem
+    g.ship.cargo.narcotics = 2
+    expect(turnInQuest(g, quest.id)).not.toBeNull()
+    expect(g.record.policeRecord).toBe(QUEST_KARMA.smuggle)
+    expect(notoriety(g)).toBeGreaterThan(0)
+  })
+
+  it('an unpaid loan puts hunters on a spotless record', () => {
+    const g = newGame({ commanderName: 'Test', seed: 103 })
+    expect(hunterChance(g)).toBe(0)
+    g.debt = BANK_BOUNTY_DEBT
+    expect(wantedByBank(g)).toBe(true)
+    expect(hunterChance(g)).toBeGreaterThan(0)
+  })
+
+  it('a notorious captain draws hunters on the way out', () => {
+    const g = newGame({ commanderName: 'Test', seed: 104 })
+    g.record.policeRecord = -12
+    let hunters = 0
+    for (let i = 0; i < 400; i++) {
+      if (rollEncounter(g, new Rng(i + 1))?.kind === 'bountyHunter') hunters++
+    }
+    expect(hunters).toBeGreaterThan(0)
+  })
+
+  it('a big fine buys the record clean and calls the law off', () => {
+    const g = newGame({ commanderName: 'Test', seed: 105 })
+    expect(payFine(g).ok).toBe(false) // nothing to clear yet
+
+    g.record.policeRecord = -6
+    const cost = fineToClear(g)
+    expect(cost).toBeGreaterThan(0)
+
+    g.credits = cost - 1
+    expect(payFine(g).ok).toBe(false) // cannot afford it
+
+    g.credits = cost
+    expect(payFine(g).ok).toBe(true)
+    expect(g.credits).toBe(0)
+    expect(g.record.policeRecord).toBe(0)
+    expect(hunterChance(g)).toBe(0)
+  })
+
+  it('a deeper record costs more to clear and more days to serve', () => {
+    const light = newGame({ commanderName: 'Test', seed: 106 })
+    const heavy = newGame({ commanderName: 'Test', seed: 106 })
+    light.record.policeRecord = -3
+    heavy.record.policeRecord = -12
+    expect(fineToClear(heavy)).toBeGreaterThan(fineToClear(light))
+    expect(sentenceDays(heavy)).toBeGreaterThan(sentenceDays(light))
+  })
+
+  it('serving a sentence burns days and interest but clears the record', () => {
+    const g = newGame({ commanderName: 'Test', seed: 107 })
+    g.record.policeRecord = -5
+    g.credits = 20000
+    g.debt = 1000
+    const dayBefore = g.day
+    const expectedDays = sentenceDays(g)
+    const served = serveSentence(g)
+
+    expect(served.days).toBe(expectedDays)
+    expect(g.day).toBe(dayBefore + served.days)
+    expect(g.debt).toBeGreaterThan(1000) // interest kept running behind bars
+    expect(g.record.policeRecord).toBe(0)
   })
 })
 

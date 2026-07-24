@@ -47,6 +47,17 @@ export function slotsFor(size: ShipSize, cls: ShipClass): { weaponSlots: number;
   return { weaponSlots: s.w, shieldSlots: s.s, gadgetSlots: s.g }
 }
 
+/**
+ * Relative bulk of each hull size. Combat compares two ranks to decide who can
+ * outrun whom and whether a tractor beam can get a lock on a smaller ship.
+ */
+export const SIZE_RANK: Record<ShipSize, number> = {
+  small: 0,
+  medium: 1,
+  large: 2,
+  capital: 3
+}
+
 // Ship roster based on the original documentation's described capabilities.
 // Slot counts are derived from the SLOT_TABLE above (size × shipClass).
 export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
@@ -404,3 +415,8 @@ export const SHIP_TYPES: Record<ShipTypeId, ShipType> = {
 }
 
 export const SHIP_TYPE_IDS = Object.keys(SHIP_TYPES) as ShipTypeId[]
+
+/** Bulk rank of a ship type (0 = smallest hull, 3 = capital). */
+export function sizeRank(id: ShipTypeId): number {
+  return SIZE_RANK[SHIP_TYPES[id].size]
+}

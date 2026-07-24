@@ -3,6 +3,7 @@ import { Rng } from './rng'
 import { currentSystem, pushLog, freeQuarters, freeCargoBays, type ActionResult } from './game'
 import { systemDistance } from './travel'
 import { standardPrice } from './market'
+import { applyKarma, QUEST_KARMA } from './reputation'
 import { TRADE_GOODS } from '../data/goods'
 
 // Pool of wanted-pirate names for bounty quests (proper nouns, locale-stable).
@@ -359,6 +360,9 @@ export function completeBounty(state: GameState, questId: string): Quest | null 
 function finishQuest(state: GameState, q: Quest): void {
   q.status = 'completed'
   state.credits += q.reward
+  // Contracts shape how the galaxy sees you: aid runs and pirate hunting build
+  // a defender's name, contraband runs a criminal one.
+  applyKarma(state, QUEST_KARMA[q.type])
   pushLog(state, 'quest.completed', questParams(state, q))
 }
 

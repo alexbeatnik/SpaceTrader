@@ -72,6 +72,11 @@ export function CombatModal(): React.JSX.Element | null {
               🚀 {Math.max(0, enc.fleetSize - enc.defeated)}/{enc.fleetSize}
             </span>
           )}
+          {enc.tractorLocked && (
+            <span className="badge bad" style={{ marginLeft: 6 }}>
+              🧲 {t('encounter.tractor.badge')}
+            </span>
+          )}
         </h2>
 
         {enc.fleetSize > 1 && (
@@ -197,8 +202,14 @@ export function CombatModal(): React.JSX.Element | null {
               <button className="btn btn-danger" onClick={() => combatAction('attack')}>
                 ⚔ {t('encounter.action.attack')}
               </button>
-              <button className="btn" onClick={() => combatAction('flee')}>
-                💨 {t('encounter.action.flee')}
+              <button
+                className="btn"
+                title={enc.tractorLocked ? t('encounter.tractor.held') : undefined}
+                onClick={() => combatAction('flee')}
+              >
+                {enc.tractorLocked
+                  ? `🧲 ${t('encounter.action.breakFree')}`
+                  : `💨 ${t('encounter.action.flee')}`}
               </button>
               {enc.kind === 'police' && (
                 <button className="btn" onClick={() => combatAction('submit')}>
@@ -211,8 +222,23 @@ export function CombatModal(): React.JSX.Element | null {
                 </button>
               )}
               {(enc.kind === 'pirate' || enc.kind === 'bountyHunter') && (
-                <button className="btn" onClick={() => combatAction('surrender')}>
-                  🏳 {t('encounter.action.surrender')}
+                <button
+                  className="btn"
+                  title={t(
+                    enc.demand === 'arrest'
+                      ? 'encounter.action.standDownHint'
+                      : 'encounter.action.surrenderCargoHint'
+                  )}
+                  onClick={() => combatAction('surrender')}
+                >
+                  🏳{' '}
+                  {t(
+                    enc.demand === 'arrest'
+                      ? 'encounter.action.standDown'
+                      : enc.demand === 'cargo'
+                        ? 'encounter.action.surrenderCargo'
+                        : 'encounter.action.surrender'
+                  )}
                 </button>
               )}
               {enc.kind === 'trader' && (

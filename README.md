@@ -44,7 +44,23 @@ Core systems implemented:
   inspections (submit / bribe / flee / fight), a **trader marketplace** to buy and
   sell with lone traders, plus **bounty hunters** who come for wanted commanders
   and rare, deadly **alien raiders**. Plunder, escape pods, and opponents that
-  scale with your wealth, combat reputation, and criminal record.
+  scale with your wealth, combat reputation, and criminal record. Blow-by-blow
+  combat logs call out **critical hits**, shields soaking a volley, shields
+  collapsing, and a hull breached and venting.
+- **Hull size matters** — a small ship **outruns** a heavier one, but a pack of
+  big hulls can pin it in a **tractor beam**: while the lock holds there is no
+  escape and you are an easier target, until you overload the emitters and slip
+  free.
+- **Surrender terms** — pirates size up your hold and name the cargo they came
+  for; give it up and they strip the hold and let you fly on. Bounty hunters want
+  *you*: standing down means days in a cell and a fine — but you come out with a
+  **clean record**.
+- **Standing & bounty hunters** — the galaxy files you somewhere between
+  **Outlaw** and **Champion of justice**. Smuggling runs blacken the record;
+  relief missions, pirate bounties and clean inspections redeem it. Go notorious
+  — *or* leave a bank loan unpaid — and hunters are hired to collect, better
+  armed the bigger the payday. Buy the record clean with a **large fine** at the
+  bank (the bank calls its own collectors off only when the debt is paid).
 - **Crew & mercenaries** — hire from a roster of **26 named mercenaries** spread
   across system personnel offices; each takes over duties in their best skill and
   draws a daily wage.

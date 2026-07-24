@@ -35,8 +35,9 @@ A modern desktop remake of the classic *Space Trader* game, built with
 - `src/game/data/` — static tables (goods, ships, equipment, governments,
   economies, mercenaries, names). Pure data, no logic.
 - `src/game/engine/` — types, RNG, galaxy, market, travel, combat, warp, mining,
-  events, quests, and the `game.ts` action layer. `src/game/index.ts` is the
-  public barrel; import engine symbols through `@game/index`, not deep paths.
+  events, quests, reputation, and the `game.ts` action layer. `src/game/index.ts`
+  is the public barrel; import engine symbols through `@game/index`, not deep
+  paths.
   `advanceDay(state)` (in `game.ts`) is the shared daily tick used by both `warp`
   and `mine` — reuse it rather than re-implementing wages/interest/insurance.
 - `src/i18n/` — locale dictionaries and helpers. `en` is the default locale.
@@ -98,6 +99,32 @@ Related quest UX wired to the same engine helpers:
 - The quest card's "buy supplies" shortcut buys the missing amount straight
   from the local market (`buyGood`) and is enabled only where the good is
   actually sold (`buyPrice > 0 && qty > 0`) with free cargo space.
+
+### Standing (karma) and hired hunters
+
+`reputation.ts` owns the whole karma model. `record.policeRecord` is the single
+signed axis — negative is criminal notoriety, positive a defender's name — and
+**every change to it goes through `applyKarma`**, which logs when the player
+crosses into a new `standing()` tier. Never write `record.policeRecord` directly
+outside that module. Quest hand-ins award `QUEST_KARMA[type]` (smuggling costs
+karma, relief and bounty work earn it). `hunterChance` drives bounty-hunter
+spawns in `rollEncounter` and covers **both** triggers — notoriety and a bank
+loan past `BANK_BOUNTY_DEBT` — with `hunterEmployer` deciding whether the law or
+the bank is paying (it changes the encounter's opening lines). The two ways out
+are `payFine` (fast, expensive) and `serveSentence` (surrendering to a hunter:
+days on the calendar plus a fine, contraband seized, record wiped).
+
+### Combat: hull size, tractor beams, criticals
+
+Combat compares `sizeRank` (from `data/ships.ts`) on both sides. `fleeChance`
+gives smaller hulls an escape edge over heavier ones; `tractorChance` lets a
+group of *bigger* hulls (or one that dwarfs the player) lock the player down —
+while `enc.tractorLocked` is set, flee attempts only roll to break the lock and
+attackers get `TRACTOR_ACCURACY_BONUS`. Hits roll separately for a critical
+(`CRIT_MULTIPLIER`), and `applyDamage` returns a `DamageReport` so the log can
+narrate shields absorbing, shields collapsing, and a crippled hull as distinct
+messages. Pirates and hunters also push a demand line (`enc.demand`) that the
+combat modal uses to label the surrender button.
 
 ### Exotic (resource-gated) goods
 

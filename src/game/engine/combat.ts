@@ -1,11 +1,29 @@
 import type { GameState, GoodId, ShipTypeId, WeaponId, ShieldId } from './types'
 import { Rng } from './rng'
-import { SHIP_TYPES } from '../data/ships'
+import { SHIP_TYPES, sizeRank } from '../data/ships'
 import { WEAPONS, SHIELDS } from '../data/equipment'
 import { GOOD_IDS, TRADE_GOODS } from '../data/goods'
 import { POLITICS } from '../data/politics'
-import { effectiveSkills, weaponPower, freeCargoBays, pushLog, type ActionResult } from './game'
+import {
+  effectiveSkills,
+  weaponPower,
+  freeCargoBays,
+  usedCargoBays,
+  totalCargoBays,
+  maxHull,
+  pushLog,
+  type ActionResult
+} from './game'
 import { completeBounty } from './quests'
+import {
+  applyKarma,
+  hunterChance,
+  hunterEmployer,
+  notoriety,
+  serveSentence,
+  standing,
+  wantedByBank
+} from './reputation'
 
 export type EncounterKind = 'trader' | 'pirate' | 'police' | 'bountyHunter' | 'alien'
 
@@ -17,9 +35,15 @@ export type EncounterStatus =
   | 'playerDestroyed'
   | 'oppSurrendered'
   | 'playerSurrendered'
+  | 'playerArrested'
   | 'inspected'
   | 'ignored'
   | 'bribed'
+
+/** Damage multiplier when a shot lands as a critical strike. */
+export const CRIT_MULTIPLIER = 2
+/** Accuracy a shooter gains against a ship pinned in a tractor beam. */
+export const TRACTOR_ACCURACY_BONUS = 0.15
 
 export interface Opponent {
   kind: EncounterKind
@@ -56,6 +80,12 @@ export interface Encounter {
   status: EncounterStatus
   round: number
   bribeCost: number
+  /** Set while a tractor beam pins the player's ship — no escape until broken. */
+  tractorLocked?: boolean
+  /** A demand on the table: hand over the cargo, or stand down for arrest. */
+  demand?: 'cargo' | 'arrest'
+  /** Bounty hunters only: who is paying for the player's head. */
+  hiredBy?: 'law' | 'bank'
   /** Set when this pirate is a bounty target from an active quest. */
   bountyQuestId?: string
   bountyName?: string
@@ -85,10 +115,10 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
   // A rare, roaming alien raider can appear anywhere in deep space.
   if (rng.chance(0.015)) return makeEncounter('alien', state, rng)
 
-  // Outlaws attract bounty hunters: the more wanted you are, the likelier.
-  const wanted = Math.max(0, -state.record.policeRecord)
-  if (wanted >= 3 && rng.chance(Math.min(0.2, 0.02 + wanted * 0.02))) {
-    return makeEncounter('bountyHunter', state, rng)
+  // Hired hunters come for the notorious and for bank debtors alike.
+  const pHunter = hunterChance(state)
+  if (pHunter > 0 && rng.chance(pHunter)) {
+    return makeEncounter('bountyHunter', state, rng, hunterEmployer(state, rng))
   }
 
   // Base probabilities derived from government strengths.
@@ -111,9 +141,12 @@ function threatLevel(kind: EncounterKind, state: GameState): number {
   // Aliens are always a top-tier threat regardless of the player's standing.
   if (kind === 'alien') return 5
   let worth = state.credits + Math.max(0, state.record.reputation) * 120
-  if (kind === 'police') worth += Math.max(0, -state.record.policeRecord) * 6000
-  // Bounty hunters come better-equipped the more notorious you are.
-  if (kind === 'bountyHunter') worth += Math.max(0, -state.record.policeRecord) * 9000
+  if (kind === 'police') worth += notoriety(state) * 6000
+  // Bounty hunters come better-equipped the bigger the payday on your head:
+  // the law pays by notoriety, the bank by the size of the unpaid loan.
+  if (kind === 'bountyHunter') {
+    worth += notoriety(state) * 9000 + (wantedByBank(state) ? state.debt : 0)
+  }
   if (worth > 150000) return 5
   if (worth > 80000) return 4
   if (worth > 40000) return 3
@@ -182,7 +215,56 @@ function makeOpponent(kind: EncounterKind, rng: Rng, threat: number): Opponent {
   }
 }
 
-function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encounter {
+/** The most valuable commodity in the hold — what a pirate eyes up first. */
+function richestCargo(state: GameState): GoodId | null {
+  let best: GoodId | null = null
+  let bestValue = 0
+  for (const g of GOOD_IDS) {
+    const value = state.ship.cargo[g] * TRADE_GOODS[g].basePrice
+    if (value > bestValue) {
+      bestValue = value
+      best = g
+    }
+  }
+  return best
+}
+
+/**
+ * The opening demand a hostile makes before the shooting starts. Pirates want
+ * the cargo and will let you fly on without it; hunters want you in a cell.
+ */
+function openingDemand(
+  kind: EncounterKind,
+  state: GameState,
+  hiredBy: 'law' | 'bank' | undefined
+): { key: string; params?: Record<string, string | number> } | null {
+  if (kind === 'pirate') {
+    const prize = richestCargo(state)
+    if (!prize) return { key: 'encounter.pirate.demandEmpty' }
+    // A hold that is more than half full is worth a friendlier offer.
+    const laden = usedCargoBays(state.ship) * 2 >= totalCargoBays(state.ship)
+    return {
+      key: laden ? 'encounter.pirate.demandRich' : 'encounter.pirate.demandCargo',
+      params: { good: prize }
+    }
+  }
+  if (kind === 'bountyHunter') {
+    return hiredBy === 'bank'
+      ? { key: 'encounter.bountyHunter.demandBank', params: { debt: state.debt } }
+      : {
+          key: 'encounter.bountyHunter.demandLaw',
+          params: { standing: `standing.${standing(state)}` }
+        }
+  }
+  return null
+}
+
+function makeEncounter(
+  kind: EncounterKind,
+  state: GameState,
+  rng: Rng,
+  hiredBy?: 'law' | 'bank'
+): Encounter {
   const threat = threatLevel(kind, state)
 
   // Some encounters arrive as a group: a pirate ambush or a trader caravan.
@@ -217,7 +299,18 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
       ? kind === 'pirate'
         ? { key: 'encounter.pirate.ambush', params: { count: fleetSize } }
         : { key: 'encounter.trader.caravan', params: { count: fleetSize } }
-      : { key: `encounter.${kind}.appear`, params: { ship: opponent.shipType } }
+      : {
+          key:
+            kind === 'bountyHunter' && hiredBy === 'bank'
+              ? 'encounter.bountyHunter.appearBank'
+              : `encounter.${kind}.appear`,
+          params: { ship: opponent.shipType }
+        }
+
+  // Pirates and hunters open with terms before they open fire.
+  const messages = [appear]
+  const demandLine = openingDemand(kind, state, hiredBy)
+  if (demandLine) messages.push(demandLine)
 
   return {
     kind,
@@ -228,8 +321,10 @@ function makeEncounter(kind: EncounterKind, state: GameState, rng: Rng): Encount
     status: 'ongoing',
     round: 0,
     bribeCost,
+    demand: kind === 'pirate' ? 'cargo' : kind === 'bountyHunter' ? 'arrest' : undefined,
+    hiredBy: kind === 'bountyHunter' ? (hiredBy ?? 'law') : undefined,
     trade,
-    messages: [appear]
+    messages
   }
 }
 
@@ -397,15 +492,67 @@ function hitChance(attackerFighter: number, defenderPilot: number): number {
   return Math.min(0.95, Math.max(0.15, 0.55 + diff * 0.05))
 }
 
+/** Chance a landed hit finds a weak point and doubles its damage. */
+function critChance(attackerFighter: number, hasTargeting: boolean): number {
+  return Math.min(0.4, 0.05 + attackerFighter * 0.015 + (hasTargeting ? 0.08 : 0))
+}
+
+/** What a single volley did, so the log can narrate shields and hull separately. */
+interface DamageReport {
+  /** Damage soaked by shields. */
+  absorbed: number
+  /** Damage that got through to the hull. */
+  hullDamage: number
+  /** True when this volley collapsed the last of the shields. */
+  shieldsDown: boolean
+}
+
 function applyDamage(
   target: { hull: number; shieldPoints: number },
   amount: number
-): void {
-  if (amount <= 0) return
+): DamageReport {
+  if (amount <= 0) return { absorbed: 0, hullDamage: 0, shieldsDown: false }
+  const hadShields = target.shieldPoints > 0
   const absorbed = Math.min(target.shieldPoints, amount)
   target.shieldPoints -= absorbed
-  const overflow = amount - absorbed
-  target.hull = Math.max(0, target.hull - overflow)
+  const hullDamage = amount - absorbed
+  target.hull = Math.max(0, target.hull - hullDamage)
+  return { absorbed, hullDamage, shieldsDown: hadShields && target.shieldPoints === 0 }
+}
+
+/**
+ * Chance the group gets a tractor lock on the player. Only heavier hulls can
+ * tow: a lone ship needs to dwarf its quarry, but a pack only needs an edge —
+ * each extra hull adds another emitter to the net. A sharp pilot slips it.
+ */
+export function tractorChance(state: GameState, enc: Encounter): number {
+  // Traders have no interest in towing anyone, and neither do the police.
+  if (enc.kind === 'trader' || enc.kind === 'police') return 0
+  const mine = sizeRank(state.ship.type)
+  const ships = [enc.opponent, ...enc.reserves]
+  const gap = Math.max(...ships.map((o) => sizeRank(o.shipType))) - mine
+  if (gap <= 0) return 0
+  if (ships.length < 2 && gap < 2) return 0
+  const raw = gap * 0.12 + (ships.length - 1) * 0.06 - effectiveSkills(state).pilot * 0.01
+  return Math.max(0, Math.min(0.5, raw))
+}
+
+/** Chance of shaking off a tractor lock: engineering first, piloting second. */
+function breakLockChance(state: GameState, enc: Encounter): number {
+  const skills = effectiveSkills(state)
+  const gap = Math.max(0, sizeRank(enc.opponent.shipType) - sizeRank(state.ship.type))
+  const raw = 0.15 + skills.engineer * 0.03 + skills.pilot * 0.02 - gap * 0.05
+  return Math.max(0.05, Math.min(0.8, raw))
+}
+
+/**
+ * Chance of breaking off the engagement. A small hull runs rings around a
+ * heavy one; a laden freighter struggles to shake something nimble.
+ */
+export function fleeChance(state: GameState, enc: Encounter, pilot: number): number {
+  const sizeEdge = (sizeRank(enc.opponent.shipType) - sizeRank(state.ship.type)) * 0.1
+  const raw = hitChance(pilot, enc.opponent.fighter) + sizeEdge
+  return Math.max(0.05, Math.min(0.95, raw))
 }
 
 export interface CombatContext {
@@ -441,7 +588,7 @@ export function resolveRound(
     const illegal = state.ship.cargo.firearms + state.ship.cargo.narcotics
     // A hidden compartment may conceal contraband from the inspection.
     if (illegal > 0 && state.ship.gadgets.includes('hiddenCompartment') && rng.chance(0.6)) {
-      state.record.policeRecord += 1
+      applyKarma(state, 1)
       msg('encounter.police.hidden')
       enc.status = 'inspected'
       return
@@ -451,11 +598,11 @@ export function resolveRound(
       state.ship.cargo.narcotics = 0
       const fine = 500 + illegal * 50
       state.credits = Math.max(0, state.credits - fine)
-      state.record.policeRecord -= 3
+      applyKarma(state, -3)
       msg('encounter.police.impound', { fine })
       enc.status = 'inspected'
     } else {
-      state.record.policeRecord += 1
+      applyKarma(state, 1)
       msg('encounter.police.clean')
       enc.status = 'inspected'
     }
@@ -479,11 +626,13 @@ export function resolveRound(
 
   if (action === 'surrender') {
     if (enc.kind === 'pirate') {
-      // Pirates plunder cargo (or extort if empty).
+      // Pirates only ever wanted the cargo: they strip the hold (or extort a
+      // ransom from an empty one) and let the ship go.
       let looted = 0
       for (const g of GOOD_IDS) {
         looted += state.ship.cargo[g]
         state.ship.cargo[g] = 0
+        state.buyingPrice[g] = 0
       }
       if (looted === 0) {
         const extort = Math.min(state.credits, Math.round(state.credits * 0.5))
@@ -492,19 +641,23 @@ export function resolveRound(
       } else {
         msg('encounter.pirate.plundered', { qty: looted })
       }
+      msg('encounter.pirate.released')
       enc.status = 'playerSurrendered'
     } else if (enc.kind === 'police') {
       const fine = Math.min(state.credits, 1000)
       state.credits -= fine
-      state.record.policeRecord -= 1
+      applyKarma(state, -1)
       msg('encounter.police.arrested', { fine })
       enc.status = 'playerSurrendered'
     } else if (enc.kind === 'bountyHunter') {
-      // A bounty hunter collects on your head: a hefty cut, but you walk free.
-      const ransom = Math.min(state.credits, Math.max(500, Math.round(state.credits * 0.35)))
-      state.credits -= ransom
-      msg('encounter.bountyHunter.paid', { amount: ransom })
-      enc.status = 'playerSurrendered'
+      // Hunters have no use for cargo — they deliver you to a cell. Serving the
+      // sentence costs days and a fine, but the record comes out clean.
+      const sentence = serveSentence(state)
+      msg('encounter.bountyHunter.arrested', { days: sentence.days, fine: sentence.fine })
+      if (sentence.confiscated > 0) {
+        msg('encounter.bountyHunter.confiscated', { qty: sentence.confiscated })
+      }
+      enc.status = 'playerArrested'
     }
     // Aliens do not take surrender.
     return
@@ -516,14 +669,39 @@ export function resolveRound(
 
   // --- Fleeing ---
   if (action === 'flee') {
-    const chance = hitChance(skills.pilot, opp.fighter)
+    // Heavier hulls hunting in a pack can pin a small ship in a tractor beam.
+    if (!enc.tractorLocked && rng.chance(tractorChance(state, enc))) {
+      enc.tractorLocked = true
+      msg('encounter.tractor.locked')
+    }
+
+    if (enc.tractorLocked) {
+      if (rng.chance(breakLockChance(state, enc))) {
+        // Free again — and the run can still be made this round.
+        enc.tractorLocked = false
+        msg('encounter.tractor.broke')
+      } else {
+        // Held fast: the round is spent, and a pinned target is an easy shot.
+        msg('encounter.tractor.held')
+        if (opp.weaponPower > 0) {
+          if (rng.chance(hitChance(opp.fighter, skills.pilot) + TRACTOR_ACCURACY_BONUS)) {
+            dealDamageToPlayer(state, opp, rng, msg)
+          } else {
+            msg('encounter.oppMiss')
+          }
+        }
+        checkPlayerDestroyed(state, enc, msg)
+        return
+      }
+    }
+
     // Opponent gets a parting shot if it can attack.
     if (opp.weaponPower > 0 && !opp.fleeing) {
       if (rng.chance(hitChance(opp.fighter, skills.pilot))) {
-        dealDamageToPlayer(state, opp.weaponPower, rng, msg)
+        dealDamageToPlayer(state, opp, rng, msg)
       }
     }
-    if (rng.chance(chance)) {
+    if (rng.chance(fleeChance(state, enc, skills.pilot))) {
       enc.status = 'playerFled'
       msg('encounter.fledSuccess')
     } else {
@@ -538,18 +716,29 @@ export function resolveRound(
     if (playerWeapon <= 0) {
       msg('encounter.noWeapons')
     } else if (rng.chance(hitChance(skills.fighter, opp.pilot))) {
-      const dmg = playerWeapon + rng.int(0, Math.round(playerWeapon * 0.3))
-      applyDamage(opp, dmg)
-      msg('encounter.playerHit', { dmg })
+      let dmg = playerWeapon + rng.int(0, Math.round(playerWeapon * 0.3))
+      const crit = rng.chance(critChance(skills.fighter, state.ship.gadgets.includes('targeting')))
+      if (crit) dmg = Math.round(dmg * CRIT_MULTIPLIER)
+      const hit = applyDamage(opp, dmg)
+      msg(crit ? 'encounter.playerCrit' : 'encounter.playerHit', { dmg })
+      if (hit.shieldsDown) msg('encounter.oppShieldDown')
+      else if (hit.hullDamage === 0 && hit.absorbed > 0) {
+        msg('encounter.oppShieldsHeld', { absorbed: hit.absorbed })
+      }
+      if (opp.hull > 0 && opp.hull <= opp.maxHull * 0.25) msg('encounter.oppCrippled')
     } else {
       msg('encounter.playerMiss')
     }
 
     if (opp.hull <= 0) {
       state.record.reputation += 1
-      if (enc.kind === 'pirate') state.record.policeRecord += 1
-      if (enc.kind === 'police') state.record.policeRecord -= 5
-      if (enc.kind === 'bountyHunter') state.record.reputation += 2
+      if (enc.kind === 'pirate') applyKarma(state, 1)
+      if (enc.kind === 'police') applyKarma(state, -5)
+      if (enc.kind === 'bountyHunter') {
+        state.record.reputation += 2
+        // Gunning down a licensed hunter is itself a mark on the record.
+        if (enc.hiredBy !== 'bank') applyKarma(state, -1)
+      }
       if (enc.kind === 'alien') state.record.reputation += 3
       // Bounty target destroyed -> complete the quest and pay out.
       if (enc.bountyQuestId) {
@@ -587,11 +776,24 @@ export function resolveRound(
     (enc.kind === 'trader' && action === 'attack')
 
   if (oppWillFight && opp.weaponPower > 0) {
-    if (rng.chance(hitChance(opp.fighter, skills.pilot))) {
-      dealDamageToPlayer(state, opp.weaponPower, rng, msg)
+    // A ship held in a tractor beam is a far easier target.
+    const accuracy =
+      hitChance(opp.fighter, skills.pilot) + (enc.tractorLocked ? TRACTOR_ACCURACY_BONUS : 0)
+    if (rng.chance(accuracy)) {
+      dealDamageToPlayer(state, opp, rng, msg)
     } else {
       msg('encounter.oppMiss')
     }
+  }
+
+  // A wounded quarry gets invited to give up rather than be blown apart.
+  if (
+    (enc.kind === 'pirate' || enc.kind === 'bountyHunter') &&
+    state.ship.hull > 0 &&
+    state.ship.hull <= maxHull(state.ship) * 0.35 &&
+    rng.chance(0.4)
+  ) {
+    msg(`encounter.${enc.kind}.pressSurrender`)
   }
 
   checkPlayerDestroyed(state, enc, msg)
@@ -599,12 +801,17 @@ export function resolveRound(
 
 function dealDamageToPlayer(
   state: GameState,
-  power: number,
+  opp: Opponent,
   rng: Rng,
   msg: (k: string, p?: Record<string, string | number>) => void
 ): void {
-  const dmg = power + rng.int(0, Math.round(power * 0.3))
+  const power = opp.weaponPower
+  let dmg = power + rng.int(0, Math.round(power * 0.3))
+  const crit = rng.chance(critChance(opp.fighter, false))
+  if (crit) dmg = Math.round(dmg * CRIT_MULTIPLIER)
+
   // Distribute across shields then hull.
+  const hadShields = state.ship.shieldPoints.some((p) => p > 0)
   let remaining = dmg
   for (let i = 0; i < state.ship.shieldPoints.length && remaining > 0; i++) {
     const absorbed = Math.min(state.ship.shieldPoints[i], remaining)
@@ -612,7 +819,14 @@ function dealDamageToPlayer(
     remaining -= absorbed
   }
   if (remaining > 0) state.ship.hull = Math.max(0, state.ship.hull - remaining)
-  msg('encounter.oppHit', { dmg })
+
+  msg(crit ? 'encounter.oppCrit' : 'encounter.oppHit', { dmg })
+  const shieldsDown = hadShields && state.ship.shieldPoints.every((p) => p <= 0)
+  if (shieldsDown) msg('encounter.playerShieldDown')
+  else if (remaining === 0 && dmg > 0) msg('encounter.playerShieldsHeld', { absorbed: dmg })
+  if (state.ship.hull > 0 && state.ship.hull <= maxHull(state.ship) * 0.25) {
+    msg('encounter.playerCrippled')
+  }
 }
 
 function checkPlayerDestroyed(
@@ -648,7 +862,7 @@ export function plunder(state: GameState, enc: Encounter): number {
     }
   }
   if (enc.kind === 'trader' && taken > 0) {
-    state.record.policeRecord -= 2
+    applyKarma(state, -2)
     pushLog(state, 'log.plunderedTrader', { qty: taken })
   }
   enc.defeated++

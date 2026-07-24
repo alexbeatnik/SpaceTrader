@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
-import { maxLoan } from '@game/index'
+import {
+  maxLoan,
+  fineToClear,
+  notoriety,
+  sentenceDays,
+  standing,
+  wantedByBank,
+  wantedByLaw
+} from '@game/index'
 import { fmt } from '../util/format'
 
 export function BankScreen(): React.JSX.Element {
@@ -10,11 +18,15 @@ export function BankScreen(): React.JSX.Element {
   const payDebt = useGameStore((s) => s.payDebt)
   const buyInsurance = useGameStore((s) => s.buyInsurance)
   const cancelInsurance = useGameStore((s) => s.cancelInsurance)
+  const payFine = useGameStore((s) => s.payFine)
   const { t } = useI18n()
 
   const available = Math.max(0, maxLoan(game) - game.debt)
   const [loanAmt, setLoanAmt] = useState(available)
   const [payAmt, setPayAmt] = useState(Math.min(game.debt, game.credits))
+
+  const fine = fineToClear(game)
+  const wanted = notoriety(game)
 
   return (
     <div>
@@ -96,6 +108,54 @@ export function BankScreen(): React.JSX.Element {
               <div className="screen-sub" style={{ marginTop: 8 }}>{t('bank.needPod')}</div>
             )}
           </div>
+        </div>
+
+        <div className="panel panel-pad">
+          <div className="screen-sub" style={{ marginBottom: 8 }}>{t('record.title')}</div>
+          <div className="kv">
+            <span className="k">{t('record.standing')}</span>
+            <span className={`v ${wanted > 0 ? 'neg' : game.record.policeRecord > 0 ? 'pos' : ''}`}>
+              {t(`standing.${standing(game)}`)}
+            </span>
+          </div>
+          {wanted > 0 && (
+            <div className="kv">
+              <span className="k">{t('record.notoriety')}</span>
+              <span className="v neg">{wanted}</span>
+            </div>
+          )}
+          <div className="kv">
+            <span className="k">{t('record.reputation')}</span>
+            <span className="v">{game.record.reputation}</span>
+          </div>
+
+          {wantedByLaw(game) && (
+            <div className="screen-sub" style={{ marginTop: 10 }}>{t('record.wantedLaw')}</div>
+          )}
+          {wantedByBank(game) && (
+            <div className="screen-sub" style={{ marginTop: 6 }}>
+              {t('record.wantedBank', { debt: fmt(game.debt) })}
+            </div>
+          )}
+          {wanted === 0 && (
+            <div className="screen-sub" style={{ marginTop: 10 }}>{t('record.clean')}</div>
+          )}
+
+          {fine > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <button
+                className="btn btn-block"
+                disabled={game.credits < fine}
+                onClick={payFine}
+              >
+                {t('record.payFine', { amount: fmt(fine) })}
+              </button>
+              <div className="screen-sub" style={{ marginTop: 8 }}>{t('record.fineHint')}</div>
+              <div className="screen-sub" style={{ marginTop: 4 }}>
+                {t('record.sentenceHint', { days: sentenceDays(game) })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -256,6 +256,28 @@ export const en = {
     cancelInsurance: 'Cancel insurance',
     needPod: 'Requires an escape pod'
   },
+  record: {
+    title: 'Standing & record',
+    standing: 'Known as',
+    notoriety: 'Notoriety',
+    reputation: 'Combat reputation',
+    clean: 'Your record is clean. No one is hunting you.',
+    wantedLaw: '⚠ Wanted: the law has hunters on your trail.',
+    wantedBank: '⚠ The bank has hired collectors over your unpaid loan of {debt} cr.',
+    payFine: 'Buy your record clean ({amount} cr)',
+    fineHint:
+      'Paying the fine wipes your criminal record and calls off the hunters the law sent. The bank calls off its own only when the debt is paid.',
+    sentenceHint: 'If a hunter takes you in instead: {days} days in a cell.'
+  },
+  standing: {
+    outlaw: 'Outlaw',
+    criminal: 'Criminal',
+    rogue: 'Rogue',
+    citizen: 'Citizen',
+    trusted: 'Trusted trader',
+    defender: 'Defender',
+    champion: 'Champion of justice'
+  },
   chart: {
     title: 'Star Chart',
     range: 'Range',
@@ -392,12 +414,30 @@ export const en = {
       appear: 'A pirate in a {ship} attacks!',
       ambush: 'A pirate ambush — {count} ships swarm you!',
       plundered: 'Pirates plundered your hold ({qty} units).',
-      extort: 'Pirates extorted a ransom: {amount} cr.'
+      extort: 'Pirates extorted a ransom: {amount} cr.',
+      demandCargo: '"That {good} in your hold looks interesting. Hand it over and fly on."',
+      demandRich: '"A fat hold — {good} and more besides. Surrender the cargo and you keep the ship."',
+      demandEmpty: '"Holds empty? Then we take the ship. Surrender or burn."',
+      pressSurrender: '"You are venting air, captain. Give up the cargo and we stop shooting."',
+      released: 'The pirates cut you loose and melt back into the dark.'
     },
     bountyHunter: {
       appear: 'A bounty hunter in a {ship} has come to collect on your head!',
+      appearBank: 'A collector in a {ship}, hired by the bank, moves to intercept you!',
       bribed: 'The hunter pockets {amount} cr and stands down.',
-      paid: 'You pay the hunter {amount} cr to buy your freedom.'
+      paid: 'You pay the hunter {amount} cr to buy your freedom.',
+      demandLaw: '"There is a warrant out on you — {standing}. Stand down and serve your time."',
+      demandBank: '"The bank wants the {debt} cr you owe. Stand down, or we take it out of your hull."',
+      pressSurrender: '"Stand down, captain. A cell beats a coffin."',
+      arrested:
+        'You stand down. {days} days in a station cell and a {fine} cr fine — but your record comes out clean.',
+      confiscated: 'Contraband seized on booking: {qty} units.'
+    },
+    tractor: {
+      locked: 'A tractor beam clamps onto your hull — you cannot break away!',
+      held: 'The tractor beam holds you fast. No escape this round.',
+      broke: 'You overload the beam emitters and slip the tractor lock!',
+      badge: 'Tractor lock'
     },
     alien: {
       appear: 'An unknown alien vessel ({ship}-class) closes in, weapons hot!'
@@ -418,6 +458,11 @@ export const en = {
     action: {
       attack: 'Attack',
       flee: 'Flee',
+      breakFree: 'Break the tractor lock',
+      surrenderCargo: 'Surrender the cargo',
+      surrenderCargoHint: 'The pirates take your hold and let you fly on.',
+      standDown: 'Stand down',
+      standDownHint: 'You are taken in: days in a cell and a fine, but a clean record afterwards.',
       submit: 'Submit to inspection',
       bribe: 'Offer a bribe',
       surrender: 'Surrender',
@@ -427,9 +472,17 @@ export const en = {
       plunder: 'Plunder'
     },
     playerHit: 'You hit! Dealt {dmg} damage.',
+    playerCrit: 'Critical hit! You punch clean through for {dmg} damage.',
     playerMiss: 'You missed.',
     oppHit: 'The enemy hit you! Took {dmg} damage.',
+    oppCrit: 'A critical hit rocks your ship — {dmg} damage!',
     oppMiss: 'The enemy missed.',
+    oppShieldsHeld: 'Enemy shields soak up {absorbed} damage.',
+    oppShieldDown: "The enemy's shields collapse!",
+    oppCrippled: 'The enemy hull is breached and venting.',
+    playerShieldsHeld: 'Your shields absorb {absorbed} damage.',
+    playerShieldDown: 'Your shields are down!',
+    playerCrippled: 'Hull integrity critical — another hit could finish you.',
     noWeapons: 'You have no weapons to attack with!',
     oppDestroyed: 'Enemy ship destroyed!',
     playerDestroyed: 'Your ship was destroyed...',
@@ -450,7 +503,10 @@ export const en = {
     crewLeft: 'You could not pay your crew — they left you.',
     mined: 'Mined 1 {good}.',
     minedFuel: 'Scooped 1 pc of fuel.',
-    minedBonus: 'Struck a rare find: {good}!'
+    minedBonus: 'Struck a rare find: {good}!',
+    standingChanged: 'Word spreads — you are now known as: {standing}.',
+    finePaid: 'Paid a {amount} cr fine. Your record is clean.',
+    servedSentence: 'Served {days} days and a {fine} cr fine. Released with a clean record.'
   },
   info: {
     bought: 'Bought {qty} × {good} for {cost} cr.',
@@ -468,7 +524,8 @@ export const en = {
     loanTaken: 'Loan of {amount} cr received.',
     debtPaid: 'Paid off {amount} cr of debt.',
     insuranceBought: 'Insurance purchased.',
-    insuranceCancelled: 'Insurance cancelled.'
+    insuranceCancelled: 'Insurance cancelled.',
+    finePaid: 'Record cleared for {amount} cr.'
   },
   error: {
     notSold: 'This good is not sold here.',
@@ -504,6 +561,7 @@ export const en = {
     cannotTurnIn: 'This assignment cannot be handed in here.',
     tooManyQuests: 'You are juggling too many assignments already.',
     questGone: 'That posting is no longer available.',
+    recordClean: 'Your record is already clean.',
     noMineSite: 'There is nothing to mine here.',
     holdFull: 'The cargo hold is full.',
     loadFailed: 'Could not load the save file — it may be corrupted.'

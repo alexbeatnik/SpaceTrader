@@ -9,7 +9,9 @@ import {
   totalShieldPower,
   currentShieldCharge,
   weaponPower,
-  HULL_UPGRADE_AMOUNT
+  HULL_UPGRADE_AMOUNT,
+  notoriety,
+  standing
 } from '@game/index'
 import { shipName, weaponName, shieldName, gadgetName, goodName } from '@i18n/index'
 import { ShipArt } from '../components/ShipArt'
@@ -67,6 +69,18 @@ export function ShipScreen(): React.JSX.Element {
           <div className="kv"><span className="k">{t('skill.fighter')}</span><span className="v">{game.skills.fighter}</span></div>
           <div className="kv"><span className="k">{t('skill.trader')}</span><span className="v">{game.skills.trader}</span></div>
           <div className="kv"><span className="k">{t('skill.engineer')}</span><span className="v">{game.skills.engineer}</span></div>
+
+          <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('record.title')}</div>
+          <div className="kv">
+            <span className="k">{t('record.standing')}</span>
+            <span className={`v ${notoriety(game) > 0 ? 'neg' : game.record.policeRecord > 0 ? 'pos' : ''}`}>
+              {t(`standing.${standing(game)}`)}
+            </span>
+          </div>
+          <div className="kv">
+            <span className="k">{t('record.reputation')}</span>
+            <span className="v">{game.record.reputation}</span>
+          </div>
 
           <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('hud.cargo')}</div>
           {cargoItems.length === 0 ? (

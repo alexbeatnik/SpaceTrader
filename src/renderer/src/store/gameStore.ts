@@ -23,6 +23,7 @@ import {
   payDebt,
   buyInsurance,
   cancelInsurance,
+  payFine,
   warp,
   resolveRound,
   plunder,
@@ -149,6 +150,7 @@ interface GameStore {
   payDebt: (amount: number) => void
   buyInsurance: () => void
   cancelInsurance: () => void
+  payFine: () => void
 
   // travel & combat
   warpTo: (targetId: number) => void
@@ -313,6 +315,12 @@ export const useGameStore = create<GameStore>((set, get) => {
     payDebt: (amount) => withGame((g) => applyResult(g, payDebt(g, amount))),
     buyInsurance: () => withGame((g) => applyResult(g, buyInsurance(g))),
     cancelInsurance: () => withGame((g) => applyResult(g, cancelInsurance(g))),
+    payFine: () =>
+      withGame((g) => {
+        const res = payFine(g)
+        applyResult(g, res)
+        if (res.ok) void get().saveGame()
+      }),
 
     warpTo: (targetId) =>
       withGame((g) => {
