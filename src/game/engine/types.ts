@@ -336,6 +336,14 @@ export interface GameState {
   autoRefuel: boolean
   /** Purchase cost bookkeeping per good for profit display. */
   buyingPrice: Record<GoodId, number>
+  /**
+   * Units of each good obtained at the *current* planet since docking here —
+   * bought from its market or mined at its site. A contract cannot be settled
+   * with goods sourced at its own delivery point, so these are excluded from
+   * hand-ins. Reset on every arrival.
+   * Optional: saves written before this existed simply have nothing to exclude.
+   */
+  sourcedHere?: Record<GoodId, number>
   /** Log of notable events, newest first (ids + params resolved in UI). */
   log: LogEntry[]
   /** Quest / event progress flags keyed by id. */

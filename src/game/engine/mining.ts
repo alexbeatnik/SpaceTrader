@@ -6,6 +6,7 @@ import {
   maxFuel,
   advanceDay,
   pushLog,
+  noteLocalSourcing,
   INDUSTRIAL_MINING_YIELD
 } from './game'
 import { SHIP_TYPES } from '../data/ships'
@@ -54,6 +55,8 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
   } else {
     amount = Math.min(yieldPerDay, freeCargoBays(state.ship))
     state.ship.cargo[site.resource] += amount
+    // Mined right here, so it cannot settle a contract due at this planet.
+    noteLocalSourcing(state, site.resource, amount)
     pushLog(state, 'log.mined', { good: site.resource })
     // Asteroid fields occasionally yield a rare gem.
     if (
@@ -62,6 +65,7 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
       rng.chance(0.05 + site.richness * 0.004)
     ) {
       state.ship.cargo.gems += 1
+      noteLocalSourcing(state, 'gems', 1)
       bonus = 'gems'
       pushLog(state, 'log.minedBonus', { good: 'gems' })
     }

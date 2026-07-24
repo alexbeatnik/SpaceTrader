@@ -62,6 +62,33 @@ export function freeCargoBays(ship: Ship): number {
   return totalCargoBays(ship) - usedCargoBays(ship)
 }
 
+// --- Local sourcing (contract integrity) -------------------------------------
+/**
+ * Record goods obtained at the current planet (bought at its market or mined
+ * at its site). A contract may not be settled with cargo picked up at the very
+ * planet expecting the delivery, so these units are held back from quest
+ * hand-ins until the ship travels again.
+ */
+export function noteLocalSourcing(state: GameState, good: GoodId, qty: number): void {
+  if (qty <= 0) return
+  if (!state.sourcedHere) state.sourcedHere = emptyGoods()
+  state.sourcedHere[good] += qty
+}
+
+/** Forget local sourcing — called on arrival, once the cargo has been hauled. */
+export function clearLocalSourcing(state: GameState): void {
+  state.sourcedHere = emptyGoods()
+}
+
+/**
+ * Units of a good that may be used to settle a contract here: everything in
+ * the hold except what was obtained at this very planet. Cargo hauled in,
+ * salvaged, or plundered in space all counts.
+ */
+export function deliverableUnits(state: GameState, good: GoodId): number {
+  return Math.max(0, state.ship.cargo[good] - (state.sourcedHere?.[good] ?? 0))
+}
+
 export function shipValue(ship: Ship): number {
   const type = SHIP_TYPES[ship.type]
   let value = Math.round(type.price * 0.75)
@@ -199,6 +226,7 @@ export function newGame(opts: NewGameOptions): GameState {
     noClaim: 0,
     autoRefuel: false,
     buyingPrice: emptyGoods(),
+    sourcedHere: emptyGoods(),
     log: [],
     flags: {},
     quests: [],
@@ -252,6 +280,7 @@ export function buyGood(state: GameState, good: GoodId, amount: number): ActionR
       : 0
   state.credits -= cost
   sys.qty[good] -= qty
+  noteLocalSourcing(state, good, qty)
 
   return okInfo('info.bought', { qty, good, cost })
 }

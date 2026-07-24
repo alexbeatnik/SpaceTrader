@@ -56,6 +56,8 @@ export const en = {
     rewardTitle: 'Assignment complete!',
     readyToast: 'You can hand in {count} assignment(s) here — open Quests.',
     viaCombat: 'destroy in combat',
+    sourceElsewhere:
+      'Contract cargo must be hauled in — goods bought on this planet do not count towards the delivery.',
     type: {
       delivery: 'Courier delivery',
       relief: 'Relief mission',
@@ -504,6 +506,7 @@ export const en = {
     mined: 'Mined 1 {good}.',
     minedFuel: 'Scooped 1 pc of fuel.',
     minedBonus: 'Struck a rare find: {good}!',
+    insurancePaid: 'Insurance paid out {amount} cr for the ship you lost.',
     standingChanged: 'Word spreads — you are now known as: {standing}.',
     finePaid: 'Paid a {amount} cr fine. Your record is clean.',
     servedSentence: 'Served {days} days and a {fine} cr fine. Released with a clean record.'

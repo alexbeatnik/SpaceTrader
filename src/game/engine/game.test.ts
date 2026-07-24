@@ -19,6 +19,7 @@ import {
   MAX_HULL_UPGRADES,
   advanceDay,
   weaponPower,
+  deliverableUnits,
   EXPLORER_RANGE_BONUS,
   INDUSTRIAL_MINING_YIELD
 } from './game'
@@ -711,6 +712,127 @@ describe('encounter kinds', () => {
     // The engine keeps the pod flag set; the store reads it to grant survival.
     expect(g.ship.escapePod).toBe(true)
     expect(enc.messages.some((m) => m.key === 'encounter.escapePod')).toBe(true)
+  })
+})
+
+describe('contract cargo must be hauled in', () => {
+  /** A relief contract for `amount` water, already accepted and due here. */
+  function reliefQuest(g: ReturnType<typeof newGame>, amount: number): Quest {
+    const q: Quest = {
+      id: `relief${amount}${g.quests.length}`,
+      type: 'relief',
+      giverSystem: (g.currentSystem + 1) % g.systems.length,
+      targetSystem: g.currentSystem,
+      reward: 1000,
+      status: 'offered',
+      good: 'water',
+      amount
+    }
+    acceptQuest(g, q)
+    return q
+  }
+
+  it('goods bought at the delivery point do not settle the contract', () => {
+    const g = newGame({ commanderName: 'Test', seed: 200 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 10
+    sys.qty.water = 50
+    g.credits = 10000
+    const q = reliefQuest(g, 5)
+
+    buyGood(g, 'water', 5)
+    expect(g.ship.cargo.water).toBe(5) // the hold is full enough…
+    expect(deliverableUnits(g, 'water')).toBe(0) // …but none of it was hauled in
+    expect(canTurnIn(g, q)).toBe(false)
+    expect(turnInQuest(g, q.id)).toBeNull()
+  })
+
+  it('goods hauled in from elsewhere settle it', () => {
+    const g = newGame({ commanderName: 'Test', seed: 201 })
+    const q = reliefQuest(g, 5)
+    g.ship.cargo.water = 5 // arrived carrying it
+    expect(deliverableUnits(g, 'water')).toBe(5)
+    expect(canTurnIn(g, q)).toBe(true)
+    expect(turnInQuest(g, q.id)).not.toBeNull()
+  })
+
+  it('handing in one run does not free locally bought goods for the next', () => {
+    const g = newGame({ commanderName: 'Test', seed: 202 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 10
+    sys.qty.water = 50
+    g.credits = 10000
+    const first = reliefQuest(g, 5)
+    const second = reliefQuest(g, 5)
+
+    // Arrived with just enough for one of the two.
+    g.ship.cargo.water = 5
+    expect(turnInQuest(g, first.id)).not.toBeNull()
+    expect(g.ship.cargo.water).toBe(0)
+
+    // Topping up from the local market must not settle the second one.
+    buyGood(g, 'water', 5)
+    expect(g.ship.cargo.water).toBe(5)
+    expect(canTurnIn(g, second)).toBe(false)
+    expect(turnInQuest(g, second.id)).toBeNull()
+  })
+
+  it('a supply contract cannot be filled from the giver\'s own market', () => {
+    const g = newGame({ commanderName: 'Test', seed: 203 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.ore = 20
+    sys.qty.ore = 50
+    g.credits = 10000
+    const q: Quest = {
+      id: 'fetch1',
+      type: 'fetch',
+      giverSystem: g.currentSystem,
+      targetSystem: g.currentSystem, // fetch quests are handed back to the giver
+      reward: 5000,
+      status: 'offered',
+      good: 'ore',
+      amount: 4
+    }
+    acceptQuest(g, q)
+
+    // Buying the goods on the spot — via the market or the supply shortcut —
+    // must not turn the contract into free money.
+    expect(buyQuestSupplies(g, q).ok).toBe(true)
+    expect(g.ship.cargo.ore).toBe(4)
+    expect(canTurnIn(g, q)).toBe(false)
+  })
+
+  it('arriving somewhere clears local sourcing', () => {
+    const g = newGame({ commanderName: 'Test', seed: 204 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 5
+    sys.qty.water = 50
+    g.credits = 10000
+    buyGood(g, 'water', 4)
+    expect(deliverableUnits(g, 'water')).toBe(0)
+
+    // Fly anywhere in range: the cargo has now been hauled.
+    const from = g.systems[g.currentSystem]
+    const target = g.systems.find((s) => s.id !== from.id && systemDistance(from, s) <= g.ship.fuel)
+    expect(target).toBeDefined()
+    if (!target) return
+    expect(warp(g, target.id).ok).toBe(true)
+    expect(deliverableUnits(g, 'water')).toBe(4)
+  })
+
+  it('cargo taken in space counts, cargo mined at this planet does not', () => {
+    const g = newGame({ commanderName: 'Test', seed: 205 })
+    // Salvage/plunder arrives with the ship and is deliverable.
+    g.ship.cargo.ore += 3
+    expect(deliverableUnits(g, 'ore')).toBe(3)
+
+    // Mining at the local site is sourcing it here, same as buying it here.
+    const sys = g.systems[g.currentSystem]
+    sys.mineSite = { kind: 'asteroidField', resource: 'ore', richness: 5 }
+    const res = mineOnce(g, new Rng(3))
+    expect(res.ok).toBe(true)
+    expect(g.ship.cargo.ore).toBeGreaterThan(3)
+    expect(deliverableUnits(g, 'ore')).toBe(3)
   })
 })
 

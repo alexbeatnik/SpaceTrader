@@ -1,6 +1,14 @@
 import type { GameState, Quest, GoodId } from './types'
 import { Rng } from './rng'
-import { currentSystem, pushLog, freeQuarters, freeCargoBays, type ActionResult } from './game'
+import {
+  currentSystem,
+  pushLog,
+  freeQuarters,
+  freeCargoBays,
+  deliverableUnits,
+  noteLocalSourcing,
+  type ActionResult
+} from './game'
 import { systemDistance } from './travel'
 import { standardPrice } from './market'
 import { applyKarma, QUEST_KARMA } from './reputation'
@@ -295,6 +303,8 @@ export function buyQuestSupplies(state: GameState, quest: Quest): ActionResult {
       ? Math.round((prevCost + cost) / state.ship.cargo[need.good])
       : 0
   state.credits -= cost
+  // Bought on this planet — the same restriction as any other local purchase.
+  noteLocalSourcing(state, need.good, qty)
   return { ok: true, info: { key: 'info.bought', params: { qty, good: need.good, cost } } }
 }
 
@@ -309,10 +319,22 @@ export function canTurnIn(state: GameState, quest: Quest): boolean {
   if (quest.targetSystem !== state.currentSystem) return false
   // A delivery is never handed in at the system that issued it.
   if (quest.type === 'delivery' && state.currentSystem === quest.giverSystem) return false
-  // Cargo-backed contracts need their goods in the hold.
+  // Cargo-backed contracts need their goods hauled in: buying them from the
+  // market of the very planet awaiting the delivery does not count.
   const need = questSupply(quest)
-  if (need && state.ship.cargo[need.good] < need.amount) return false
+  if (need && deliverableUnits(state, need.good) < need.amount) return false
   return true
+}
+
+/**
+ * Units still to be sourced *elsewhere* before a contract can be settled here.
+ * Differs from `questSupplyMissing` in that goods bought on this planet do not
+ * count towards the requirement.
+ */
+export function questDeliverableMissing(state: GameState, quest: Quest): number {
+  const need = questSupply(quest)
+  if (!need) return 0
+  return Math.max(0, need.amount - deliverableUnits(state, need.good))
 }
 
 /** Active quests that are ready to be handed in at the current system. */

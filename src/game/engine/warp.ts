@@ -4,7 +4,7 @@ import { SHIP_TYPES } from '../data/ships'
 import { SHIELDS } from '../data/equipment'
 import { refreshMarket } from './market'
 import { fuelCost, systemDistance } from './travel'
-import { pushLog, refuelFull, advanceDay } from './game'
+import { pushLog, refuelFull, advanceDay, clearLocalSourcing } from './game'
 import { rollEncounter, createBountyEncounter, type Encounter } from './combat'
 import { maybeTriggerEvent, type GameEvent } from './events'
 import { questsReadyToTurnIn, generateQuestOffer, generateQuestBoard, hasActiveBounty } from './quests'
@@ -23,6 +23,9 @@ export interface WarpResult {
 function onArrival(state: GameState, rng: Rng): void {
   const target = state.systems[state.currentSystem]
   target.visited = true
+  // Whatever is in the hold was hauled here, so it may settle contracts; only
+  // what gets bought or mined at this planet from now on may not.
+  clearLocalSourcing(state)
   // Shields recharge to full on docking.
   state.ship.shieldPoints = state.ship.shields.map((s) => SHIELDS[s].power)
   // Refresh the destination economy for the new day.

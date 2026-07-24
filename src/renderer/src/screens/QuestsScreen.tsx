@@ -1,6 +1,13 @@
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
-import { currentSystem, canTurnIn, questSupply, freeCargoBays, type Quest } from '@game/index'
+import {
+  currentSystem,
+  canTurnIn,
+  questSupply,
+  freeCargoBays,
+  deliverableUnits,
+  type Quest
+} from '@game/index'
 import { goodName } from '@i18n/index'
 import { questDescription, questTypeLabel } from '../util/questText'
 import { fmt } from '../util/format'
@@ -27,11 +34,13 @@ export function QuestsScreen(): React.JSX.Element {
   const active = game.quests.filter((q) => q.status === 'active')
   const completed = game.quests.filter((q) => q.status === 'completed')
 
-  // Coloured "have / need" progress line for cargo-backed quests.
+  // Coloured "have / need" progress line for cargo-backed quests. At the
+  // delivery point only hauled-in cargo counts, so that is what gets shown.
   const Progress = ({ q }: { q: Quest }): React.JSX.Element | null => {
     const need = questSupply(q)
     if (!need) return null
-    const have = game.ship.cargo[need.good]
+    const atTarget = q.targetSystem === game.currentSystem
+    const have = atTarget ? deliverableUnits(game, need.good) : game.ship.cargo[need.good]
     const ok = have >= need.amount
     return (
       <span className={ok ? 'pos' : 'neg'} style={{ fontWeight: 600 }}>
@@ -99,10 +108,16 @@ export function QuestsScreen(): React.JSX.Element {
             const ready = canTurnIn(game, q)
             const need = questSupply(q)
             const missing = need ? Math.max(0, need.amount - game.ship.cargo[need.good]) : 0
+            const atTarget = q.targetSystem === game.currentSystem
+            // Contract cargo has to be hauled in, so shopping at the delivery
+            // point never helps — flag it instead of offering a dead button.
+            const mustSourceElsewhere =
+              need !== null && atTarget && deliverableUnits(game, need.good) < need.amount
             // The supply shortcut only works where the good is actually sold.
             const canBuyHere =
               need !== null &&
               missing > 0 &&
+              !atTarget &&
               here.buyPrice[need.good] > 0 &&
               here.qty[need.good] > 0 &&
               freeCargoBays(game.ship) > 0
@@ -118,7 +133,7 @@ export function QuestsScreen(): React.JSX.Element {
                       {' · '}🎯 {game.systems[q.targetSystem]?.nameId ?? '—'}
                       {need && <> · <Progress q={q} /></>}
                     </div>
-                    {need && missing > 0 && (
+                    {need && missing > 0 && !atTarget && (
                       <button
                         className="btn btn-sm"
                         style={{ marginTop: 6 }}
@@ -127,6 +142,11 @@ export function QuestsScreen(): React.JSX.Element {
                       >
                         🛒 {t('quest.buySupplies')}
                       </button>
+                    )}
+                    {mustSourceElsewhere && (
+                      <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                        ⚠ {t('quest.sourceElsewhere')}
+                      </div>
                     )}
                   </div>
                   <div style={{ textAlign: 'right' }}>

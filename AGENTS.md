@@ -44,7 +44,9 @@ A modern desktop remake of the classic *Space Trader* game, built with
 - `src/renderer/src/store/gameStore.ts` — the **only** bridge between UI and
   engine. Components call store actions; the store calls engine functions,
   `structuredClone`s the mutated `GameState` to trigger React updates, and turns
-  `ActionResult`s into toasts via `renderMessage`.
+  `ActionResult`s into toasts via `renderMessage`. `applyResult` **persists on
+  every successful action** — don't add a state-changing path that skips it, or
+  the change lives only in memory until the next jump and is lost on quit.
 - `src/main/` + `src/preload/` — Electron shell and the save/load IPC
   (`window.api.saveGame/loadGame/hasSave`).
 
@@ -87,6 +89,16 @@ and **hands quests in manually** at the destination — `warp` no longer complet
 them. Use `canTurnIn(state, quest)` / `turnInQuest(state, id)` (bounties still
 resolve via combat). Cargo-quest rewards go through `cargoReward`, which anchors
 the payout to the goods' acquisition cost so a contract always beats trading.
+
+**Contract cargo must be hauled in.** `state.sourcedHere` counts goods obtained
+at the current planet — bought at its market (`buyGood`, `buyQuestSupplies`) or
+mined at its site — and `clearLocalSourcing` wipes it on every arrival.
+`deliverableUnits(state, good)` is `cargo − sourcedHere`, and `canTurnIn` uses it
+so a contract can never be settled by shopping at its own delivery point (which
+otherwise made `fetch` quests, whose target *is* the giver, free money). Any new
+code that adds cargo must decide: obtained here → `noteLocalSourcing`; taken in
+space (salvage, plunder, loot) → nothing. The field is optional for save
+compatibility — always read it through `deliverableUnits`.
 
 Related quest UX wired to the same engine helpers:
 

@@ -38,6 +38,7 @@ import {
   mineOnce,
   currentSystem,
   pushLog,
+  shipValue,
   systemDistance,
   Rng,
   SHIP_TYPES,
@@ -194,7 +195,14 @@ function ensureBoard(game: GameState): void {
 export const useGameStore = create<GameStore>((set, get) => {
   // Apply an engine mutation, refresh reactive state, and surface a toast.
   const applyResult = (game: GameState, result: ActionResult): void => {
-    if (result.ok && result.info) {
+    if (!result.ok) {
+      // A rejected action changed nothing — report it and leave the save alone.
+      if (result.error) {
+        set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error) } })
+      }
+      return
+    }
+    if (result.info) {
       set({
         game: clone(game),
         toast: {
@@ -203,13 +211,13 @@ export const useGameStore = create<GameStore>((set, get) => {
           text: renderMessage(result.info.key, result.info.params)
         }
       })
-    } else if (!result.ok && result.error) {
-      set({
-        toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error) }
-      })
     } else {
       set({ game: clone(game) })
     }
+    // Persist every successful action. Without this a purchase (a new ship
+    // above all) lives only in memory until the next jump, and quitting or
+    // crashing before that silently rolls it back.
+    void get().saveGame()
   }
 
   const withGame = (fn: (g: GameState) => void): void => {
@@ -315,12 +323,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     payDebt: (amount) => withGame((g) => applyResult(g, payDebt(g, amount))),
     buyInsurance: () => withGame((g) => applyResult(g, buyInsurance(g))),
     cancelInsurance: () => withGame((g) => applyResult(g, cancelInsurance(g))),
-    payFine: () =>
-      withGame((g) => {
-        const res = payFine(g)
-        applyResult(g, res)
-        if (res.ok) void get().saveGame()
-      }),
+    payFine: () => withGame((g) => applyResult(g, payFine(g))),
 
     warpTo: (targetId) =>
       withGame((g) => {
@@ -525,19 +528,9 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     declineQuestOffer: () => set({ questOffer: null }),
 
-    acceptBoardQuest: (questId) =>
-      withGame((g) => {
-        const res = acceptBoardQuest(g, questId)
-        applyResult(g, res)
-        if (res.ok) void get().saveGame()
-      }),
+    acceptBoardQuest: (questId) => withGame((g) => applyResult(g, acceptBoardQuest(g, questId))),
 
-    abandonQuest: (questId) =>
-      withGame((g) => {
-        const res = abandonQuest(g, questId)
-        applyResult(g, res)
-        if (res.ok) void get().saveGame()
-      }),
+    abandonQuest: (questId) => withGame((g) => applyResult(g, abandonQuest(g, questId))),
 
     turnInQuest: (questId) =>
       withGame((g) => {
@@ -557,6 +550,9 @@ export const useGameStore = create<GameStore>((set, get) => {
 /** Handle ship destruction with an escape pod: drop into a Flea. */
 function handleDestruction(g: GameState): void {
   if (!g.ship.escapePod) return
+  // Value the wreck *before* it is replaced: insurance must pay out on the ship
+  // that was actually lost, not on the Flea handed over as a replacement.
+  const payout = g.insurance ? shipValue(g.ship) : 0
   const flea = SHIP_TYPES.flea
   g.ship = {
     type: 'flea',
@@ -571,11 +567,11 @@ function handleDestruction(g: GameState): void {
     crew: [],
     escapePod: false
   }
-  if (g.insurance) {
-    // Insurance refunds a base amount; simplified.
-    g.credits += Math.round(SHIP_TYPES.flea.price)
+  if (payout > 0) {
+    g.credits += payout
     g.insurance = false
     g.noClaim = 0
+    pushLog(g, 'log.insurancePaid', { amount: payout })
   }
   pushLog(g, 'encounter.escapePod')
 }
