@@ -56,6 +56,15 @@ export interface SaveSlotInfo {
 }
 
 /**
+ * Whether this build can make sense of a save's envelope. A file from a *newer*
+ * build may hold state this one has no idea how to read, so it is refused with
+ * an explanation rather than loaded into a crash.
+ */
+export function isSupportedFormat(format: number): boolean {
+  return Number.isFinite(format) && format <= SAVE_FORMAT
+}
+
+/**
  * Read a slot file's contents, accepting both the current envelope and the
  * legacy shape (a lone `savegame.json` holding a bare `GameState`) so a voyage
  * in progress survives the upgrade to slots. Returns null if neither fits.
@@ -69,9 +78,36 @@ export function parseSaveFile(raw: string): SaveFile | null {
   }
   if (!parsed || typeof parsed !== 'object') return null
   const obj = parsed as Record<string, unknown>
-  if (obj.state && obj.meta) return obj as unknown as SaveFile
+  if (obj.state && obj.meta) {
+    // A state that is not an object cannot be a GameState whatever the envelope
+    // claims, and a slot card built from a malformed summary renders "undefined"
+    // at the player. Both are reported as damaged instead.
+    if (typeof obj.state !== 'object') return null
+    const meta = envelopeMeta(obj.meta)
+    if (!meta) return null
+    return { format: typeof obj.format === 'number' ? obj.format : 1, meta, state: obj.state }
+  }
   const meta = legacyMeta(obj)
   return meta ? { format: 1, meta, state: obj } : null
+}
+
+/**
+ * Normalise the summary out of an envelope. Every field is defaulted rather
+ * than demanded: a save written by an earlier build may predate a field, and
+ * losing the voyage over a missing timestamp would be absurd.
+ */
+function envelopeMeta(value: unknown): SaveMeta | null {
+  if (!value || typeof value !== 'object') return null
+  const m = value as Record<string, unknown>
+  if (typeof m.commanderName !== 'string' || typeof m.day !== 'number') return null
+  return {
+    commanderName: m.commanderName,
+    day: m.day,
+    credits: typeof m.credits === 'number' ? m.credits : 0,
+    shipType: typeof m.shipType === 'string' ? m.shipType : 'flea',
+    systemName: typeof m.systemName === 'string' ? m.systemName : '',
+    savedAt: typeof m.savedAt === 'number' ? m.savedAt : 0
+  }
 }
 
 /**

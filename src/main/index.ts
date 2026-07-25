@@ -1,21 +1,11 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
-import { readFile, writeFile, mkdir, rename, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
-import {
-  AUTO_SLOT,
-  SAVE_SLOT_IDS,
-  isSaveSlotId,
-  parseSaveFile,
-  type SaveSlotId,
-  type SaveSlotInfo
-} from '../shared/saves'
+import { isSaveSlotId, type SaveSlotInfo } from '../shared/saves'
+import { createSaveStore } from './saveStore'
 import { setupUpdater } from './updater'
 
-const SAVE_DIR = () => join(app.getPath('userData'), 'saves')
-const slotFile = (slot: SaveSlotId): string => join(SAVE_DIR(), `slot-${slot}.json`)
-/** The single save file used before slots existed. */
-const LEGACY_FILE = () => join(SAVE_DIR(), 'savegame.json')
+const saves = createSaveStore(() => join(app.getPath('userData'), 'saves'))
 
 function createWindow(): void {
   // In dev the icon lives in the project's build/ dir; packaged builds embed it
@@ -60,103 +50,46 @@ function createWindow(): void {
 }
 
 // --- Persistence IPC ---------------------------------------------------------
-async function ensureSaveDir(): Promise<void> {
-  const dir = SAVE_DIR()
-  if (!existsSync(dir)) await mkdir(dir, { recursive: true })
-}
-
-/**
- * Move a pre-slots `savegame.json` into the autosave slot so an in-progress
- * voyage survives the upgrade. Runs once — after the move the file is gone.
- */
-async function migrateLegacySave(): Promise<void> {
-  try {
-    if (!existsSync(LEGACY_FILE()) || existsSync(slotFile(AUTO_SLOT))) return
-    await ensureSaveDir()
-    await rename(LEGACY_FILE(), slotFile(AUTO_SLOT))
-  } catch {
-    // A failed migration must never keep the app from starting; the legacy
-    // file is left untouched and the player simply starts a new voyage.
-  }
-}
-
-/**
- * Counter that keeps concurrent writes off each other's scratch file. The
- * renderer fires autosaves without awaiting them, so two writes to one slot can
- * genuinely overlap — sharing a single `.tmp` path let them interleave their
- * bytes and rename the mess over a good save.
- */
-let tmpCounter = 0
-
+// Slot ids arrive from the renderer, so they are checked against the fixed set
+// before they can reach a file path; everything past that point is the save
+// store's business.
 ipcMain.handle('save:write', async (_e, slot: unknown, data: unknown) => {
   if (!isSaveSlotId(slot) || typeof data !== 'string') return false
-  const target = slotFile(slot)
-  const tmp = `${target}.${process.pid}.${++tmpCounter}.tmp`
-  try {
-    await ensureSaveDir()
-    // Write-then-rename: autosaves fire after every action, and a crash or a
-    // full disk mid-write must never leave a truncated file where a good save
-    // used to be. The rename is atomic, so overlapping writes simply mean the
-    // last one to finish wins — with a whole file, never half of two.
-    await writeFile(tmp, data, 'utf-8')
-    await rename(tmp, target)
-    return true
-  } catch {
-    // Disk errors must not reject into the renderer's fire-and-forget save.
-    // Clear the scratch file so a failing disk cannot litter the save folder.
-    await unlink(tmp).catch(() => {})
-    return false
-  }
+  return saves.write(slot, data)
 })
 
 ipcMain.handle('save:read', async (_e, slot: unknown) => {
   if (!isSaveSlotId(slot)) return null
-  try {
-    const file = slotFile(slot)
-    if (!existsSync(file)) return null
-    return await readFile(file, 'utf-8')
-  } catch {
-    return null
-  }
+  return saves.read(slot)
 })
 
 ipcMain.handle('save:delete', async (_e, slot: unknown) => {
   if (!isSaveSlotId(slot)) return false
-  try {
-    const file = slotFile(slot)
-    if (existsSync(file)) await unlink(file)
-    return true
-  } catch {
-    return false
-  }
+  return saves.remove(slot)
 })
 
-ipcMain.handle('save:list', async (): Promise<SaveSlotInfo[]> => {
-  const out: SaveSlotInfo[] = []
-  for (const slot of SAVE_SLOT_IDS) {
-    const file = slotFile(slot)
-    if (!existsSync(file)) {
-      out.push({ slot, meta: null })
-      continue
-    }
-    try {
-      const parsed = parseSaveFile(await readFile(file, 'utf-8'))
-      // A file that exists but will not parse is reported as damaged rather
-      // than empty, so the player can tell "nothing here" from "lost".
-      out.push(parsed ? { slot, meta: parsed.meta } : { slot, meta: null, corrupt: true })
-    } catch {
-      out.push({ slot, meta: null, corrupt: true })
-    }
-  }
-  return out
-})
+ipcMain.handle('save:list', (): Promise<SaveSlotInfo[]> => saves.list())
 
 app.whenReady().then(async () => {
-  await migrateLegacySave()
+  await saves.migrateLegacySave()
+  await saves.sweepScratchFiles()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+/**
+ * The player's last action is exactly the one they would notice missing, and
+ * closing the window used to abandon whatever save it had just started. Hold
+ * the quit open until the queue has drained.
+ */
+let flushing = false
+app.on('before-quit', (event) => {
+  if (flushing || !saves.hasPending()) return
+  event.preventDefault()
+  flushing = true
+  void saves.flush().then(() => app.quit())
 })
 
 app.on('window-all-closed', () => {

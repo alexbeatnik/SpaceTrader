@@ -91,6 +91,8 @@ export const en = {
     delete: 'Delete',
     saved: 'Game saved to slot {slot}.',
     saveFailed: 'Could not write the save file.',
+    autosaveFailed: 'Autosave failed — your progress is not being written to disk.',
+    autosaveRecovered: 'Autosave is working again.',
     unknownTime: 'date unknown',
     confirm: {
       save: 'Overwrite?',
@@ -842,6 +844,7 @@ export const en = {
     holdTooSmall: 'Your hold is too small for this contract.',
     contractEmbargo: 'This planet is short of it — that is why you were hired to bring it. Buy it elsewhere.',
     loadFailed: 'Could not load the save file — it may be corrupted.',
+    saveTooNew: 'This save was written by a newer version of Star Trader. Update the game to open it.',
     noMarketHere: 'There is no market here. Trading is done at the planet\'s spaceport.',
     noShipyardHere: 'Nothing here will work on a ship. Try the planet, or a station.',
     noBankHere: 'The bank is planet-side.',

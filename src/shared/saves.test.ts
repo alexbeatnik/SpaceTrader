@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { SAVE_FORMAT, SAVE_SLOT_IDS, isSaveSlotId, parseSaveFile, type SaveFile } from './saves'
+import {
+  SAVE_FORMAT,
+  SAVE_SLOT_IDS,
+  isSaveSlotId,
+  isSupportedFormat,
+  parseSaveFile,
+  type SaveFile
+} from './saves'
 
 const meta = {
   commanderName: 'Jameson',
@@ -63,5 +70,47 @@ describe('parseSaveFile', () => {
     expect(parseSaveFile('null')).toBeNull()
     expect(parseSaveFile('[]')).toBeNull()
     expect(parseSaveFile('{"nothing":"useful"}')).toBeNull()
+  })
+
+  it('rejects an envelope whose state could not be a GameState', () => {
+    // Reported as damaged rather than loaded into a crash further downstream.
+    expect(parseSaveFile(JSON.stringify({ format: 2, meta, state: 'a string' }))).toBeNull()
+    expect(parseSaveFile(JSON.stringify({ format: 2, meta, state: 42 }))).toBeNull()
+  })
+
+  it('rejects an envelope with no usable summary', () => {
+    // A slot card built from this used to render "undefined" at the player.
+    const state = { day: 12 }
+    expect(parseSaveFile(JSON.stringify({ format: 2, meta: 'nonsense', state }))).toBeNull()
+    expect(parseSaveFile(JSON.stringify({ format: 2, meta: { day: 3 }, state }))).toBeNull()
+  })
+
+  it('defaults summary fields a older build never wrote', () => {
+    const state = { day: 12 }
+    const parsed = parseSaveFile(
+      JSON.stringify({ format: 2, meta: { commanderName: 'Ghost', day: 4 }, state })
+    )
+    expect(parsed?.meta).toEqual({
+      commanderName: 'Ghost',
+      day: 4,
+      credits: 0,
+      shipType: 'flea',
+      systemName: '',
+      savedAt: 0
+    })
+  })
+})
+
+describe('isSupportedFormat', () => {
+  it('accepts this build\'s format and everything older', () => {
+    expect(isSupportedFormat(SAVE_FORMAT)).toBe(true)
+    expect(isSupportedFormat(1)).toBe(true)
+  })
+
+  it('refuses a save from a newer build', () => {
+    // Its state may hold shapes this build has no idea how to read, so it is
+    // turned away with an explanation instead of loaded into a crash.
+    expect(isSupportedFormat(SAVE_FORMAT + 1)).toBe(false)
+    expect(isSupportedFormat(Number.NaN)).toBe(false)
   })
 })
