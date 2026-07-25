@@ -78,6 +78,7 @@ import { bodyDisplayName } from '../util/bodyText'
 import {
   AUTO_SLOT,
   SAVE_FORMAT,
+  isSupportedFormat,
   parseSaveFile,
   type SaveFile,
   type SaveSlotId,
@@ -241,6 +242,9 @@ interface GameStore {
 
 let toastCounter = 0
 
+/** Whether the last autosave reached the disk, so only changes are reported. */
+let autosaveHealthy = true
+
 // Warp result whose encounter/event/offer is deferred until the travel
 // animation finishes. Kept outside reactive state (it is not rendered directly).
 let pendingWarp: WarpResult | null = null
@@ -376,9 +380,17 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (typeof window === 'undefined' || !window.api) return false
       try {
         const data = await window.api.loadGame(slot)
-        if (!data) return false
+        // An empty slot is not an exception, but it is not nothing either: the
+        // player asked for a game and must be told why they did not get one.
+        if (!data) throw new Error('empty slot')
         const file = parseSaveFile(data)
         if (!file) throw new Error('unreadable save file')
+        if (!isSupportedFormat(file.format)) {
+          set({
+            toast: { id: ++toastCounter, type: 'error', text: renderMessage('error.saveTooNew') }
+          })
+          return false
+        }
         const game = file.state as GameState
         ensureBoard(game)
         pendingWarp = null
@@ -410,7 +422,22 @@ export const useGameStore = create<GameStore>((set, get) => {
           },
           state: g
         }
-        return await window.api.saveGame(slot, JSON.stringify(file))
+        const ok = await window.api.saveGame(slot, JSON.stringify(file))
+        // Autosaves are fired without being awaited, so a disk that has started
+        // refusing them would otherwise stay invisible until the player reloaded
+        // and found the run gone. Announced once on the way down and once on the
+        // way back up, never on every action.
+        if (slot === AUTO_SLOT && ok !== autosaveHealthy) {
+          autosaveHealthy = ok
+          set({
+            toast: {
+              id: ++toastCounter,
+              type: ok ? 'info' : 'error',
+              text: renderMessage(ok ? 'saves.autosaveRecovered' : 'saves.autosaveFailed')
+            }
+          })
+        }
+        return ok
       } catch {
         // A failed save must not crash the game; the next auto-save retries.
         return false
@@ -616,7 +643,12 @@ export const useGameStore = create<GameStore>((set, get) => {
             gameOver: !survives,
             gameOverCause: survives ? null : clone(story)
           })
-          void get().saveGame()
+          // The autosave is the player's checkpoint from just before the run
+          // ended, so a lost ship is deliberately *not* written over it — the
+          // wreck sits at zero hull, and persisting it (gameOver lives in the
+          // store, not in the state) made "Continue" resurrect a corpse. A pod
+          // means the voyage goes on, and that does belong on disk.
+          if (survives) void get().saveGame()
           return
         }
         // Survived it — the story is told, and anything else waiting on this
@@ -844,11 +876,12 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ escort: null })
       if (!run || !g) return
       if (run.destroyed) {
-        // Losing the ship on contract is resolved exactly as in combat.
+        // Losing the ship on contract is resolved exactly as in combat — and,
+        // as there, the checkpoint before the run ended is left standing.
         const survives = g.ship.escapePod
         handleDestruction(g)
         set({ game: clone(g), gameOver: !survives })
-        void get().saveGame()
+        if (survives) void get().saveGame()
         return
       }
       const quest = g.quests.find((q) => q.id === run.questId)
