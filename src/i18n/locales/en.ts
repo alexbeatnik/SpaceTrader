@@ -28,7 +28,8 @@ export const en = {
     pc: 'pc'
   },
   nav: {
-    system: 'System',
+    system: 'Planet',
+    systemMap: 'System',
     market: 'Market',
     shipyard: 'Shipyard',
     bank: 'Bank',
@@ -301,6 +302,18 @@ export const en = {
       title: 'Ancient probe',
       body: 'You recovered a derelict alien probe and sold its tech for {value} cr.',
       log: 'Alien probe sold: +{value} cr.'
+    },
+    blackHole: {
+      title: 'Singularity',
+      warning: 'Nothing on the charts. The instruments simply stop reporting a direction.',
+      bodySurvived:
+        'A black hole nobody had charted takes hold of the ship. The helm burns everything the drives have and drags you back over the lip of the well — {dmg} hull gone to tidal stress, {days} day(s) lost to a clock that was not yours. The odds were {chance}%.',
+      bodyLost:
+        'A black hole nobody had charted takes hold of the ship. There is no angle left to run at. The last of the hull goes as the horizon closes over you, and the stars behind smear into a ring and go out.',
+      bodyPod:
+        'A black hole nobody had charted takes hold of the ship. There is no angle left to run at — and no time to argue with it. The pod fires clear a heartbeat before the hull goes, and you watch your ship stretch into a thread of light and vanish.',
+      logSurvived: 'Pulled clear of a singularity: -{dmg} hull, {days} day(s) lost.',
+      logLost: 'The ship crossed the horizon of an uncharted singularity.'
     }
   },
   menu: {
@@ -332,8 +345,95 @@ export const en = {
     pirates: 'Pirates',
     traders: 'Traders',
     wormhole: 'Wormhole',
+    unstableWormhole: 'Unmapped wormhole',
+    unstableWormholeHint:
+      'It goes somewhere. Nobody has ever established where until they were already there.',
+    enterWormhole: 'Fall into it',
     hereNow: 'You are here',
-    noSpecialResource: 'Ordinary resources'
+    noSpecialResource: 'Ordinary resources',
+    news: 'Planetary news',
+    noNews: 'The feeds are quiet today.',
+    openSystemMap: 'System map'
+  },
+  body: {
+    kind: {
+      planet: 'Settled world',
+      barren: 'Uninhabited',
+      station: 'Station'
+    },
+    terrain: {
+      asteroidBelt: 'Asteroid belt',
+      gasGiant: 'Gas giant',
+      iceMoon: 'Ice moon',
+      rockyMoon: 'Rocky moon',
+      lavaWorld: 'Volcanic world',
+      dustWorld: 'Dust world'
+    },
+    capital: 'Capital planet',
+    barrenBlurb: 'No port, no market, nobody. Whatever is here has to be dug out.',
+    noMine: 'Nothing here is worth the fuel to extract.',
+    numeral: {
+      1: 'I',
+      2: 'II',
+      3: 'III',
+      4: 'IV',
+      5: 'V',
+      6: 'VI',
+      7: 'VII',
+      8: 'VIII'
+    }
+  },
+  station: {
+    science: 'Research Station',
+    military: 'Naval Yard',
+    engineering: 'Fabrication Yard',
+    short: {
+      science: 'Research',
+      military: 'Naval',
+      engineering: 'Fabrication'
+    },
+    blurb: {
+      science:
+        'Deep-space physics, sensors and navigation. Everything here was built by people who do not have to explain themselves to a planetary licensing board.',
+      military:
+        'Weapons research, run at a distance from anything inhabited. The guns fitted here are not sold on any world.',
+      engineering:
+        'Heavy fabrication in free fall: holds, drives and hull plate, made to tolerances no ground-side dry dock can hold.'
+    },
+    catalog: 'Station catalogue',
+    nothing: 'This yard builds nothing of that kind.',
+    grade: 'Station grade',
+    onlyHere: 'Sold at stations only',
+    hullUpgrades: 'Fits hull reinforcement up to {max}',
+    repairDiscount: 'Hull repairs at {percent}% of a planetary yard',
+    noMarket: 'No market, bank or hiring hall — that is what the planet is for.'
+  },
+  systemMap: {
+    title: 'System map',
+    bodies: '{count} bodies',
+    star: '{class} star',
+    orbit: 'Orbit {n}',
+    dockedHere: 'Docked here',
+    select: 'Pick somewhere in this system',
+    setCourse: 'Set course',
+    transit: '{days} day(s) under impulse',
+    noWarp:
+      'A warp drive is dead weight this deep in a gravity well. Crossing the system is done on impulse, and impulse takes days.',
+    toChart: 'Leave the system',
+    services: 'What is here',
+    service: {
+      market: 'Commodity market',
+      shipyard: 'Shipyard',
+      bank: 'Bank',
+      hall: 'Hiring hall',
+      board: 'Job board',
+      mine: 'Mineable: {resource}',
+      stationCatalog: 'Station catalogue',
+      none: 'Nothing but the view'
+    },
+    arrived: 'Docked after {days} day(s).',
+    awayFromPort: 'You are away from the spaceport — {place}.',
+    returnToPort: 'Return to the planet'
   },
   market: {
     title: 'Spaceport — Commodity Market',
@@ -440,6 +540,8 @@ export const en = {
   },
   warp: {
     jumping: 'Warp jump in progress',
+    impulse: 'Crossing the system on impulse',
+    wormhole: 'Falling through the wormhole',
     skip: 'Skip'
   },
   escort: {
@@ -493,7 +595,8 @@ export const en = {
     pilot: 'Pilot',
     fighter: 'Fighter',
     trader: 'Trader',
-    engineer: 'Engineer'
+    engineer: 'Engineer',
+    electrician: 'Electrician'
   },
   good: {
     water: 'Water',
@@ -658,8 +761,10 @@ export const en = {
     empty: 'Nothing has happened yet.',
     gameStart: 'Journey begins in the {system} system.',
     arrived: 'Arrived at {system} ({distance} pc).',
+    arrivedBody: 'Crossed the system on impulse: {days} day(s).',
     autoRefuel: 'Auto-refuelled {parsecs} pc for {cost} cr.',
     wormhole: 'Wormhole jump to {system} (tax {tax} cr).',
+    unstableWormhole: 'Fell through an unmapped wormhole and came out at {system}.',
     plunderedTrader: 'You plundered a trader ({qty} units).',
     crewLeft: 'You could not pay your crew — they left you.',
     crewLeftBehind: '{count} of your crew had no berth on the new ship and stayed behind.',
@@ -736,7 +841,15 @@ export const en = {
     holdFull: 'The cargo hold is full.',
     holdTooSmall: 'Your hold is too small for this contract.',
     contractEmbargo: 'This planet is short of it — that is why you were hired to bring it. Buy it elsewhere.',
-    loadFailed: 'Could not load the save file — it may be corrupted.'
+    loadFailed: 'Could not load the save file — it may be corrupted.',
+    noMarketHere: 'There is no market here. Trading is done at the planet\'s spaceport.',
+    noShipyardHere: 'Nothing here will work on a ship. Try the planet, or a station.',
+    noBankHere: 'The bank is planet-side.',
+    noHiringHallHere: 'Nobody is looking for a berth out here.',
+    noPortHere: 'The port office is down on the planet.',
+    notStockedHere: 'This yard does not stock that.',
+    noWormholeHere: 'There is no wormhole in this system.',
+    alreadyHere: 'You are already docked there.'
   },
   tech: {
     preAgricultural: 'Pre-agricultural',
@@ -777,6 +890,13 @@ export const en = {
     cropFailure: 'Crop failure',
     lackOfWorkers: 'Lack of workers'
   },
+  starClass: {
+    blue: 'blue',
+    white: 'white',
+    yellow: 'yellow',
+    orange: 'orange',
+    red: 'red'
+  },
   resource: {
     none: 'None',
     mineralRich: 'Mineral rich',
@@ -805,12 +925,15 @@ export const en = {
     beam: 'Beam laser',
     plasma: 'Plasma cannon',
     military: 'Military laser',
-    fusion: 'Fusion cannon'
+    fusion: 'Fusion cannon',
+    railgun: 'Mass-driver railgun',
+    singularity: 'Singularity lance'
   },
   shield: {
     energy: 'Energy shield',
     reflective: 'Reflective shield',
-    deflector: 'Deflector shield'
+    deflector: 'Deflector shield',
+    barrier: 'Barrier field'
   },
   gadget: {
     cargoBays: 'Extra cargo bays (+5)',
@@ -819,6 +942,177 @@ export const en = {
     targeting: 'Targeting system',
     fuelCompactor: 'Fuel compactor (+3 pc)',
     hiddenCompartment: 'Hidden compartment',
-    cloaking: 'Cloaking device'
+    cloaking: 'Cloaking device',
+    nanoHold: 'Nanofolded hold (+20 bays)',
+    quantumCompactor: 'Quantum compactor (+12 pc)',
+    aiHelm: 'Helm intelligence',
+    battleComputer: 'Battle computer',
+    nanoForge: 'Nanoforge repair rig'
+  },
+  news: {
+    droughtDecree: {
+      headline: 'Governor declares a Water Emergency',
+      body: 'The harvest is a write-off and the reservoirs are down to mud. The Governor has ordered every commune to pull together for the duration, and the ministry has begun buying water in bulk from any hauler who can bring it in.'
+    },
+    droughtRation: {
+      headline: 'Third week of water rationing',
+      body: 'Standpipes open two hours a day. Anything wet sells the moment it is off the ramp, and nobody is asking where it came from.'
+    },
+    cropFailureGranary: {
+      headline: 'State granaries stand empty',
+      body: 'The strategic reserve is gone. Port authority has posted a standing call for food shipments and is paying for speed rather than haggling.'
+    },
+    cropFailureFarmhands: {
+      headline: 'A season with nothing to bring in',
+      body: 'Farmhands are being laid off across the growing belt. The co-operatives are selling their equipment to buy the food they used to grow.'
+    },
+    plagueQuarantine: {
+      headline: 'Hospitals overrun as the outbreak spreads',
+      body: 'Wards are full and the medicine ran out days ago. Ships carrying any are being waved straight through customs.'
+    },
+    plagueBorder: {
+      headline: 'Borders sealed by emergency decree',
+      body: 'The Ministry of Health has closed the surface to all but licensed traffic and requisitioned every dose on the planet. Enforcement has not been gentle.'
+    },
+    warLevy: {
+      headline: 'Mobilisation order posted',
+      body: 'Reservists are being called up and the armouries are buying. Anything that shoots fetches a wartime price, and nobody is asking where it came from.'
+    },
+    warBlackMarket: {
+      headline: 'Rationing drives trade underground',
+      body: 'With the port on a war footing, half the planet\'s business now happens in cargo bays after dark.'
+    },
+    coldSnap: {
+      headline: 'Deep freeze grips the settlements',
+      body: 'The grid is failing under the load. Furs, heaters and anything that burns are selling faster than they can be landed.'
+    },
+    boredomFestival: {
+      headline: 'A planet with nothing whatsoever to do',
+      body: 'The entertainment board has approved anything anyone cares to import. Games are fetching frankly silly money.'
+    },
+    workerShortage: {
+      headline: 'Nobody left to work the lines',
+      body: 'Half the shifts are unfilled. Managers are bidding against each other for android crews and paying freight to have them shipped in.'
+    },
+    electionSeason: {
+      headline: 'Campaign season opens',
+      body: 'Three candidates, one debate a night, and a promise of lower docking fees from every one of them.'
+    },
+    partyQuota: {
+      headline: 'Quota met ahead of schedule, ministry says',
+      body: 'The figures are impressive. So are the queues outside the state stores.'
+    },
+    corporateMerger: {
+      headline: 'Merger clears the board',
+      body: 'Two of the system\'s four holding companies are now one. Analysts expect layoffs; the analysts work for the company.'
+    },
+    piracyRife: {
+      headline: 'Another convoy lost in the outer approaches',
+      body: 'There is no authority here to complain to. Captains who dock armed tend to dock again.'
+    },
+    templeFast: {
+      headline: 'The Great Fast begins at dusk',
+      body: 'Markets close one day in seven, and the temple takes its tithe on everything landed.'
+    },
+    royalTour: {
+      headline: 'The Crown tours the provinces',
+      body: 'Streets have been scrubbed, prices fixed for the week, and the honour guard is inspecting cargo manifests personally.'
+    },
+    cyberNet: {
+      headline: 'Net upgrade goes live planet-side',
+      body: 'Every citizen\'s implant was patched overnight. Most of them consented.'
+    },
+    satoriSilence: {
+      headline: 'The Year of Silence continues',
+      body: 'Business is conducted in writing. Trade is slow, courteous and remarkably honest.'
+    },
+    technocratPaper: {
+      headline: 'Institute publishes, and the price of everything shifts',
+      body: 'A new refining process has been released into the public domain. The industrial worlds are already retooling.'
+    },
+    juntaParade: {
+      headline: 'Victory parade closes the capital',
+      body: 'Curfew at dusk, papers on demand, and a very good view of the fleet.'
+    },
+    pacifistRally: {
+      headline: 'Disarmament rally fills the plaza',
+      body: 'Weapon imports have been taxed into the sky. The crowd is friendly and the police are unarmed.'
+    },
+    oreStrike: {
+      headline: 'New seam opens at the deep workings',
+      body: 'The assay came back rich. Every hauler in the system is being offered a contract.'
+    },
+    refineryFlare: {
+      headline: 'Stack flare lights the night side',
+      body: 'A cracking tower vented and burned for six hours. Nobody was hurt, and fuel is cheap this week.'
+    },
+    resortSeason: {
+      headline: 'The season opens',
+      body: 'The orbital hotels are full, the beaches are crowded, and a bottle of water costs what a bottle of wine costs anywhere else.'
+    },
+    factoryQuota: {
+      headline: 'Line record broken on the night shift',
+      body: 'The heavy works are running flat out. Machine tools are leaving the planet faster than they can be crated.'
+    },
+    harvestBumper: {
+      headline: 'Best harvest in a decade',
+      body: 'Silos are overflowing and the co-operatives are selling grain at giveaway prices just to clear the space.'
+    },
+    hiTechLaunch: {
+      headline: 'New model unveiled at the exchange',
+      body: 'The fabs retooled overnight. Last year\'s robots are being cleared out at a discount.'
+    },
+    gemRush: {
+      headline: 'Gem rush at the eastern claims',
+      body: 'A prospector hit colour and half the settlement followed. The assay office has a queue around the block.'
+    },
+    mushroomBloom: {
+      headline: 'The bloom is early this year',
+      body: 'The caves are thick with it. The xenobiologists are worried; the exporters are delighted.'
+    },
+    herbHarvest: {
+      headline: 'Herb harvest comes in strong',
+      body: 'The medicinal crop is the best in years, and the off-world buyers have already landed.'
+    },
+    artFestival: {
+      headline: 'The festival takes over the capital',
+      body: 'Every hall is hung with new work, and collectors are arriving by the hour.'
+    },
+    warGames: {
+      headline: 'War games open on the northern plain',
+      body: 'The clans are fighting their annual mock war. Relic dealers follow the armies like gulls.'
+    },
+    springBottling: {
+      headline: 'Bottling plants running double shifts',
+      body: 'The springs are famous for good reason, and off-world demand has never been higher.'
+    },
+    dustStorm: {
+      headline: 'Dust storm buries the outer settlements',
+      body: 'Visibility is nil, filters are failing, and water is being trucked in from the poles.'
+    },
+    pirateSighting: {
+      headline: 'Raiders sighted near the jump point',
+      body: 'Two freighters have gone missing this month. Port authority advises an armed escort.'
+    },
+    patrolCrackdown: {
+      headline: 'Customs crackdown at the port',
+      body: 'Every hold is being opened. The officers are being watched by their own inspectorate, so a bribe is a poor bet this week.'
+    },
+    traderInflux: {
+      headline: 'Traffic at record levels',
+      body: 'Berths are booked out three days deep. Whatever you are carrying, somebody here wants it.'
+    },
+    stationTraffic: {
+      headline: 'Yard traffic heavy in the outer system',
+      body: 'The station is running at capacity. Captains report the wait is worth it for what can be fitted out there.'
+    },
+    dockStrike: {
+      headline: 'Dockers vote to work to rule',
+      body: 'Loading has slowed to a crawl. The union says it is about safety; the port authority says it is about money.'
+    },
+    quietWeek: {
+      headline: 'A quiet week, and the papers say so',
+      body: 'No crisis, no scandal, no shortage. The lead story is a lost cat.'
+    }
   }
 } as const

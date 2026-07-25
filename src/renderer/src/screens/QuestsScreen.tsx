@@ -1,6 +1,7 @@
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
 import {
+  atCapital,
   currentSystem,
   canTurnIn,
   questSupply,
@@ -44,7 +45,10 @@ export function QuestsScreen(): React.JSX.Element {
   })
 
   const here = currentSystem(game)
-  const board = here.questBoard ?? []
+  // The board hangs in the port office. Out at a belt or a station there is
+  // nothing to read and nothing to sign, so it is not offered at all.
+  const docked = atCapital(game)
+  const board = docked ? (here.questBoard ?? []) : []
   const active = game.quests.filter((q) => q.status === 'active')
   const completed = game.quests.filter((q) => q.status === 'completed')
 
@@ -75,7 +79,9 @@ export function QuestsScreen(): React.JSX.Element {
         🪧 {t('quest.board')} · {here.nameId}
       </div>
       {board.length === 0 ? (
-        <div className="panel panel-pad muted">{t('quest.boardEmpty')}</div>
+        <div className="panel panel-pad muted">
+          {docked ? t('quest.boardEmpty') : t('error.noPortHere')}
+        </div>
       ) : (
         <div className="grid" style={{ gap: 10 }}>
           {board.map((q) => {

@@ -1,6 +1,7 @@
 import type { GameState, Quest, GoodId } from './types'
 import { Rng } from './rng'
 import {
+  atCapital,
   currentSystem,
   pushLog,
   freeQuarters,
@@ -277,6 +278,8 @@ export function boardQuestProblem(state: GameState, quest: Quest): string | null
 
 /** Accept a posting from the current planet's job board. */
 export function acceptBoardQuest(state: GameState, questId: string): ActionResult {
+  // The board is in the port office, down on the planet.
+  if (!atCapital(state)) return { ok: false, error: 'error.noPortHere' }
   const sys = currentSystem(state)
   const board = sys.questBoard ?? []
   const idx = board.findIndex((q) => q.id === questId)
@@ -315,6 +318,7 @@ export function questSupplyMissing(state: GameState, quest: Quest): number {
  * missing amount, bounded by credits and free cargo space.
  */
 export function buyQuestSupplies(state: GameState, quest: Quest): ActionResult {
+  if (!atCapital(state)) return { ok: false, error: 'error.noMarketHere' }
   const need = questSupply(quest)
   if (!need) return { ok: false, error: 'error.cannotBuy' }
   const missing = questSupplyMissing(state, quest)
@@ -349,6 +353,8 @@ export function canTurnIn(state: GameState, quest: Quest): boolean {
   // Bounties resolve in combat and escorts on the convoy run itself.
   if (quest.type === 'bounty' || quest.type === 'escort') return false
   if (quest.targetSystem !== state.currentSystem) return false
+  // The people who signed the contract are at the port, not out at the belt.
+  if (!atCapital(state)) return false
   // A delivery is never handed in at the system that issued it.
   if (quest.type === 'delivery' && state.currentSystem === quest.giverSystem) return false
   // Cargo-backed contracts need their goods hauled in: buying them from the

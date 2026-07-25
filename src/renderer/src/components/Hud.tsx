@@ -6,9 +6,11 @@ import {
   usedCargoBays,
   maxHull,
   maxFuel,
+  currentBody,
   currentSystem
 } from '@game/index'
 import { LocaleToggle } from './LocaleToggle'
+import { bodyDisplayName } from '../util/bodyText'
 
 export function Hud(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
@@ -52,9 +54,11 @@ export function Hud(): React.JSX.Element {
           {usedCargoBays(ship)}/{totalCargoBays(ship)}
         </span>
       </div>
+      {/* Where the ship actually is, not just which star it is under: away
+          from the capital the name carries the orbit or the station. */}
       <div className="hud-stat">
-        <span className="label">{t('nav.system')}</span>
-        <span className="value">{sys.nameId}</span>
+        <span className="label">{t('nav.systemMap')}</span>
+        <span className="value">{bodyDisplayName(sys.nameId, currentBody(game))}</span>
       </div>
 
       <div className="hud-spacer" />

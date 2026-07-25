@@ -37,14 +37,15 @@ A modern desktop remake of the classic *Space Trader* game, built with
 
 ## Architecture
 
-- `src/game/data/` — static tables (goods, ships, equipment, governments,
-  economies, mercenaries, names). Pure data, no logic.
-- `src/game/engine/` — types, RNG, galaxy, market, travel, combat, warp, mining,
-  events, quests, reputation, and the `game.ts` action layer. `src/game/index.ts`
-  is the public barrel; import engine symbols through `@game/index`, not deep
-  paths.
-  `advanceDay(state)` (in `game.ts`) is the shared daily tick used by both `warp`
-  and `mine` — reuse it rather than re-implementing wages/interest/insurance.
+- `src/game/data/` — static tables (goods, ships, equipment, stations,
+  governments, economies, mercenaries, names). Pure data, no logic.
+- `src/game/engine/` — types, RNG, galaxy, location, market, travel, combat,
+  warp, in-system travel, mining, news, events, quests, reputation, and the
+  `game.ts` action layer. `src/game/index.ts` is the public barrel; import engine
+  symbols through `@game/index`, not deep paths.
+  `advanceDay(state)` (in `game.ts`) is the shared daily tick used by `warp`,
+  `mine` and `travelToBody` — reuse it rather than re-implementing
+  wages/interest/insurance.
 - `src/i18n/` — locale dictionaries and helpers. **English is the primary
   locale**: the default on a fresh install, the first entry in `LOCALES` (which
   is the order the toggle offers), and the fallback for any key a translation
@@ -111,6 +112,40 @@ validates every one with `isSaveSlotId` before it reaches a path. Writes go
 through a temp file and a rename, because the autosave fires constantly and a
 half-written file must never replace a good save.
 
+### Star systems have insides: bodies, stations, in-system travel
+
+A `SolarSystem` is no longer one place. It carries `bodies: SystemBody[]` —
+**index 0 is always the settled capital planet**, and the rest are uninhabited
+worlds and the occasional station — plus a `starClass` for the map.
+`GameState.currentBody` says which one the ship is docked at (absent = 0, which
+is what every pre-bodies save means).
+
+- **`engine/location.ts`** is the "where are we" module. It imports nothing but
+  the types and the station catalogue, so `game.ts` can gate its actions on
+  location without a cycle. `atCapital`, `hasShipyard`, `currentStation`,
+  `currentMineSite`, `maxHullUpgradesHere`, `repairCostMulHere`. `game.ts`
+  re-exports the lot, so `@game/index` is unchanged.
+- **Only the capital planet has a port.** Market, bank, job board and hiring hall
+  all check `atCapital` and fail with `error.noMarketHere` / `noBankHere` /
+  `noPortHere` / `noHiringHallHere`. `canTurnIn` checks it too, so the Quests
+  badge follows for free. A shipyard is the planet **or** any station
+  (`hasShipyard`).
+- **`SolarSystem.mineSite` stays the capital's own site**; every other body
+  carries its own in `body.mineSite`. Read either through `bodyMineSite(sys,
+  body)` / `currentMineSite(state)` — never copy one into the other, or the two
+  drift and setting `sys.mineSite` silently stops meaning anything.
+- **`engine/system.ts` owns `travelToBody`.** It burns days (`advanceDay` per
+  day, so wages, interest and crew incidents all apply), no fuel — an impulse
+  drive that charged fuel could strand a dry ship on a dead rock with no way back
+  to the only place selling any. It deliberately does **not** call
+  `settleArrival`: hopping to a moon and back must not refresh the market,
+  repost the board, or clear `sourcedHere` (that last one would launder cargo
+  bought at a planet into cargo "hauled in" to it and break every contract).
+- **Stations** (`data/stations.ts`) sell equipment marked `stationOnly`, and
+  nothing else — `weaponsForSale`/`shieldsForSale`/`gadgetsForSale`/`shipsForSale`
+  in `game.ts` are the single source for what a yard stocks; the shipyard screen
+  renders whatever they return rather than filtering the tables itself.
+
 ### Travel animation (deferred encounters)
 
 `warp()` in the engine is synchronous: it mutates `GameState` (fuel, day,
@@ -145,6 +180,26 @@ for `finishTravel`. When adding flow that runs on arrival, thread it through
 `WarpResult` → `pendingWarp` → `finishTravel`, not directly out of `warpTo`.
 Note: `pendingWarp` lives outside reactive state and is not persisted, so a hard
 close mid-animation drops that one pending encounter (acceptable).
+
+**Three journeys, one overlay.** `TravelAnim.mode` is `warp | wormhole |
+impulse`, and `warpTo`, `enterWormhole` and `flyToBody` all funnel through the
+store's `startTravel` helper. Read the destination from `WarpResult.arrivedAt`,
+never from the id you asked for — an unmapped wormhole picks its own.
+
+### Deep-space hazards: unmapped wormholes and black holes
+
+`enterUnstableWormhole` (warp.ts) is the second kind of wormhole: no fuel, no
+tax, and a destination drawn from the seeded rng at the moment of entry. It
+shares `flyTo` with `warp`, so arrival is settled identically.
+
+A black hole is rolled inside `flyTo` (`blackHoleChance(distance)`, capped) and
+resolved by `resolveBlackHole`, which burns days and — on a failed
+`blackHoleEscapeChance` roll — leaves the ship at **zero hull and returns
+`survived: false`**. It does *not* look at the escape pod: that is the store's
+job in `finishTravel`, resolved exactly as a combat kill is
+(`handleDestruction` + `gameOver`), so there is one death path, not two.
+`blackHoleEvent(bh, escapedByPod)` turns it into a `GameEvent` the modal (or the
+game-over screen, via `gameOverCause`) can show.
 
 ### Timed overlays (warp, mining)
 
@@ -248,6 +303,15 @@ Related quest UX wired to the same engine helpers:
 - The quest card's "buy supplies" shortcut buys the missing amount straight
   from the local market (`buyGood`) and is enabled only where the good is
   actually sold (`buyPrice > 0 && qty > 0`) with free cargo space.
+
+### Planetary news
+
+`engine/news.ts` builds each planet's feed from a weighted template pool whose
+`when(sys)` predicates read the world's status, government, economy and special
+resource — so the stories are *about* the planet, never generic filler. A world
+in crisis always leads with the crisis. Ids only: a template's copy lives at
+`news.<id>.headline` / `news.<id>.body` in both locales. The set is regenerated
+in `settleArrival` and stored on `SolarSystem.news`.
 
 ### Standing (karma) and hired hunters
 

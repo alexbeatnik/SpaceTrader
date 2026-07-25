@@ -1,10 +1,10 @@
-import type { GameState, CrewRole, Skills, GoodId } from './types'
+import type { GameState, CrewRole, GadgetId, Skills, GoodId } from './types'
 import { CREW_ROLES } from './types'
 import { Rng } from './rng'
 import { SHIP_TYPES } from '../data/ships'
 import { MERCENARIES, MERCENARY_IDS } from '../data/mercenaries'
 import { ROBOTS } from '../data/robots'
-import { GADGET_SKILL_BONUS } from '../data/equipment'
+import { GADGET_SKILL_BONUS, GADGET_SKILL_BONUS_ADVANCED } from '../data/equipment'
 import { GOOD_IDS } from '../data/goods'
 import { releaseLocalSourcing } from './sourcing'
 
@@ -28,10 +28,17 @@ export const ROLE_SKILL: Record<CrewRole, keyof Skills> = {
 }
 
 /** Gadget that stands in for a trained hand at each station. */
-const ROLE_GADGET: Partial<Record<CrewRole, string>> = {
+const ROLE_GADGET: Partial<Record<CrewRole, GadgetId>> = {
   pilot: 'navigation',
   gunner: 'targeting',
   mechanic: 'autoRepair'
+}
+
+/** The station-built equivalent, which is worth far more than a bolt-on. */
+const ROLE_GADGET_ADVANCED: Partial<Record<CrewRole, GadgetId>> = {
+  pilot: 'aiHelm',
+  gunner: 'battleComputer',
+  mechanic: 'nanoForge'
 }
 
 /** How much of their skill someone brings to a post that is not really theirs. */
@@ -124,12 +131,19 @@ export function crewLoad(state: GameState): number {
   return minCrew(state) / Math.max(1, crewCount(state))
 }
 
-/** A hand's skill at a station, including any gadget that assists there. */
+/**
+ * A hand's skill at a station, including any gadget that assists there. The
+ * station-built assistant supersedes the bolt-on rather than stacking with it —
+ * there is only one set of controls to sit at.
+ */
 function skillAt(state: GameState, hand: CrewHand, role: CrewRole): number {
   const base = hand.skills[ROLE_SKILL[role]]
+  const advanced = ROLE_GADGET_ADVANCED[role]
+  if (advanced && state.ship.gadgets.includes(advanced)) {
+    return base + GADGET_SKILL_BONUS_ADVANCED
+  }
   const gadget = ROLE_GADGET[role]
-  const assisted = gadget && state.ship.gadgets.includes(gadget as never)
-  return base + (assisted ? GADGET_SKILL_BONUS : 0)
+  return base + (gadget && state.ship.gadgets.includes(gadget) ? GADGET_SKILL_BONUS : 0)
 }
 
 /**

@@ -159,6 +159,67 @@ export interface MineSite {
   richness: number
 }
 
+// --- Bodies inside a star system ---------------------------------------------
+/**
+ * A star system is not one dot on the chart but a handful of places to dock at:
+ * the settled capital planet, the dead rocks and gas giants that share its star,
+ * and the occasional orbital station. Warp drives do not work this far down a
+ * gravity well, so moving between them burns days on the impulse drive.
+ */
+export type BodyKind = 'planet' | 'barren' | 'station'
+
+/** The three kinds of orbital station, each with its own speciality. */
+export type StationKind = 'science' | 'military' | 'engineering'
+export const STATION_KINDS = ['science', 'military', 'engineering'] as const
+
+/** Surface of an uninhabited world — flavour, and what can be dug out of it. */
+export type BarrenTerrain =
+  | 'asteroidBelt'
+  | 'gasGiant'
+  | 'iceMoon'
+  | 'rockyMoon'
+  | 'lavaWorld'
+  | 'dustWorld'
+
+/** Spectral class of a system's star. Cosmetic: it colours the system map. */
+export type StarClass = 'blue' | 'white' | 'yellow' | 'orange' | 'red'
+
+export interface SystemBody {
+  /** Index into the owning system's `bodies` array. 0 is always the capital. */
+  id: number
+  kind: BodyKind
+  /**
+   * Orbit index, 1 = innermost. Drives both the system-map layout and how long
+   * the impulse run between two bodies takes.
+   */
+  orbit: number
+  /** Position around the star in turns (0..1). Layout only. */
+  angle: number
+  /** Station speciality, for `kind === 'station'`. */
+  station?: StationKind
+  /** Surface type, for `kind === 'barren'`. */
+  terrain?: BarrenTerrain
+  /** A mineable site here, if any. */
+  mineSite: MineSite | null
+}
+
+// --- Planetary news ----------------------------------------------------------
+/**
+ * A story running on a planet's feeds, generated from what is actually true of
+ * it — its economy, its government, and whatever crisis it is living through.
+ * Like everything else in the engine this carries ids, not prose.
+ */
+export interface NewsItem {
+  id: string
+  /** i18n key for the headline. */
+  headlineKey: string
+  /** i18n key for the story. */
+  bodyKey: string
+  params?: Record<string, string | number>
+  /** How the story reads for a trader passing through. */
+  tone: 'good' | 'bad' | 'neutral'
+}
+
 // --- Ships & equipment -------------------------------------------------------
 
 /** Physical hull size — governs base slot capacity and docking restrictions. */
@@ -231,8 +292,16 @@ export interface ShipType {
   minTechLevel: TechLevel
 }
 
-export type WeaponId = 'pulse' | 'beam' | 'plasma' | 'military' | 'fusion'
-export type ShieldId = 'energy' | 'reflective' | 'deflector'
+export type WeaponId =
+  | 'pulse'
+  | 'beam'
+  | 'plasma'
+  | 'military'
+  | 'fusion'
+  // Station-grade ordnance, built in orbital yards only.
+  | 'railgun'
+  | 'singularity'
+export type ShieldId = 'energy' | 'reflective' | 'deflector' | 'barrier'
 export type GadgetId =
   | 'cargoBays'
   | 'autoRepair'
@@ -241,23 +310,33 @@ export type GadgetId =
   | 'cloaking'
   | 'fuelCompactor'
   | 'hiddenCompartment'
+  // Station-grade modules. No planetary yard has the fabricators for these.
+  | 'nanoHold'
+  | 'quantumCompactor'
+  | 'aiHelm'
+  | 'battleComputer'
+  | 'nanoForge'
 
 export interface Weapon {
   id: WeaponId
   power: number
   price: number
   minTechLevel: TechLevel
+  /** Built only in orbit: sold at stations, never at a planetary yard. */
+  stationOnly?: boolean
 }
 export interface Shield {
   id: ShieldId
   power: number
   price: number
   minTechLevel: TechLevel
+  stationOnly?: boolean
 }
 export interface Gadget {
   id: GadgetId
   price: number
   minTechLevel: TechLevel
+  stationOnly?: boolean
 }
 
 // --- Runtime state -----------------------------------------------------------
@@ -283,14 +362,29 @@ export interface SolarSystem {
   /** Optional wormhole destination system id. */
   wormholeTo: number | null
   /**
+   * An unmapped wormhole hangs in this system: it goes *somewhere*, and which
+   * somewhere is only settled the moment a ship falls into it.
+   */
+  unstableWormhole?: boolean
+  /**
    * Hands looking for a berth at this planet's hiring hall, refreshed on
    * arrival. Optional so saves written before hiring halls existed still load.
    */
   mercenaryIds?: string[]
   /** Assignments posted on this planet's job board (refreshed on arrival). */
   questBoard: Quest[]
-  /** A mineable site in this system, if any. */
+  /** A mineable site at the capital planet itself, if any. */
   mineSite: MineSite | null
+  /**
+   * Everywhere in this system a ship can dock, capital planet first. Optional
+   * so saves written before star systems had more than one place in them still
+   * load — `ensureBodies` fills them in on load.
+   */
+  bodies?: SystemBody[]
+  /** Spectral class of the star, for the system map. */
+  starClass?: StarClass
+  /** What the planet's feeds are running today; refreshed on every arrival. */
+  news?: NewsItem[]
 }
 
 export interface Ship {
@@ -381,6 +475,12 @@ export interface GameState {
   ship: Ship
   record: PlayerRecord
   currentSystem: number
+  /**
+   * Which body of the current system the ship is docked at (an index into its
+   * `bodies`). Optional for save compatibility: absent means the capital
+   * planet, which is where every pre-system-map save left the player.
+   */
+  currentBody?: number
   systems: SolarSystem[]
   /** Insurance active flag + accumulated no-claim days. */
   insurance: boolean

@@ -1,6 +1,7 @@
 import type { GameState, QuestType } from './types'
 import { Rng } from './rng'
 import { advanceDay, pushLog, type ActionResult } from './game'
+import { releaseLocalSourcing } from './sourcing'
 
 /**
  * Standing (karma) model.
@@ -151,10 +152,13 @@ export function serveSentence(state: GameState): Sentence {
   const days = sentenceDays(state)
   const fine = Math.min(state.credits, PRISON_FINE_BASE + notoriety(state) * PRISON_FINE_PER_NOTORIETY)
   const confiscated = state.ship.cargo.firearms + state.ship.cargo.narcotics
-  state.ship.cargo.firearms = 0
-  state.ship.cargo.narcotics = 0
-  state.buyingPrice.firearms = 0
-  state.buyingPrice.narcotics = 0
+  // Seized cargo leaves the hold, the price paid for it, and the local-sourcing
+  // ledger together — exactly as at a roadside inspection.
+  for (const g of ['firearms', 'narcotics'] as const) {
+    releaseLocalSourcing(state, g, state.ship.cargo[g])
+    state.ship.cargo[g] = 0
+    state.buyingPrice[g] = 0
+  }
   state.credits -= fine
   for (let i = 0; i < days; i++) advanceDay(state)
   // Time served wipes the slate.

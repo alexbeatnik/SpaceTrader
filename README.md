@@ -17,8 +17,26 @@ goods between solar systems, exploit local shortages and special resources, dodg
 
 Core systems implemented:
 
-- **Procedural galaxy** — 60 solar systems with tech levels, governments, special
+- **Procedural galaxy** — 140 star systems with tech levels, governments, special
   resources, situational events (war, plague, drought…), and wormholes.
+- **Systems you fly around inside** — each star has 2–7 places to dock at, drawn
+  on their orbits around a coloured sun: the settled **capital planet** with the
+  spaceport, the **uninhabited worlds** sharing its star (asteroid belts, gas
+  giants, ice moons, lava and dust worlds — some worth mining, some just rock),
+  and now and then an **orbital station**, marked in grey. A warp drive is dead
+  weight this deep in a gravity well, so crossing the system is done on impulse:
+  it costs **days**, not fuel, and out there you can still be intercepted.
+- **Orbital stations** — research, naval and fabrication yards that build what no
+  planet can: mass-driver railguns and singularity lances, barrier fields,
+  nanofolded holds, quantum compactors, helm intelligences and battle computers.
+  A fabrication yard also reinforces a hull far past a planetary dry dock and
+  repairs at half price. They sell no cargo, no hulls and no berths — for that
+  you go back down to the planet.
+- **Planetary news** — every world runs its own feed, written from what is
+  actually true of it. A drought on an agrarian world under a dictatorship reads
+  nothing like one on a hi-tech democracy: the harvest is a write-off, the
+  Governor orders every commune to pull together, and the ministry starts buying
+  water in bulk from anyone who can haul it in. Refreshed on every arrival.
 - **Dynamic market** — prices driven by tech level, **planet economy type**
   (agrarian, mining, industrial, energy, resort, hi-tech — e.g. food is cheap on
   agrarian worlds, machines dear), government preferences, special resources,
@@ -35,6 +53,15 @@ Core systems implemented:
   wormhole shortcuts. Each jump plays an animated **warp transition** you sit
   through — no skipping — with streaking stars, your ship, the distance and the
   day, so travel is never instantaneous.
+- **Unmapped wormholes** — besides the surveyed pairs, some systems hold a hole
+  in the floor with no charted far end. It costs no fuel and no tax, and where it
+  puts you down is decided the moment you go in: anywhere on the map, next door
+  or halfway across the galaxy. There is no way to aim it.
+- **Black holes** — a leg can stray into a singularity nobody had charted. There
+  is nothing to shoot and nothing to bargain with: the helm either drags the ship
+  back over the lip of the well or it does not. Survive and you lose hull plate
+  and days to a clock that was not yours; fail, and the escape pod is the only
+  thing that comes back — if you bought one.
 - **Star chart** — interactive map with a fuel-range ring, wormhole links, and
   **pulsing markers on active quest destinations** (with where each job was taken
   and its reward). A marker glows **dim** while you lack the goods needed for
@@ -103,8 +130,9 @@ Core systems implemented:
   friendly convoys, refugees, colony rewards, and ancient alien probes.
 - **Economy** — bank loans with daily interest, ship insurance with no-claim
   discount.
-- **Shipyard & modules** — **16 ship types** from the nimble Flea scout to the
-  elite Widow flagship, five laser tiers, three shield tiers, seven gadgets
+- **Shipyard & modules** — **24 ship types** from the nimble Flea scout to the
+  elite Widow flagship, five planet-built laser tiers (plus two station-built),
+  three shield tiers (plus the station barrier field), seven gadgets
   (extra bays, fuel compactor, hidden compartment, cloaking, …), refuel/repair,
   **hull-reinforcement upgrades** (+HP), escape pods, and sell-back of installed
   equipment. Every hull mounts at least one weapon, shield and gadget slot, so
@@ -165,16 +193,17 @@ src/
   preload/     Context-bridge API exposed to the renderer
   shared/      Save-file format shared by main and renderer
   game/        Pure game engine (no React/Electron imports)
-    data/      Static data: goods, ships, equipment, governments, economies, names
-    engine/    Types, RNG, galaxy, market, travel, combat, warp, mining,
-               events, quests, game actions
+    data/      Static data: goods, ships, equipment, stations, governments,
+               economies, names
+    engine/    Types, RNG, galaxy, location, system travel, market, travel,
+               combat, warp, mining, news, events, quests, game actions
   i18n/        Locale dictionaries (en, uk) + translation helpers
   renderer/    React app
     src/
       components/  HUD, nav, toast, ship art, warp transition, mining overlay,
                    modals (combat, event, quest offer/complete, amount, game over)
-      screens/     Menu, System, Market, Shipyard, Bank, Crew, Quests,
-                   Star Chart, Ship, Log, Saves
+      screens/     Menu, System Map, Planet, Market, Shipyard, Bank, Crew,
+                   Quests, Star Chart, Ship, Log, Saves
       store/       Zustand store wiring the engine to the UI
 build/         App icon (icon.png / icon.ico) for packaging
 ```

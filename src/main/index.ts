@@ -19,7 +19,9 @@ const LEGACY_FILE = () => join(SAVE_DIR(), 'savegame.json')
 
 function createWindow(): void {
   // In dev the icon lives in the project's build/ dir; packaged builds embed it
-  // into the exe (electron-builder), so a missing path here is harmless.
+  // into the exe (electron-builder), so a missing path here is harmless. The
+  // key is omitted rather than set to undefined — Electron treats a present
+  // `icon: undefined` as a bad argument and warns about it on every launch.
   const iconPath = join(__dirname, '../../build/icon.png')
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -30,7 +32,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     backgroundColor: '#05060f',
     title: 'Star Trader',
-    icon: existsSync(iconPath) ? iconPath : undefined,
+    ...(existsSync(iconPath) ? { icon: iconPath } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -78,20 +80,31 @@ async function migrateLegacySave(): Promise<void> {
   }
 }
 
+/**
+ * Counter that keeps concurrent writes off each other's scratch file. The
+ * renderer fires autosaves without awaiting them, so two writes to one slot can
+ * genuinely overlap — sharing a single `.tmp` path let them interleave their
+ * bytes and rename the mess over a good save.
+ */
+let tmpCounter = 0
+
 ipcMain.handle('save:write', async (_e, slot: unknown, data: unknown) => {
   if (!isSaveSlotId(slot) || typeof data !== 'string') return false
+  const target = slotFile(slot)
+  const tmp = `${target}.${process.pid}.${++tmpCounter}.tmp`
   try {
     await ensureSaveDir()
     // Write-then-rename: autosaves fire after every action, and a crash or a
     // full disk mid-write must never leave a truncated file where a good save
-    // used to be.
-    const target = slotFile(slot)
-    const tmp = `${target}.tmp`
+    // used to be. The rename is atomic, so overlapping writes simply mean the
+    // last one to finish wins — with a whole file, never half of two.
     await writeFile(tmp, data, 'utf-8')
     await rename(tmp, target)
     return true
   } catch {
     // Disk errors must not reject into the renderer's fire-and-forget save.
+    // Clear the scratch file so a failing disk cannot litter the save folder.
+    await unlink(tmp).catch(() => {})
     return false
   }
 })

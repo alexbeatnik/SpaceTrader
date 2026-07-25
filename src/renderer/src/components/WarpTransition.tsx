@@ -29,17 +29,22 @@ export function WarpTransition(): React.JSX.Element | null {
   // Hold station while the fight is on; the rest of the leg waits.
   const halted = !!encounter || gameOver
 
+  // An impulse crossing is a slow slog across one system, not a jump between
+  // stars: fewer, shorter streaks, and its own caption.
+  const impulse = travel?.mode === 'impulse'
+  const streakCount = impulse ? 18 : 46
+
   // Pre-computed streak descriptors so they stay stable for the animation.
   const streaks = useMemo(
     () =>
-      Array.from({ length: 46 }).map(() => ({
+      Array.from({ length: streakCount }).map(() => ({
         top: Math.random() * 100,
         delay: Math.random() * 1.2,
         duration: 0.5 + Math.random() * 0.9,
         width: 40 + Math.random() * 220,
         opacity: 0.25 + Math.random() * 0.6
       })),
-    [travel?.toId]
+    [travel?.toId, streakCount]
   )
 
   // A fresh jump resets the run. Runs before the flight effect below, so that
@@ -130,9 +135,11 @@ export function WarpTransition(): React.JSX.Element | null {
         </div>
 
         <div className="warp-sub">
-          {travel.viaWormhole
-            ? t('chart.viaWormhole')
-            : `${travel.distance} ${t('common.pc')}`}{' '}
+          {impulse
+            ? t('systemMap.transit', { days: travel.distance })
+            : travel.viaWormhole
+              ? t('chart.viaWormhole')
+              : `${travel.distance} ${t('common.pc')}`}{' '}
           · {t('common.day')} {game.day}
         </div>
 
@@ -140,7 +147,13 @@ export function WarpTransition(): React.JSX.Element | null {
           <div style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
 
-        <div className="warp-caption">{t('warp.jumping')}</div>
+        <div className="warp-caption">
+          {impulse
+            ? t('warp.impulse')
+            : travel.mode === 'wormhole'
+              ? t('warp.wormhole')
+              : t('warp.jumping')}
+        </div>
       </div>
     </div>
   )

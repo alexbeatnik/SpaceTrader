@@ -23,10 +23,39 @@ import {
   dumpGood,
   noteLocalSourcing,
   marketBuyPrice,
+  atCapital,
+  hasShipyard,
+  currentStation,
+  currentMineSite,
+  systemBodies,
+  maxHullUpgradesHere,
+  repairPricePerUnit,
+  weaponsForSale,
+  shieldsForSale,
+  shipsForSale,
+  buyShield,
+  buyGadget,
+  buyShip,
+  getLoan,
+  refuel,
+  totalCargoBays,
   EXPLORER_RANGE_BONUS,
   INDUSTRIAL_MINING_YIELD
 } from './game'
-import { warp, encounterRolls } from './warp'
+import {
+  warp,
+  encounterRolls,
+  enterUnstableWormhole,
+  blackHoleChance,
+  blackHoleEscapeChance,
+  blackHoleEvent,
+  BLACK_HOLE_CHANCE_MAX
+} from './warp'
+import { travelToBody, bodyTravelProblem } from './system'
+import { generateNews, systemNews, NEWS_MIN, NEWS_MAX } from './news'
+import { t } from '../../i18n/index'
+import { WEAPONS, SHIELDS, WEAPON_IDS, SHIELD_IDS, EXTRA_CARGO_BAYS, EXTRA_CARGO_BAYS_ADVANCED } from '../data/equipment'
+import { STATION_KINDS } from './types'
 import {
   resolveRound,
   tradeBuy,
@@ -50,7 +79,14 @@ import {
   BANK_BOUNTY_DEBT,
   QUEST_KARMA
 } from './reputation'
-import { generateGalaxy, SYSTEM_COUNT } from './galaxy'
+import {
+  generateGalaxy,
+  ensureBodies,
+  SYSTEM_COUNT,
+  MAX_SYSTEM_BODIES,
+  WORMHOLE_PAIRS,
+  UNSTABLE_WORMHOLES
+} from './galaxy'
 import { standardPrice, refreshMarket } from './market'
 import { TRADE_GOODS, GOOD_IDS } from '../data/goods'
 import { SHIP_TYPES, SHIP_TYPE_IDS } from '../data/ships'
@@ -139,8 +175,19 @@ describe('galaxy generation', () => {
     expect(a.map((s) => [s.x, s.y, s.techLevel])).toEqual(b.map((s) => [s.x, s.y, s.techLevel]))
   })
 
-  it('produces the expected number of systems', () => {
+  it('produces the expected number of systems, whatever the seed', () => {
+    // The galaxy packs systems by rejection sampling against a minimum spacing,
+    // so a denser one has to be checked over a spread of seeds, not just one:
+    // a short attempt budget shows up as the odd galaxy quietly coming up short.
+    for (let seed = 1; seed <= 25; seed++) {
+      expect(generateGalaxy(seed).length).toBe(SYSTEM_COUNT)
+    }
     expect(generateGalaxy(999).length).toBe(SYSTEM_COUNT)
+  })
+
+  it('gives every system its own name', () => {
+    const names = generateGalaxy(2024).map((s) => s.nameId)
+    expect(new Set(names).size).toBe(names.length)
   })
 })
 
@@ -1628,7 +1675,9 @@ describe('travel and warp', () => {
     const dayBefore = g.day
     const res = warp(g, target)
     expect(res.ok).toBe(true)
-    expect(g.day).toBe(dayBefore + 1)
+    // A jump costs a day — plus whatever a singularity stole on the way, if the
+    // leg happened to find one.
+    expect(g.day).toBe(dayBefore + 1 + (res.blackHole?.daysLost ?? 0))
     expect(g.ship.fuel).toBeLessThan(fuelBefore)
     expect(g.currentSystem).toBe(target)
   })
@@ -1984,5 +2033,349 @@ describe('a planet awaiting a delivery has none to sell', () => {
     expect(turnInQuest(g, q.id)).not.toBeNull()
     expect(isContractEmbargoed(g, 'water')).toBe(false)
     expect(marketBuyPrice(g, 'water')).toBeGreaterThan(0)
+  })
+})
+
+describe('star systems have insides', () => {
+  it('gives every system a star and somewhere to dock', () => {
+    const systems = generateGalaxy(4242)
+    for (const sys of systems) {
+      const bodies = systemBodies(sys)
+      expect(bodies.length).toBeGreaterThanOrEqual(2)
+      expect(bodies.length).toBeLessThanOrEqual(MAX_SYSTEM_BODIES)
+      // Index 0 is always the settled world — that is where a ship makes port.
+      expect(bodies[0].kind).toBe('planet')
+      expect(bodies.filter((b) => b.kind === 'planet').length).toBe(1)
+      expect(sys.starClass).toBeTruthy()
+      // Ids match position, so `currentBody` can index straight in.
+      bodies.forEach((b, i) => expect(b.id).toBe(i))
+    }
+  })
+
+  it('puts uninhabited worlds and the odd station in among the planets', () => {
+    const systems = generateGalaxy(77)
+    const barren = systems.flatMap((s) => systemBodies(s).filter((b) => b.kind === 'barren'))
+    const stations = systems.flatMap((s) => systemBodies(s).filter((b) => b.kind === 'station'))
+    expect(barren.length).toBeGreaterThan(systems.length) // more dead rocks than systems
+    expect(stations.length).toBeGreaterThan(5)
+    // No system gets two stations — they are meant to be worth crossing to.
+    for (const sys of systems) {
+      expect(systemBodies(sys).filter((b) => b.kind === 'station').length).toBeLessThanOrEqual(1)
+    }
+    // Every station advertises which of the three trades it plies.
+    for (const st of stations) expect(STATION_KINDS).toContain(st.station)
+  })
+
+  it('grows bodies for a save written before systems had any', () => {
+    const g = newGame({ commanderName: 'Test', seed: 8 })
+    for (const sys of g.systems) delete sys.bodies
+    ensureBodies(g.seed, g.systems)
+    for (const sys of g.systems) expect(systemBodies(sys).length).toBeGreaterThanOrEqual(2)
+    // Deterministic: the same save always grows the same worlds.
+    const again = newGame({ commanderName: 'Test', seed: 8 })
+    for (const sys of again.systems) delete sys.bodies
+    ensureBodies(again.seed, again.systems)
+    expect(g.systems.map((s) => s.bodies?.map((b) => [b.kind, b.orbit]))).toEqual(
+      again.systems.map((s) => s.bodies?.map((b) => [b.kind, b.orbit]))
+    )
+  })
+})
+
+describe('crossing a system on impulse', () => {
+  /** A game parked at a system with somewhere else to fly to. */
+  const withBodies = (seed = 21): ReturnType<typeof newGame> => {
+    const g = newGame({ commanderName: 'Test', seed })
+    // Guarantee a second body so the test never depends on generation luck.
+    const sys = g.systems[g.currentSystem]
+    sys.bodies = [
+      { id: 0, kind: 'planet', orbit: 1, angle: 0, mineSite: null },
+      { id: 1, kind: 'barren', orbit: 4, angle: 0.3, terrain: 'asteroidBelt', mineSite: { kind: 'asteroidField', resource: 'ore', richness: 10 } },
+      { id: 2, kind: 'station', orbit: 6, angle: 0.7, station: 'engineering', mineSite: null }
+    ]
+    g.currentBody = 0
+    return g
+  }
+
+  it('costs days rather than fuel, and moves the ship', () => {
+    const g = withBodies()
+    const dayBefore = g.day
+    const fuelBefore = g.ship.fuel
+    const res = travelToBody(g, 1, new Rng(5))
+    expect(res.ok).toBe(true)
+    expect(res.days).toBeGreaterThanOrEqual(1)
+    expect(g.currentBody).toBe(1)
+    // Impulse burns no tank fuel — otherwise a dry ship could strand itself on
+    // a dead rock with no way back to the only place selling any.
+    expect(g.ship.fuel).toBe(fuelBefore)
+    expect(g.day).toBeGreaterThanOrEqual(dayBefore + res.days!)
+  })
+
+  it('refuses a course to where the ship already is', () => {
+    const g = withBodies()
+    expect(travelToBody(g, 0, new Rng(1)).ok).toBe(false)
+    expect(bodyTravelProblem(g, 0)).toBe('error.alreadyHere')
+    expect(bodyTravelProblem(g, 99)).toBe('error.invalidTarget')
+  })
+
+  it('does not launder locally-bought cargo into hauled-in cargo', () => {
+    const g = withBodies()
+    // Buy at the planet, fly out to the belt and back: the goods were still
+    // bought here, so they must not settle a contract due here.
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 10
+    sys.qty.water = 50
+    g.credits = 10000
+    expect(buyGood(g, 'water', 5).ok).toBe(true)
+    expect(deliverableUnits(g, 'water')).toBe(0)
+    travelToBody(g, 1, new Rng(2))
+    travelToBody(g, 0, new Rng(3))
+    expect(deliverableUnits(g, 'water')).toBe(0)
+  })
+
+  it('takes the port with it: no market, bank or hall away from the planet', () => {
+    const g = withBodies()
+    g.currentBody = 1
+    expect(atCapital(g)).toBe(false)
+    expect(hasShipyard(g)).toBe(false)
+    expect(buyGood(g, 'water', 1).error).toBe('error.noMarketHere')
+    expect(sellGood(g, 'water', 1).error).toBe('error.noMarketHere')
+    expect(getLoan(g, 100).error).toBe('error.noBankHere')
+    expect(refuel(g, 1).error).toBe('error.noShipyardHere')
+    expect(hireMercenary(g, MERCENARY_IDS[0]).error).toBe('error.noHiringHallHere')
+  })
+
+  it('mines the site of the body the ship is actually at', () => {
+    const g = withBodies()
+    g.systems[g.currentSystem].mineSite = null // nothing at the planet itself
+    expect(currentMineSite(g)).toBeNull()
+    expect(mineOnce(g, new Rng(1)).ok).toBe(false)
+    g.currentBody = 1 // out at the belt
+    expect(currentMineSite(g)?.resource).toBe('ore')
+    expect(mineOnce(g, new Rng(1)).ok).toBe(true)
+  })
+})
+
+describe('orbital stations', () => {
+  const atStation = (kind: 'science' | 'military' | 'engineering'): ReturnType<typeof newGame> => {
+    const g = newGame({ commanderName: 'Test', seed: 33 })
+    g.systems[g.currentSystem].bodies = [
+      { id: 0, kind: 'planet', orbit: 1, angle: 0, mineSite: null },
+      { id: 1, kind: 'station', orbit: 3, angle: 0.4, station: kind, mineSite: null }
+    ]
+    g.currentBody = 1
+    g.credits = 2_000_000
+    return g
+  }
+
+  it('sells gear no planetary yard stocks, and no ordinary gear at all', () => {
+    const g = atStation('military')
+    expect(currentStation(g)).toBe('military')
+    expect(weaponsForSale(g)).toContain('singularity')
+    expect(weaponsForSale(g)).not.toContain('pulse')
+    // A planet never stocks the station-built kit, however advanced it is.
+    const planet = newGame({ commanderName: 'Test', seed: 33 })
+    planet.systems[planet.currentSystem].techLevel = 7
+    expect(weaponsForSale(planet)).toContain('fusion')
+    expect(weaponsForSale(planet)).not.toContain('singularity')
+    expect(shieldsForSale(planet)).not.toContain('barrier')
+  })
+
+  it('station ordnance is a clear step above anything a planet builds', () => {
+    const bestPlanetGun = Math.max(
+      ...WEAPON_IDS.filter((id) => !WEAPONS[id].stationOnly).map((id) => WEAPONS[id].power)
+    )
+    expect(WEAPONS.singularity.power).toBeGreaterThan(bestPlanetGun * 2)
+    const bestPlanetShield = Math.max(
+      ...SHIELD_IDS.filter((id) => !SHIELDS[id].stationOnly).map((id) => SHIELDS[id].power)
+    )
+    expect(SHIELDS.barrier.power).toBeGreaterThan(bestPlanetShield * 2)
+  })
+
+  it('refuses to sell what this yard does not build', () => {
+    const g = atStation('engineering')
+    expect(buyWeapon(g, 'pulse').error).toBe('error.notStockedHere')
+    expect(buyShield(g, 'barrier').error).toBe('error.notStockedHere')
+    expect(buyGadget(g, 'nanoHold').ok).toBe(true)
+  })
+
+  it('sells no hulls — that is what the planet below is for', () => {
+    const g = atStation('science')
+    expect(shipsForSale(g)).toEqual([])
+    expect(buyShip(g, 'gnat').error).toBe('error.noShipyardHere')
+  })
+
+  it('fabrication yards reinforce hulls past a planetary dry dock, and cheaper', () => {
+    const g = atStation('engineering')
+    // A hull whose repair bill is big enough for a discount to show (the Flea's
+    // is one credit a point, and nothing goes below that).
+    g.ship.type = 'goliath'
+    expect(maxHullUpgradesHere(g)).toBeGreaterThan(MAX_HULL_UPGRADES)
+    expect(repairPricePerUnit(g)).toBeLessThan(SHIP_TYPES[g.ship.type].repairCostPerUnit)
+    for (let i = 0; i < MAX_HULL_UPGRADES + 1; i++) {
+      expect(buyHullUpgrade(g).ok).toBe(true)
+    }
+    expect(g.ship.hullUpgrades).toBe(MAX_HULL_UPGRADES + 1)
+  })
+
+  it('a nanofolded hold is worth far more than a bolt-on bay', () => {
+    const g = atStation('engineering')
+    const before = totalCargoBays(g.ship)
+    expect(buyGadget(g, 'nanoHold').ok).toBe(true)
+    expect(totalCargoBays(g.ship) - before).toBe(EXTRA_CARGO_BAYS_ADVANCED)
+    expect(EXTRA_CARGO_BAYS_ADVANCED).toBeGreaterThan(EXTRA_CARGO_BAYS)
+  })
+})
+
+describe('planetary news', () => {
+  it('a world in crisis leads with the crisis', () => {
+    const g = newGame({ commanderName: 'Test', seed: 3 })
+    const sys = g.systems[g.currentSystem]
+    sys.status = 'drought'
+    sys.politics = 'dictatorship'
+    sys.economyType = 'agricultural'
+    const items = generateNews(sys, new Rng(9))
+    expect(items.length).toBeGreaterThanOrEqual(NEWS_MIN)
+    expect(items.length).toBeLessThanOrEqual(NEWS_MAX + 1)
+    // The drought is the story of the day, whatever else is running.
+    expect(items[0].id.startsWith('drought')).toBe(true)
+    // Every story resolves to real dictionary entries, in both locales.
+    for (const item of items) {
+      expect(item.headlineKey).toBe(`news.${item.id}.headline`)
+      expect(t(item.headlineKey)).not.toBe(item.headlineKey)
+      expect(t(item.bodyKey)).not.toBe(item.bodyKey)
+    }
+  })
+
+  it('never runs the same story twice in one bulletin', () => {
+    const g = newGame({ commanderName: 'Test', seed: 4 })
+    for (let seed = 1; seed < 40; seed++) {
+      const items = generateNews(g.systems[seed % g.systems.length], new Rng(seed))
+      expect(new Set(items.map((i) => i.id)).size).toBe(items.length)
+    }
+  })
+
+  it('is themed on the planet, not picked at random from the whole pool', () => {
+    const g = newGame({ commanderName: 'Test', seed: 5 })
+    const sys = g.systems[g.currentSystem]
+    sys.status = 'uneventful'
+    sys.politics = 'anarchy'
+    sys.specialResource = 'none'
+    sys.economyType = 'mining'
+    const ids = new Set<string>()
+    for (let seed = 1; seed < 60; seed++) {
+      for (const item of generateNews(sys, new Rng(seed))) ids.add(item.id)
+    }
+    // Anarchy and a mining economy show up; a theocracy's fast never can.
+    expect(ids.has('piracyRife')).toBe(true)
+    expect(ids.has('oreStrike')).toBe(true)
+    expect(ids.has('templeFast')).toBe(false)
+    expect(ids.has('resortSeason')).toBe(false)
+  })
+
+  it('is refreshed on arrival', () => {
+    const g = newGame({ commanderName: 'Test', seed: 6 })
+    const target = g.systems.find((s) => s.id !== g.currentSystem)!.id
+    g.ship.fuel = 999
+    warp(g, target)
+    expect(systemNews(g.systems[target]).length).toBeGreaterThan(0)
+  })
+})
+
+describe('wormholes', () => {
+  it('the galaxy has both surveyed pairs and unmapped holes', () => {
+    const systems = generateGalaxy(1234)
+    const paired = systems.filter((s) => s.wormholeTo !== null)
+    expect(paired.length).toBe(WORMHOLE_PAIRS * 2)
+    // Both ends agree with each other.
+    for (const s of paired) expect(systems[s.wormholeTo!].wormholeTo).toBe(s.id)
+    const unstable = systems.filter((s) => s.unstableWormhole)
+    expect(unstable.length).toBe(UNSTABLE_WORMHOLES)
+    // An unmapped hole never shares a sky with a surveyed one.
+    for (const s of unstable) expect(s.wormholeTo).toBeNull()
+  })
+
+  it('an unmapped wormhole drops you somewhere else, free of charge', () => {
+    const g = newGame({ commanderName: 'Test', seed: 90 })
+    const from = g.currentSystem
+    g.systems[from].unstableWormhole = true
+    g.ship.fuel = 4
+    const creditsBefore = g.credits
+    const res = enterUnstableWormhole(g)
+    expect(res.ok).toBe(true)
+    expect(g.currentSystem).not.toBe(from)
+    expect(res.arrivedAt).toBe(g.currentSystem)
+    // No tax, no fuel: it is a hole in the floor, not a road.
+    expect(g.credits).toBe(creditsBefore)
+    expect(g.ship.fuel).toBe(4)
+    // And it puts you down at the far system's capital, properly docked.
+    expect(g.currentBody).toBe(0)
+    expect(g.systems[g.currentSystem].visited).toBe(true)
+  })
+
+  it('throws you anywhere on the chart, not just next door', () => {
+    const destinations = new Set<number>()
+    for (let seed = 1; seed < 40; seed++) {
+      const g = newGame({ commanderName: 'Test', seed })
+      g.systems[g.currentSystem].unstableWormhole = true
+      const res = enterUnstableWormhole(g)
+      if (res.ok) destinations.add(g.currentSystem)
+    }
+    // Wildly different landing spots across runs — it is not a fixed link.
+    expect(destinations.size).toBeGreaterThan(15)
+  })
+
+  it('refuses when there is no hole to fall into', () => {
+    const g = newGame({ commanderName: 'Test', seed: 91 })
+    g.systems[g.currentSystem].unstableWormhole = false
+    expect(enterUnstableWormhole(g).error).toBe('error.noWormholeHere')
+  })
+})
+
+describe('black holes', () => {
+  it('a better pilot in a sound hull has better odds of pulling clear', () => {
+    const weak = newGame({ commanderName: 'Test', seed: 12 })
+    weak.skills.pilot = 1
+    weak.ship.hull = 1
+    const strong = newGame({ commanderName: 'Test', seed: 12 })
+    strong.skills.pilot = 10
+    expect(blackHoleEscapeChance(strong)).toBeGreaterThan(blackHoleEscapeChance(weak))
+    // Never a certainty, and never hopeless.
+    expect(blackHoleEscapeChance(strong)).toBeLessThan(1)
+    expect(blackHoleEscapeChance(weak)).toBeGreaterThan(0)
+  })
+
+  it('a longer haul is more likely to find one, up to a ceiling', () => {
+    expect(blackHoleChance(30)).toBeGreaterThan(blackHoleChance(2))
+    expect(blackHoleChance(100000)).toBeLessThanOrEqual(BLACK_HOLE_CHANCE_MAX)
+  })
+
+  it('turns up over a run of jumps, and can be fatal', () => {
+    let met = 0
+    let killed = 0
+    for (let seed = 1; seed < 400 && killed === 0; seed++) {
+      const g = newGame({ commanderName: 'Test', seed })
+      g.ship.fuel = 999
+      g.skills.pilot = 1 // a poor helmsman: the well keeps some of them
+      const target = g.systems.find((s) => s.id !== g.currentSystem)!.id
+      const res = warp(g, target)
+      if (!res.blackHole) continue
+      met++
+      expect(res.blackHole.daysLost).toBeGreaterThan(0)
+      if (!res.blackHole.survived) {
+        killed++
+        // Nothing left of the ship for the caller to salvage.
+        expect(g.ship.hull).toBe(0)
+      }
+    }
+    expect(met).toBeGreaterThan(0)
+    expect(killed).toBe(1)
+  })
+
+  it('reads back as an event the UI can show either way', () => {
+    const survived = blackHoleEvent({ survived: true, damage: 12, daysLost: 2, escapeChance: 0.5 })
+    expect(survived.bodyKey).toBe('event.blackHole.bodySurvived')
+    expect(survived.params?.chance).toBe(50)
+    const lost = blackHoleEvent({ survived: false, damage: 40, daysLost: 3, escapeChance: 0.2 })
+    expect(lost.bodyKey).toBe('event.blackHole.bodyLost')
   })
 })

@@ -1,7 +1,7 @@
 import type { GameState, Quest } from './types'
 import { Rng } from './rng'
 import { SHIELDS } from '../data/equipment'
-import { advanceDay, pushLog, escortShipProblem } from './game'
+import { advanceDay, atCapital, pushLog, escortShipProblem } from './game'
 import {
   spawnEncounter,
   resolveRound,
@@ -125,7 +125,10 @@ export function runEscort(state: GameState, questId: string, rng: Rng): EscortRe
     (q) => q.id === questId && q.status === 'active' && q.type === 'escort'
   )
   if (!quest) return { ok: false, error: 'error.questGone' }
-  if (state.currentSystem !== quest.giverSystem) return { ok: false, error: 'error.escortNotHere' }
+  // The convoy forms up over the capital planet, not out at a belt or a station.
+  if (state.currentSystem !== quest.giverSystem || !atCapital(state)) {
+    return { ok: false, error: 'error.escortNotHere' }
+  }
   const problem = escortShipProblem(state)
   if (problem) return { ok: false, error: problem }
 

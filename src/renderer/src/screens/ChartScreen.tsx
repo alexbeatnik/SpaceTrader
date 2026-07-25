@@ -88,6 +88,23 @@ export function ChartScreen(): React.JSX.Element {
                 />
               ) : null
             )}
+            {/* unmapped wormholes: a swirl with no line, because it goes nowhere
+                in particular until someone falls into it */}
+            {game.systems.map((sys) =>
+              sys.unstableWormhole && (sys.visited || sys.id === here.id) ? (
+                <circle
+                  key={`u-${sys.id}`}
+                  className="quest-ring"
+                  cx={sys.x * SCALE}
+                  cy={sys.y * SCALE}
+                  r={8}
+                  fill="none"
+                  stroke="rgba(190,120,255,0.8)"
+                  strokeWidth={1.3}
+                  strokeDasharray="2 3"
+                />
+              ) : null
+            )}
             {/* systems */}
             {game.systems.map((sys) => {
               const reachable = systemDistance(here, sys) <= game.ship.fuel && sys.id !== here.id
@@ -217,6 +234,12 @@ export function ChartScreen(): React.JSX.Element {
                     <div className="kv">
                       <span className="k">{t('system.status')}</span>
                       <span className="v"><span className="badge warn">{statusName(selected.status)}</span></span>
+                    </div>
+                  )}
+                  {selected.unstableWormhole && (
+                    <div className="kv">
+                      <span className="k">{t('system.unstableWormhole')}</span>
+                      <span className="v"><span className="badge">🌀</span></span>
                     </div>
                   )}
                 </>
