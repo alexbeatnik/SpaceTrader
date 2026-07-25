@@ -1,7 +1,7 @@
 import type { GameState, GoodId } from './types'
 import { Rng } from './rng'
 import {
-  currentSystem,
+  currentMineSite,
   freeCargoBays,
   maxFuel,
   advanceDay,
@@ -28,12 +28,13 @@ export interface MineResult {
 }
 
 /**
- * Extract from the current system's mine site. A day passes each time, and
- * there is a chance raiders jump the operation. Industrial-class hulls run
- * heavy rigs and extract several units per day.
+ * Extract from the site at whichever body the ship is docked at — the belt or
+ * the ice moon out in the system, as often as the capital planet's own workings.
+ * A day passes each time, and there is a chance raiders jump the operation.
+ * Industrial-class hulls run heavy rigs and extract several units per day.
  */
 export function mineOnce(state: GameState, rng: Rng): MineResult {
-  const site = currentSystem(state).mineSite
+  const site = currentMineSite(state)
   if (!site) return { ok: false, error: 'error.noMineSite' }
 
   // Make sure there's somewhere to put the yield before spending a day.

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { useGameStore } from './store/gameStore'
+import { atCapital, hasShipyard } from '@game/index'
+import { useGameStore, type Screen } from './store/gameStore'
 import { useI18n } from './hooks/useI18n'
 import { Hud } from './components/Hud'
 import { Nav } from './components/Nav'
@@ -14,6 +15,7 @@ import { MiningOverlay } from './components/MiningOverlay'
 import { EscortOverlay } from './components/EscortOverlay'
 import { CrewIncidentModal } from './components/CrewIncidentModal'
 import { MenuScreen } from './screens/MenuScreen'
+import { SystemMapScreen } from './screens/SystemMapScreen'
 import { SystemScreen } from './screens/SystemScreen'
 import { MarketScreen } from './screens/MarketScreen'
 import { ShipyardScreen } from './screens/ShipyardScreen'
@@ -26,9 +28,12 @@ import { LogScreen } from './screens/LogScreen'
 import { SavesScreen } from './screens/SavesScreen'
 import { AboutScreen } from './screens/AboutScreen'
 
+/** Screens that only exist at the capital planet's spaceport. */
+const PLANET_ONLY: Screen[] = ['market', 'bank', 'crew']
+
 export function App(): React.JSX.Element {
   const game = useGameStore((s) => s.game)
-  const screen = useGameStore((s) => s.screen)
+  const rawScreen = useGameStore((s) => s.screen)
   const encounter = useGameStore((s) => s.encounter)
   const gameOver = useGameStore((s) => s.gameOver)
   const travel = useGameStore((s) => s.travel)
@@ -40,6 +45,16 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     document.title = 'Star Trader'
   }, [])
+
+  // Leaving port takes the port's services with it. Rather than leave a stale
+  // market on screen after the ship has flown out to a moon, fall back to the
+  // planet dossier — which explains where the ship actually is.
+  const screen: Screen =
+    game && PLANET_ONLY.includes(rawScreen) && !atCapital(game)
+      ? 'system'
+      : game && rawScreen === 'shipyard' && !hasShipyard(game)
+        ? 'system'
+        : rawScreen
 
   if (!game || screen === 'menu') {
     return (
@@ -58,6 +73,7 @@ export function App(): React.JSX.Element {
       <div className="main">
         <Nav />
         <div className="content">
+          {screen === 'systemMap' && <SystemMapScreen />}
           {screen === 'system' && <SystemScreen />}
           {screen === 'market' && <MarketScreen />}
           {screen === 'shipyard' && <ShipyardScreen />}

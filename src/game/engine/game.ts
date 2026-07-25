@@ -12,18 +12,31 @@ import type {
 import { Rng, randomSeed } from './rng'
 import { generateGalaxy, distance } from './galaxy'
 import { refreshMarket } from './market'
-import { SHIP_TYPES } from '../data/ships'
+import { SHIP_TYPES, SHIP_TYPE_IDS } from '../data/ships'
 import { GOOD_IDS } from '../data/goods'
 import {
   WEAPONS,
   SHIELDS,
   GADGETS,
+  WEAPON_IDS,
+  SHIELD_IDS,
+  GADGET_IDS,
   EXTRA_CARGO_BAYS,
-  EXTRA_FUEL_TANKS
+  EXTRA_CARGO_BAYS_ADVANCED,
+  EXTRA_FUEL_TANKS,
+  EXTRA_FUEL_TANKS_ADVANCED
 } from '../data/equipment'
 import { MERCENARIES } from '../data/mercenaries'
 import { ROBOTS } from '../data/robots'
 import { economyOf } from '../data/economies'
+import { PLANET_MAX_HULL_UPGRADES, STATIONS } from '../data/stations'
+import {
+  atCapital,
+  currentStation,
+  hasShipyard,
+  maxHullUpgradesHere,
+  repairCostMulHere
+} from './location'
 import {
   assignRoles,
   crewHands,
@@ -49,13 +62,34 @@ export {
   deliverableUnits
 } from './sourcing'
 
+// Likewise the "where in the system are we docked" helpers: they answer only to
+// the types and the station catalogue, so this module can gate on them.
+export {
+  systemBodies,
+  bodyMineSite,
+  currentBody,
+  currentBodyIndex,
+  currentMineSite,
+  currentStation,
+  atCapital,
+  hasSpaceport,
+  hasShipyard,
+  maxHullUpgradesHere,
+  repairCostMulHere,
+  bodyTransitDays,
+  transitDaysTo
+} from './location'
+
 export const GAME_VERSION = 1
 export const STARTING_CREDITS = 1000
 export const MAX_SKILL = 10
 /** Extra max-hull points granted per reinforced-hull upgrade. */
 export const HULL_UPGRADE_AMOUNT = 25
-/** Maximum reinforced-hull upgrades a ship may carry. */
-export const MAX_HULL_UPGRADES = 5
+/**
+ * Reinforced-hull upgrades a planetary shipyard will install. Orbital yards go
+ * further — ask `maxHullUpgradesHere` for the limit that actually applies.
+ */
+export const MAX_HULL_UPGRADES = PLANET_MAX_HULL_UPGRADES
 /** One-off price of an escape pod. */
 export const ESCAPE_POD_PRICE = 2000
 /** Extra warp range (parsecs) explorer-class hulls squeeze from their drives. */
@@ -69,7 +103,16 @@ export const INDUSTRIAL_MINING_YIELD = 2
 export function totalCargoBays(ship: Ship): number {
   const base = SHIP_TYPES[ship.type].cargoBays
   const extra = ship.gadgets.filter((g) => g === 'cargoBays').length * EXTRA_CARGO_BAYS
-  return base + extra
+  // A station-built nanoHold folds far more space into the same slot.
+  const advanced = ship.gadgets.filter((g) => g === 'nanoHold').length * EXTRA_CARGO_BAYS_ADVANCED
+  return base + extra + advanced
+}
+
+/** Bays lost by removing one hold-expanding gadget. */
+function gadgetBays(id: GadgetId): number {
+  if (id === 'cargoBays') return EXTRA_CARGO_BAYS
+  if (id === 'nanoHold') return EXTRA_CARGO_BAYS_ADVANCED
+  return 0
 }
 
 export function usedCargoBays(ship: Ship): number {
@@ -131,12 +174,14 @@ export function effectiveSkills(state: GameState): Skills {
   }
 }
 
-/** Maximum fuel capacity including fuelCompactor gadgets and the explorer perk. */
+/** Maximum fuel capacity including compactor gadgets and the explorer perk. */
 export function maxFuel(ship: Ship): number {
   const type = SHIP_TYPES[ship.type]
   const extra = ship.gadgets.filter((g) => g === 'fuelCompactor').length * EXTRA_FUEL_TANKS
+  const advanced =
+    ship.gadgets.filter((g) => g === 'quantumCompactor').length * EXTRA_FUEL_TANKS_ADVANCED
   const classBonus = type.shipClass === 'explorer' ? EXPLORER_RANGE_BONUS : 0
-  return type.fuelTanks + extra + classBonus
+  return type.fuelTanks + extra + advanced + classBonus
 }
 
 /**
@@ -243,6 +288,8 @@ export function newGame(opts: NewGameOptions): GameState {
     ship,
     record: { policeRecord: 0, reputation: 0 },
     currentSystem: startId,
+    // Every journey starts on the capital planet's landing field.
+    currentBody: 0,
     systems,
     insurance: false,
     noClaim: 0,
@@ -296,6 +343,7 @@ export function marketBuyPrice(state: GameState, good: GoodId): number {
 }
 
 export function buyGood(state: GameState, good: GoodId, amount: number): ActionResult {
+  if (!atCapital(state)) return fail('error.noMarketHere')
   const sys = currentSystem(state)
   const price = sys.buyPrice[good]
   if (price <= 0 || sys.qty[good] <= 0) return fail('error.notSold')
@@ -328,6 +376,7 @@ export function buyGood(state: GameState, good: GoodId, amount: number): ActionR
 }
 
 export function sellGood(state: GameState, good: GoodId, amount: number): ActionResult {
+  if (!atCapital(state)) return fail('error.noMarketHere')
   const sys = currentSystem(state)
   const have = state.ship.cargo[good]
   if (have <= 0) return fail('error.nothingToSell')
@@ -358,6 +407,7 @@ export function dumpGood(state: GameState, good: GoodId, amount: number): Action
 
 // --- Shipyard actions --------------------------------------------------------
 export function refuel(state: GameState, parsecs: number): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const unit = fuelPricePerParsec(state)
   const needed = Math.min(parsecs, maxFuel(state.ship) - state.ship.fuel)
   if (needed <= 0) return fail('error.tankFull')
@@ -373,27 +423,39 @@ export function refuelFull(state: GameState): ActionResult {
   return refuel(state, maxFuel(state.ship))
 }
 
+/** What one point of hull costs to patch where the ship is docked. */
+export function repairPricePerUnit(state: GameState): number {
+  const base = SHIP_TYPES[state.ship.type].repairCostPerUnit
+  return Math.max(1, Math.round(base * repairCostMulHere(state)))
+}
+
 export function repair(state: GameState, units: number): ActionResult {
-  const type = SHIP_TYPES[state.ship.type]
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
+  const unit = repairPricePerUnit(state)
   const needed = Math.min(units, maxHull(state.ship) - state.ship.hull)
   if (needed <= 0) return fail('error.hullFull')
-  const affordable = Math.floor(state.credits / type.repairCostPerUnit)
+  const affordable = Math.floor(state.credits / unit)
   const fix = Math.min(needed, affordable)
   if (fix <= 0) return fail('error.noCreditsRepair')
   state.ship.hull += fix
-  state.credits -= fix * type.repairCostPerUnit
-  return okInfo('info.repaired', { units: fix, cost: fix * type.repairCostPerUnit })
+  state.credits -= fix * unit
+  return okInfo('info.repaired', { units: fix, cost: fix * unit })
 }
 
 export function repairFull(state: GameState): ActionResult {
   return repair(state, maxHull(state.ship))
 }
 
-/** Install a reinforced-hull upgrade: raises max hull and current hull. */
+/**
+ * Install a reinforced-hull upgrade: raises max hull and current hull. How many
+ * a ship may carry depends on the yard — a station's dry dock will keep going
+ * well past the point a planetary one runs out of gantry.
+ */
 export function buyHullUpgrade(state: GameState): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const ship = state.ship
   const current = ship.hullUpgrades ?? 0
-  if (current >= MAX_HULL_UPGRADES) return fail('error.maxHullUpgrades')
+  if (current >= maxHullUpgradesHere(state)) return fail('error.maxHullUpgrades')
   const price = hullUpgradePrice(ship)
   if (state.credits < price) return fail('error.notEnoughCredits')
   state.credits -= price
@@ -402,12 +464,47 @@ export function buyHullUpgrade(state: GameState): ActionResult {
   return okInfo('info.hullUpgraded', { amount: HULL_UPGRADE_AMOUNT, cost: price })
 }
 
+// --- Equipment catalogue -----------------------------------------------------
+/**
+ * What the yard where the ship is docked will actually sell.
+ *
+ * A planetary shipyard stocks whatever its world's tech level can build. A
+ * station stocks its own speciality instead: gear no planet has the orbital
+ * fabricators for, and none of the ordinary stuff — that is what the planet
+ * below is for.
+ */
+export function weaponsForSale(state: GameState): WeaponId[] {
+  const station = currentStation(state)
+  if (station) return STATIONS[station].weapons
+  if (!atCapital(state)) return []
+  const tech = currentSystem(state).techLevel
+  return WEAPON_IDS.filter((id) => !WEAPONS[id].stationOnly && WEAPONS[id].minTechLevel <= tech)
+}
+
+export function shieldsForSale(state: GameState): ShieldId[] {
+  const station = currentStation(state)
+  if (station) return STATIONS[station].shields
+  if (!atCapital(state)) return []
+  const tech = currentSystem(state).techLevel
+  return SHIELD_IDS.filter((id) => !SHIELDS[id].stationOnly && SHIELDS[id].minTechLevel <= tech)
+}
+
+export function gadgetsForSale(state: GameState): GadgetId[] {
+  const station = currentStation(state)
+  if (station) return STATIONS[station].gadgets
+  if (!atCapital(state)) return []
+  const tech = currentSystem(state).techLevel
+  return GADGET_IDS.filter((id) => !GADGETS[id].stationOnly && GADGETS[id].minTechLevel <= tech)
+}
+
 // --- Equipment purchases -----------------------------------------------------
 function traderPrice(state: GameState, base: number): number {
   return Math.round(base * (1 - traderDiscount(state)))
 }
 
 export function buyWeapon(state: GameState, id: WeaponId): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
+  if (!weaponsForSale(state).includes(id)) return fail('error.notStockedHere')
   const type = SHIP_TYPES[state.ship.type]
   if (state.ship.weapons.length >= type.weaponSlots) return fail('error.noWeaponSlot')
   const price = traderPrice(state, WEAPONS[id].price)
@@ -418,6 +515,8 @@ export function buyWeapon(state: GameState, id: WeaponId): ActionResult {
 }
 
 export function buyShield(state: GameState, id: ShieldId): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
+  if (!shieldsForSale(state).includes(id)) return fail('error.notStockedHere')
   const type = SHIP_TYPES[state.ship.type]
   if (state.ship.shields.length >= type.shieldSlots) return fail('error.noShieldSlot')
   const price = traderPrice(state, SHIELDS[id].price)
@@ -429,9 +528,12 @@ export function buyShield(state: GameState, id: ShieldId): ActionResult {
 }
 
 export function buyGadget(state: GameState, id: GadgetId): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
+  if (!gadgetsForSale(state).includes(id)) return fail('error.notStockedHere')
   const type = SHIP_TYPES[state.ship.type]
   if (state.ship.gadgets.length >= type.gadgetSlots) return fail('error.noGadgetSlot')
-  if (id !== 'cargoBays' && state.ship.gadgets.includes(id)) return fail('error.alreadyOwned')
+  // Hold expanders stack; everything else is one to a ship.
+  if (gadgetBays(id) === 0 && state.ship.gadgets.includes(id)) return fail('error.alreadyOwned')
   const price = traderPrice(state, GADGETS[id].price)
   if (state.credits < price) return fail('error.notEnoughCredits')
   state.credits -= price
@@ -440,6 +542,7 @@ export function buyGadget(state: GameState, id: GadgetId): ActionResult {
 }
 
 export function buyEscapePod(state: GameState): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
   if (state.ship.escapePod) return fail('error.alreadyOwned')
   if (state.credits < ESCAPE_POD_PRICE) return fail('error.notEnoughCredits')
   state.credits -= ESCAPE_POD_PRICE
@@ -447,8 +550,17 @@ export function buyEscapePod(state: GameState): ActionResult {
   return okInfo('info.escapePodBought')
 }
 
+/** Hulls the yard where the ship is docked has on the lot. */
+export function shipsForSale(state: GameState): ShipTypeId[] {
+  // Stations service ships and build modules; they do not sell hulls.
+  if (!atCapital(state)) return []
+  const tech = currentSystem(state).techLevel
+  return SHIP_TYPE_IDS.filter((id) => SHIP_TYPES[id].minTechLevel <= tech)
+}
+
 /** Buy a new ship, trading in the old hull + equipment (cargo must be empty). */
 export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
+  if (!atCapital(state)) return fail('error.noShipyardHere')
   if (target === state.ship.type) return fail('error.sameShip')
   if (usedCargoBays(state.ship) > 0) return fail('error.cargoNotEmpty')
 
@@ -487,6 +599,7 @@ export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
 
 // --- Equipment removal (sell back at 75%) ------------------------------------
 export function sellWeapon(state: GameState, index: number): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const id = state.ship.weapons[index]
   if (!id) return fail('error.nothingToRemove')
   state.ship.weapons.splice(index, 1)
@@ -495,6 +608,7 @@ export function sellWeapon(state: GameState, index: number): ActionResult {
 }
 
 export function sellShield(state: GameState, index: number): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const id = state.ship.shields[index]
   if (!id) return fail('error.nothingToRemove')
   state.ship.shields.splice(index, 1)
@@ -504,10 +618,12 @@ export function sellShield(state: GameState, index: number): ActionResult {
 }
 
 export function sellGadget(state: GameState, index: number): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const id = state.ship.gadgets[index]
   if (!id) return fail('error.nothingToRemove')
-  // Removing extra cargo bays is refused if the hold would overflow.
-  if (id === 'cargoBays' && usedCargoBays(state.ship) > totalCargoBays(state.ship) - EXTRA_CARGO_BAYS) {
+  // Removing hold space is refused if what is aboard would no longer fit.
+  const bays = gadgetBays(id)
+  if (bays > 0 && usedCargoBays(state.ship) > totalCargoBays(state.ship) - bays) {
     return fail('error.cargoNotEmpty')
   }
   state.ship.gadgets.splice(index, 1)
@@ -517,6 +633,7 @@ export function sellGadget(state: GameState, index: number): ActionResult {
 
 // --- Crew / mercenaries ------------------------------------------------------
 export function hireMercenary(state: GameState, id: string): ActionResult {
+  if (!atCapital(state)) return fail('error.noHiringHallHere')
   const sys = currentSystem(state)
   const roster = sys.mercenaryIds ?? []
   if (!roster.includes(id) || !MERCENARIES[id]) return fail('error.mercNotHere')
@@ -528,6 +645,8 @@ export function hireMercenary(state: GameState, id: string): ActionResult {
 }
 
 export function fireMercenary(state: GameState, id: string): ActionResult {
+  // Nobody is put off the ship anywhere they cannot find another berth.
+  if (!atCapital(state)) return fail('error.noHiringHallHere')
   const idx = state.ship.crew.indexOf(id)
   if (idx < 0) return fail('error.notInCrew')
   state.ship.crew.splice(idx, 1)
@@ -538,8 +657,15 @@ export function fireMercenary(state: GameState, id: string): ActionResult {
 }
 
 // --- Robots ------------------------------------------------------------------
-/** Robot models a shipyard at the current system will sell. */
+/**
+ * Robot models on sale where the ship is docked. Science stations build the
+ * whole range regardless of what the local worlds can manage; a planet is
+ * limited to what its own tech level runs to.
+ */
 export function robotsForSale(state: GameState): string[] {
+  const station = currentStation(state)
+  if (station === 'science') return Object.keys(ROBOTS)
+  if (!atCapital(state)) return []
   const tech = currentSystem(state).techLevel
   return Object.keys(ROBOTS).filter((id) => ROBOTS[id].minTechLevel <= tech)
 }
@@ -559,6 +685,7 @@ export function buyRobot(state: GameState, id: string): ActionResult {
 
 /** Sell a robot back at the usual 75% of list. */
 export function sellRobot(state: GameState, index: number): ActionResult {
+  if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const robots = state.ship.robots ?? []
   const id = robots[index]
   if (!id || !ROBOTS[id]) return fail('error.nothingToRemove')
@@ -575,6 +702,7 @@ export function maxLoan(state: GameState): number {
 }
 
 export function getLoan(state: GameState, amount: number): ActionResult {
+  if (!atCapital(state)) return fail('error.noBankHere')
   const available = maxLoan(state) - state.debt
   const take = Math.min(amount, available)
   if (take <= 0) return fail('error.noLoanAvailable')
@@ -584,6 +712,7 @@ export function getLoan(state: GameState, amount: number): ActionResult {
 }
 
 export function payDebt(state: GameState, amount: number): ActionResult {
+  if (!atCapital(state)) return fail('error.noBankHere')
   const pay = Math.min(amount, state.debt, state.credits)
   if (pay <= 0) return fail('error.nothingToPay')
   state.debt -= pay
@@ -592,6 +721,7 @@ export function payDebt(state: GameState, amount: number): ActionResult {
 }
 
 export function buyInsurance(state: GameState): ActionResult {
+  if (!atCapital(state)) return fail('error.noBankHere')
   if (!state.ship.escapePod) return fail('error.needEscapePod')
   if (state.insurance) return fail('error.alreadyInsured')
   state.insurance = true
@@ -600,6 +730,7 @@ export function buyInsurance(state: GameState): ActionResult {
 }
 
 export function cancelInsurance(state: GameState): ActionResult {
+  if (!atCapital(state)) return fail('error.noBankHere')
   if (!state.insurance) return fail('error.noInsurance')
   state.insurance = false
   return okInfo('info.insuranceCancelled')

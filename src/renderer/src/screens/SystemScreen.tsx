@@ -2,12 +2,18 @@ import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
 import {
   currentSystem,
+  currentBody,
+  currentBodyIndex,
+  currentMineSite,
+  atCapital,
+  systemBodies,
   POLITICS,
   TRADE_GOODS,
   GOOD_IDS,
   isSpecialGood,
   TECH_LEVEL_IDS,
-  standardPrice
+  standardPrice,
+  systemNews
 } from '@game/index'
 import {
   techLevelName,
@@ -15,9 +21,13 @@ import {
   statusName,
   resourceName,
   economyName,
-  goodName
+  goodName,
+  stationName,
+  terrainName,
+  renderMessage
 } from '@i18n/index'
 import { fmt } from '../util/format'
+import { bodyDisplayName } from '../util/bodyText'
 
 function StrengthBar({ value }: { value: number }): React.JSX.Element {
   return (
@@ -41,19 +51,51 @@ export function SystemScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
   const setScreen = useGameStore((s) => s.setScreen)
   const startMining = useGameStore((s) => s.startMining)
+  const flyToBody = useGameStore((s) => s.flyToBody)
+  const enterWormhole = useGameStore((s) => s.enterWormhole)
   const { t } = useI18n()
   const sys = currentSystem(game)
   const gov = POLITICS[sys.politics]
-  const mine = sys.mineSite
+  // Mining follows the ship: the belt out in the system, not just the planet.
+  const mine = currentMineSite(game)
+  const here = currentBody(game)
+  const docked = atCapital(game)
+  const news = systemNews(sys)
 
   return (
     <div>
       <div className="screen-title">🪐 {sys.nameId}</div>
       <div className="screen-sub">
-        {t('system.hereNow')} · {t('common.day')} {game.day}
+        {docked
+          ? t('system.hereNow')
+          : t('systemMap.awayFromPort', {
+              place: bodyDisplayName(sys.nameId, here)
+            })}{' '}
+        · {t('common.day')} {game.day}
       </div>
 
-      <div className="grid grid-2">
+      {!docked && (
+        <div className="panel panel-pad" style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 26 }}>{here?.kind === 'station' ? '🛰️' : '🪨'}</span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontWeight: 600 }}>
+                {here?.kind === 'station'
+                  ? stationName(here.station ?? 'science')
+                  : terrainName(here?.terrain ?? 'rockyMoon')}
+              </div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                {here?.kind === 'station' ? t('station.noMarket') : t('body.barrenBlurb')}
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={() => flyToBody(0)}>
+              🚀 {t('systemMap.returnToPort')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-2" style={{ marginTop: 12 }}>
         <div className="panel panel-pad">
           <div className="kv">
             <span className="k">{t('system.techLevel')}</span>
@@ -93,6 +135,16 @@ export function SystemScreen(): React.JSX.Element {
               </span>
             </div>
           )}
+          {sys.unstableWormhole && (
+            <div className="kv">
+              <span className="k">{t('system.unstableWormhole')}</span>
+              <span className="v">
+                <button className="btn btn-sm" onClick={() => enterWormhole()}>
+                  🌀 {t('system.enterWormhole')}
+                </button>
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="panel panel-pad">
@@ -108,9 +160,22 @@ export function SystemScreen(): React.JSX.Element {
             <span className="k">{t('system.traders')}</span>
             <span className="v"><StrengthBar value={gov.strengthTraders} /></span>
           </div>
-          <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-            <button className="btn btn-primary" onClick={() => setScreen('market')}>
+          <div className="kv">
+            <span className="k">{t('systemMap.bodies', { count: systemBodies(sys).length })}</span>
+            <span className="v">
+              {docked ? t('body.capital') : `#${currentBodyIndex(game)}`}
+            </span>
+          </div>
+          <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary"
+              disabled={!docked}
+              onClick={() => setScreen('market')}
+            >
               💱 {t('nav.market')}
+            </button>
+            <button className="btn" onClick={() => setScreen('systemMap')}>
+              🛰️ {t('system.openSystemMap')}
             </button>
             <button className="btn" onClick={() => setScreen('chart')}>
               🗺️ {t('nav.chart')}
@@ -118,6 +183,18 @@ export function SystemScreen(): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {news.length > 0 && (
+        <div className="panel panel-pad" style={{ marginTop: 16 }}>
+          <div className="screen-sub" style={{ marginBottom: 10 }}>📰 {t('system.news')}</div>
+          {news.map((item) => (
+            <div key={item.id} className={`news-item news-${item.tone}`}>
+              <div className="news-headline">{t(item.headlineKey)}</div>
+              <div className="news-body">{renderMessage(item.bodyKey, item.params)}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {mine && (
         <div className="panel panel-pad" style={{ marginTop: 16 }}>

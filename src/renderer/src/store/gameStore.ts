@@ -38,12 +38,21 @@ import {
   buyQuestSupplies,
   turnInQuest,
   generateQuestBoard,
+  generateNews,
   runEscort,
   mineOnce,
   currentSystem,
+  currentMineSite,
+  currentBodyIndex,
+  systemBodies,
+  travelToBody,
+  enterUnstableWormhole,
+  blackHoleEvent,
+  ensureBodies,
   pushLog,
   shipValue,
   systemDistance,
+  transitDaysTo,
   Rng,
   SHIP_TYPES,
   GOOD_IDS,
@@ -65,6 +74,7 @@ import {
   type CrewIncident
 } from '@game/index'
 import { renderMessage } from '@i18n/index'
+import { bodyDisplayName } from '../util/bodyText'
 import {
   AUTO_SLOT,
   SAVE_FORMAT,
@@ -76,6 +86,7 @@ import {
 
 export type Screen =
   | 'menu'
+  | 'systemMap'
   | 'system'
   | 'market'
   | 'shipyard'
@@ -94,12 +105,21 @@ export interface Toast {
   text: string
 }
 
-/** Descriptor of an in-progress warp jump, used to drive the travel animation. */
+/**
+ * How the ship is getting there. A warp jump between stars, a fall through a
+ * wormhole, and an impulse crossing inside one system all replay through the
+ * same overlay, and only the caption and the pace differ.
+ */
+export type TravelMode = 'warp' | 'wormhole' | 'impulse'
+
+/** Descriptor of an in-progress journey, used to drive the travel animation. */
 export interface TravelAnim {
+  mode: TravelMode
   fromId: number
   toId: number
   fromName: string
   toName: string
+  /** Parsecs for a warp jump; days under way for an impulse crossing. */
   distance: number
   viaWormhole: boolean
   shipType: ShipTypeId
@@ -137,6 +157,8 @@ interface GameStore {
   screen: Screen
   toast: Toast | null
   gameOver: boolean
+  /** What finished the run, when there is a story to tell about it. */
+  gameOverCause: GameEvent | null
   /** Active warp animation; while set, the destination results are deferred. */
   travel: TravelAnim | null
 
@@ -189,6 +211,10 @@ interface GameStore {
 
   // travel & combat
   warpTo: (targetId: number) => void
+  /** Run the impulse drive to another body inside the current system. */
+  flyToBody: (bodyId: number) => void
+  /** Fall into the unmapped wormhole here; the far end is anyone's guess. */
+  enterWormhole: () => void
   /** Surfaces the next en-route encounter; false when there was none left. */
   interceptTravel: () => boolean
   finishTravel: () => void
@@ -225,15 +251,21 @@ function clone<T>(v: T): T {
 
 /**
  * Ensure the current system has a job board and a hiring hall (fresh game, or
- * a save written before either existed).
+ * a save written before either existed), and that every system has the bodies
+ * the system map draws.
  */
 function ensureBoard(game: GameState): void {
+  // Saves written before star systems had insides get theirs grown now, from
+  // the galaxy seed, so the same save always yields the same worlds.
+  ensureBodies(game.seed, game.systems)
+  if (game.currentBody === undefined) game.currentBody = 0
   const sys = game.systems[game.currentSystem]
   const rng = new Rng((game.seed ^ (game.day * 2654435761)) >>> 0)
   if (!sys.questBoard || sys.questBoard.length === 0) {
     sys.questBoard = generateQuestBoard(game, rng)
   }
   if (!sys.mercenaryIds) sys.mercenaryIds = generateCrewRoster(game, rng)
+  if (!sys.news || sys.news.length === 0) sys.news = generateNews(sys, rng)
   // Legacy saves predate robots and the electrician trade.
   if (!game.ship.robots) game.ship.robots = []
   if (game.skills.electrician === undefined) game.skills.electrician = game.skills.engineer
@@ -273,6 +305,35 @@ export const useGameStore = create<GameStore>((set, get) => {
     fn(g)
   }
 
+  /**
+   * Hand a resolved journey over to the travel overlay. The engine has already
+   * moved the ship and settled the arrival; what is deferred is *showing* the
+   * player what happened on the way, so the jump does not resolve instantly.
+   * Warp jumps, wormhole falls and impulse crossings all come through here.
+   */
+  const startTravel = (
+    game: GameState,
+    result: WarpResult,
+    anim: Omit<TravelAnim, 'interceptPoints' | 'toId'> & { toId?: number }
+  ): void => {
+    pendingWarp = result
+    const toId = anim.toId ?? result.arrivedAt ?? 0
+    // Whoever is out there does not politely wait at the destination: scatter
+    // each meeting anywhere along the leg, from the drive lighting up to the
+    // moment you make port.
+    const rng = new Rng((game.seed ^ (game.day * 668265263) ^ ((toId + 1) * 2654435761)) >>> 0)
+    const interceptPoints = (result.encounters ?? []).map(() => rng.next()).sort((a, b) => a - b)
+    set({
+      game: clone(game),
+      encounter: null,
+      event: null,
+      questOffer: null,
+      screen: 'systemMap',
+      travel: { ...anim, toId, interceptPoints }
+    })
+    void get().saveGame()
+  }
+
   return {
     game: null,
     encounter: null,
@@ -285,6 +346,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     screen: 'menu',
     toast: null,
     gameOver: false,
+    gameOverCause: null,
     travel: null,
 
     startNewGame: (opts) => {
@@ -293,7 +355,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       pendingWarp = null
       set({
         game,
-        screen: 'system',
+        // A ship arriving anywhere sees the system before it sees the planet.
+        screen: 'systemMap',
         encounter: null,
         event: null,
         questOffer: null,
@@ -302,6 +365,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         escort: null,
         incident: null,
         gameOver: false,
+        gameOverCause: null,
         toast: null,
         travel: null
       })
@@ -318,7 +382,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         const game = file.state as GameState
         ensureBoard(game)
         pendingWarp = null
-        set({ game, screen: 'system', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, gameOver: false, travel: null })
+        set({ game, screen: 'systemMap', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, gameOver: false, gameOverCause: null, travel: null })
         return true
       } catch {
         // Corrupt save file or a failed read — tell the player instead of
@@ -387,7 +451,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     quitToMenu: () => {
       pendingWarp = null
-      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, travel: null })
+      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, travel: null, gameOverCause: null })
     },
 
     buy: (good, amount) => withGame((g) => applyResult(g, buyGood(g, good, amount))),
@@ -433,7 +497,6 @@ export const useGameStore = create<GameStore>((set, get) => {
         const viaWormhole = fromSys.wormholeTo === targetId
         const distance = systemDistance(fromSys, toSys)
         const fromName = fromSys.nameId
-        const toName = toSys.nameId
         const shipType = g.ship.type
 
         const result = warp(g, targetId)
@@ -442,40 +505,79 @@ export const useGameStore = create<GameStore>((set, get) => {
           return
         }
 
-        // Defer surfacing encounter/event/offer until the travel animation ends.
-        pendingWarp = result
         // A long jump: ~10s (wormhole / short hop) up to ~30s far.
         const durationMs = viaWormhole
           ? 10000
           : Math.min(30000, Math.max(10000, distance * 900))
 
-        // Whoever is out there does not politely wait at the destination: scatter
-        // each meeting anywhere along the leg, from the drive lighting up to the
-        // moment you make port.
-        const rng = new Rng((g.seed ^ (g.day * 668265263) ^ targetId) >>> 0)
-        const interceptPoints = (result.encounters ?? [])
-          .map(() => rng.next())
-          .sort((a, b) => a - b)
-
-        set({
-          game: clone(g),
-          encounter: null,
-          event: null,
-          questOffer: null,
-          screen: 'system',
-          travel: {
-            fromId: fromSys.id,
-            toId: targetId,
-            fromName,
-            toName,
-            distance,
-            viaWormhole,
-            shipType,
-            durationMs,
-            interceptPoints
-          }
+        startTravel(g, result, {
+          mode: viaWormhole ? 'wormhole' : 'warp',
+          fromId: fromSys.id,
+          fromName,
+          toName: toSys.nameId,
+          distance,
+          viaWormhole,
+          shipType,
+          durationMs
         })
-        void get().saveGame()
+      }),
+
+    // Impulse across the system: no warp drive works this deep in a star's
+    // well, so this is measured in days rather than parsecs — and days out
+    // there are days somebody can find you.
+    flyToBody: (bodyId) =>
+      withGame((g) => {
+        const sys = g.systems[g.currentSystem]
+        const bodies = systemBodies(sys)
+        const fromIndex = currentBodyIndex(g)
+        const days = transitDaysTo(g, bodyId)
+        const shipType = g.ship.type
+
+        const rng = new Rng((g.seed ^ (g.day * 2246822519) ^ ((bodyId + 1) * 40503)) >>> 0)
+        const result = travelToBody(g, bodyId, rng)
+        if (!result.ok) {
+          set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error!) } })
+          return
+        }
+
+        startTravel(
+          g,
+          { ok: true, encounters: result.encounters, incident: result.incident },
+          {
+            mode: 'impulse',
+            fromId: fromIndex,
+            toId: bodyId,
+            fromName: bodyDisplayName(sys.nameId, bodies[fromIndex]),
+            toName: bodyDisplayName(sys.nameId, bodies[bodyId]),
+            distance: days,
+            viaWormhole: false,
+            shipType,
+            // Roughly four seconds a day under way, within sane bounds.
+            durationMs: Math.min(20000, Math.max(6000, days * 4000))
+          }
+        )
+      }),
+
+    enterWormhole: () =>
+      withGame((g) => {
+        const fromSys = g.systems[g.currentSystem]
+        const shipType = g.ship.type
+        const result = enterUnstableWormhole(g)
+        if (!result.ok) {
+          set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage(result.error!) } })
+          return
+        }
+        const toSys = g.systems[result.arrivedAt ?? g.currentSystem]
+        startTravel(g, result, {
+          mode: 'wormhole',
+          fromId: fromSys.id,
+          toName: toSys.nameId,
+          fromName: fromSys.nameId,
+          distance: 0,
+          viaWormhole: true,
+          shipType,
+          durationMs: 9000
+        })
       }),
 
     // Something cuts across the course mid-jump: surface the next encounter in
@@ -493,6 +595,42 @@ export const useGameStore = create<GameStore>((set, get) => {
       const result = pendingWarp
       pendingWarp = null
       const ready = result?.questsReady ?? []
+      const g = get().game
+
+      // A singularity met en route is settled here, at the far end: the engine
+      // has already left the ship at zero hull if it did not pull clear, and it
+      // is resolved exactly as being shot to pieces is.
+      const blackHole = result?.blackHole ?? null
+      if (blackHole && g) {
+        if (!blackHole.survived) {
+          const survives = g.ship.escapePod
+          const story = blackHoleEvent(blackHole, survives)
+          handleDestruction(g)
+          set({
+            travel: null,
+            game: clone(g),
+            encounter: null,
+            event: survives ? clone(story) : null,
+            incident: null,
+            questOffer: null,
+            gameOver: !survives,
+            gameOverCause: survives ? null : clone(story)
+          })
+          void get().saveGame()
+          return
+        }
+        // Survived it — the story is told, and anything else waiting on this
+        // arrival can wait for the next screen.
+        set({
+          travel: null,
+          encounter: result?.encounters?.length ? clone(result.encounters[0]) : null,
+          event: clone(blackHoleEvent(blackHole)),
+          incident: result?.incident ? clone(result.incident) : null,
+          questOffer: null
+        })
+        return
+      }
+
       set({
         travel: null,
         // Normally every encounter has already been met en route; anything left
@@ -514,7 +652,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     startMining: () =>
       withGame((g) => {
-        const site = currentSystem(g).mineSite
+        const site = currentMineSite(g)
         if (!site) {
           set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage('error.noMineSite') } })
           return
@@ -696,7 +834,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           })
           return
         }
-        set({ game: clone(g), escort: clone(res.run), screen: 'system' })
+        set({ game: clone(g), escort: clone(res.run), screen: 'systemMap' })
         void get().saveGame()
       }),
 
@@ -740,6 +878,7 @@ function handleDestruction(g: GameState): void {
     shieldPoints: [],
     gadgets: [],
     crew: [],
+    robots: [],
     escapePod: false
   }
   if (payout > 0) {

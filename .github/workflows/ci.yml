@@ -5,6 +5,11 @@ name: CI
 # pull requests into main. Runs on Linux — the engine, the i18n dictionaries and
 # the save format are all pure logic needing no Electron binary, so its download
 # is skipped to keep the job fast; typecheck resolves types from the npm package.
+#
+# Typecheck and tests are separate jobs on purpose: they run in parallel, and a
+# pull request shows "test" as its own required check, so a red suite is
+# distinguishable from a type error at a glance instead of hiding behind one
+# combined job.
 on:
   push:
     # main lands via already-checked PRs and is handled by release.yml.
@@ -19,7 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  typecheck:
+    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,5 +48,25 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      # Vitest: the engine suite plus the locale-parity check. Headless, so it
+      # needs neither a display nor the Electron binary.
       - name: Test
         run: npm test

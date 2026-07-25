@@ -6,6 +6,9 @@ export * from './engine/combat'
 export * from './engine/travel'
 export * from './engine/market'
 export * from './engine/galaxy'
+export * from './engine/location'
+export * from './engine/system'
+export * from './engine/news'
 export * from './engine/events'
 export * from './engine/quests'
 export * from './engine/mining'
@@ -25,9 +28,13 @@ export {
   WEAPON_IDS,
   SHIELD_IDS,
   GADGET_IDS,
-  EXTRA_CARGO_BAYS
+  EXTRA_CARGO_BAYS,
+  EXTRA_CARGO_BAYS_ADVANCED,
+  EXTRA_FUEL_TANKS,
+  EXTRA_FUEL_TANKS_ADVANCED
 } from './data/equipment'
+export { STATIONS, STATION_IDS, PLANET_MAX_HULL_UPGRADES } from './data/stations'
 export { MERCENARIES, MERCENARY_IDS, mercenaryWorth } from './data/mercenaries'
 export { ROBOTS, ROBOT_IDS } from './data/robots'
 export { CREW_TABLE, crewFor } from './data/ships'
-export { TECH_LEVEL_IDS, SHIP_SIZES, SHIP_CLASSES } from './engine/types'
+export { TECH_LEVEL_IDS, SHIP_SIZES, SHIP_CLASSES, STATION_KINDS } from './engine/types'

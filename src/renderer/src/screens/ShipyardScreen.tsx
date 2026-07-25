@@ -2,27 +2,39 @@ import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
 import {
   currentSystem,
+  currentBody,
+  currentStation,
+  maxHullUpgradesHere,
+  repairPricePerUnit,
+  weaponsForSale,
+  shieldsForSale,
+  gadgetsForSale,
+  shipsForSale,
   SHIP_TYPES,
-  SHIP_TYPE_IDS,
   WEAPONS,
   SHIELDS,
   GADGETS,
-  WEAPON_IDS,
-  SHIELD_IDS,
-  GADGET_IDS,
   maxHull,
   maxFuel,
   shipValue,
   fuelPricePerParsec,
   hullUpgradePrice,
   HULL_UPGRADE_AMOUNT,
-  MAX_HULL_UPGRADES,
   ESCAPE_POD_PRICE,
   type ShipTypeId
 } from '@game/index'
-import { weaponName, shieldName, gadgetName, shipName, shipClassName, economyName } from '@i18n/index'
+import {
+  weaponName,
+  shieldName,
+  gadgetName,
+  shipName,
+  shipClassName,
+  economyName,
+  stationName
+} from '@i18n/index'
 import { fmt } from '../util/format'
 import { ShipArt } from '../components/ShipArt'
+import { bodyDisplayName } from '../util/bodyText'
 
 export function ShipyardScreen(): React.JSX.Element {
   const game = useGameStore((s) => s.game)!
@@ -32,15 +44,30 @@ export function ShipyardScreen(): React.JSX.Element {
   const ship = game.ship
   const type = SHIP_TYPES[ship.type]
 
-  const fuelCap = maxFuel(ship) // includes fuelCompactor gadgets
+  // A station yard has its own catalogue, its own hull-reinforcement limit and
+  // its own repair rates; the planet below has the ordinary stock and the lot.
+  const station = currentStation(game)
+  const maxUpgrades = maxHullUpgradesHere(game)
+  const repairUnit = repairPricePerUnit(game)
+  const weapons = weaponsForSale(game)
+  const shields = shieldsForSale(game)
+  const gadgets = gadgetsForSale(game)
+  const hulls = shipsForSale(game)
+
+  const fuelCap = maxFuel(ship) // includes compactor gadgets
   const fuelMissing = fuelCap - ship.fuel
   const hullMissing = maxHull(ship) - ship.hull
   const fuelUnit = fuelPricePerParsec(game)
 
   return (
     <div>
-      <div className="screen-title">🛠️ {t('shipyard.title')}</div>
-      <div className="screen-sub">{sys.nameId}</div>
+      <div className="screen-title">
+        🛠️ {station ? stationName(station) : t('shipyard.title')}
+      </div>
+      <div className="screen-sub">
+        {bodyDisplayName(sys.nameId, currentBody(game))}
+        {station ? ` · ${t('station.grade')}` : ''}
+      </div>
 
       <div className="grid grid-2">
         {/* Fuel & repair */}
@@ -90,14 +117,21 @@ export function ShipyardScreen(): React.JSX.Element {
             disabled={hullMissing <= 0}
             onClick={() => s.repairFull()}
           >
-            {t('shipyard.repairFull')} · {fmt(hullMissing * type.repairCostPerUnit)} {t('common.cr')}
+            {t('shipyard.repairFull')} · {fmt(hullMissing * repairUnit)} {t('common.cr')}
           </button>
+          {station && repairUnit < type.repairCostPerUnit && (
+            <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+              {t('station.repairDiscount', {
+                percent: Math.round((repairUnit / type.repairCostPerUnit) * 100)
+              })}
+            </div>
+          )}
 
           <div className="kv" style={{ marginTop: 12 }}>
             <span className="k">{t('shipyard.hullUpgrade')}</span>
-            <span className="v">{(ship.hullUpgrades ?? 0)}/{MAX_HULL_UPGRADES}</span>
+            <span className="v">{(ship.hullUpgrades ?? 0)}/{maxUpgrades}</span>
           </div>
-          {(ship.hullUpgrades ?? 0) >= MAX_HULL_UPGRADES ? (
+          {(ship.hullUpgrades ?? 0) >= maxUpgrades ? (
             <div className="badge">{t('shipyard.hullUpgradeMax')}</div>
           ) : (
             <button
@@ -127,8 +161,17 @@ export function ShipyardScreen(): React.JSX.Element {
 
         {/* Equipment */}
         <div className="panel panel-pad">
-          <div className="screen-sub" style={{ marginBottom: 8 }}>{t('shipyard.weapons')}</div>
-          {WEAPON_IDS.filter((id) => WEAPONS[id].minTechLevel <= sys.techLevel).map((id) => (
+          <div className="screen-sub" style={{ marginBottom: 8 }}>
+            {station ? t('station.catalog') : t('shipyard.weapons')}
+          </div>
+          {station && (
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+              {t(`station.blurb.${station}`)}
+            </div>
+          )}
+          {station && <div className="screen-sub" style={{ marginBottom: 8 }}>{t('shipyard.weapons')}</div>}
+          {weapons.length === 0 && <div className="muted">{t('station.nothing')}</div>}
+          {weapons.map((id) => (
             <div className="kv" key={id}>
               <span className="k">{weaponName(id)} <span className="muted">· {WEAPONS[id].power}⚔</span></span>
               <button
@@ -141,7 +184,8 @@ export function ShipyardScreen(): React.JSX.Element {
             </div>
           ))}
           <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('shipyard.shields')}</div>
-          {SHIELD_IDS.filter((id) => SHIELDS[id].minTechLevel <= sys.techLevel).map((id) => (
+          {shields.length === 0 && <div className="muted">{t('station.nothing')}</div>}
+          {shields.map((id) => (
             <div className="kv" key={id}>
               <span className="k">{shieldName(id)} <span className="muted">· {SHIELDS[id].power}🛡</span></span>
               <button
@@ -154,14 +198,15 @@ export function ShipyardScreen(): React.JSX.Element {
             </div>
           ))}
           <div className="screen-sub" style={{ margin: '14px 0 8px' }}>{t('shipyard.gadgets')}</div>
-          {GADGET_IDS.filter((id) => GADGETS[id].minTechLevel <= sys.techLevel).map((id) => (
+          {gadgets.length === 0 && <div className="muted">{t('station.nothing')}</div>}
+          {gadgets.map((id) => (
             <div className="kv" key={id}>
               <span className="k">{gadgetName(id)}</span>
               <button
                 className="btn btn-sm"
                 disabled={
                   ship.gadgets.length >= type.gadgetSlots ||
-                  (id !== 'cargoBays' && ship.gadgets.includes(id))
+                  (id !== 'cargoBays' && id !== 'nanoHold' && ship.gadgets.includes(id))
                 }
                 onClick={() => s.buyGadget(id)}
               >
@@ -217,7 +262,8 @@ export function ShipyardScreen(): React.JSX.Element {
         </div>
       )}
 
-      {/* Ships for sale */}
+      {/* Ships for sale — hulls are sold planet-side; a station only fits them out. */}
+      {hulls.length > 0 && (
       <div className="panel panel-pad" style={{ marginTop: 16 }}>
         <div className="screen-sub" style={{ marginBottom: 8 }}>
           {t('shipyard.ships')} · {t('shipyard.tradeIn')}: {fmt(shipValue(ship))} {t('common.cr')}
@@ -238,7 +284,7 @@ export function ShipyardScreen(): React.JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {SHIP_TYPE_IDS.filter((id) => SHIP_TYPES[id].minTechLevel <= sys.techLevel).map((id: ShipTypeId) => {
+            {hulls.map((id: ShipTypeId) => {
               const st = SHIP_TYPES[id]
               const net = st.price - shipValue(ship)
               const isCurrent = id === ship.type
@@ -273,6 +319,7 @@ export function ShipyardScreen(): React.JSX.Element {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   )
 }

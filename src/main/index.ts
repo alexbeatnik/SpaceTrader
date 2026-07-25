@@ -78,20 +78,31 @@ async function migrateLegacySave(): Promise<void> {
   }
 }
 
+/**
+ * Counter that keeps concurrent writes off each other's scratch file. The
+ * renderer fires autosaves without awaiting them, so two writes to one slot can
+ * genuinely overlap — sharing a single `.tmp` path let them interleave their
+ * bytes and rename the mess over a good save.
+ */
+let tmpCounter = 0
+
 ipcMain.handle('save:write', async (_e, slot: unknown, data: unknown) => {
   if (!isSaveSlotId(slot) || typeof data !== 'string') return false
+  const target = slotFile(slot)
+  const tmp = `${target}.${process.pid}.${++tmpCounter}.tmp`
   try {
     await ensureSaveDir()
     // Write-then-rename: autosaves fire after every action, and a crash or a
     // full disk mid-write must never leave a truncated file where a good save
-    // used to be.
-    const target = slotFile(slot)
-    const tmp = `${target}.tmp`
+    // used to be. The rename is atomic, so overlapping writes simply mean the
+    // last one to finish wins — with a whole file, never half of two.
     await writeFile(tmp, data, 'utf-8')
     await rename(tmp, target)
     return true
   } catch {
     // Disk errors must not reject into the renderer's fire-and-forget save.
+    // Clear the scratch file so a failing disk cannot litter the save folder.
+    await unlink(tmp).catch(() => {})
     return false
   }
 })

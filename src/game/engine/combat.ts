@@ -665,6 +665,9 @@ export function resolveRound(
       let looted = 0
       for (const g of GOOD_IDS) {
         looted += state.ship.cargo[g]
+        // Cargo off the ship is cargo off the local-sourcing ledger too, or the
+        // hold would go on being credited with goods the pirates have taken.
+        releaseLocalSourcing(state, g, state.ship.cargo[g])
         state.ship.cargo[g] = 0
         state.buyingPrice[g] = 0
       }
@@ -751,7 +754,9 @@ export function resolveRound(
       msg('encounter.noWeapons')
     } else if (rng.chance(hitChance(skills.fighter, opp.pilot))) {
       let dmg = playerWeapon + rng.int(0, Math.round(playerWeapon * 0.3))
-      const crit = rng.chance(critChance(skills.fighter, state.ship.gadgets.includes('targeting')))
+      const fireControl =
+        state.ship.gadgets.includes('targeting') || state.ship.gadgets.includes('battleComputer')
+      const crit = rng.chance(critChance(skills.fighter, fireControl))
       if (crit) dmg = Math.round(dmg * CRIT_MULTIPLIER)
       const hit = applyDamage(opp, dmg)
       msg(crit ? 'encounter.playerCrit' : 'encounter.playerHit', { dmg })

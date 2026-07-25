@@ -67,6 +67,12 @@ export const weaponName = (id: string): string => t(`weapon.${id}`)
 export const shieldName = (id: string): string => t(`shield.${id}`)
 export const gadgetName = (id: string): string => t(`gadget.${id}`)
 export const mercName = (id: string): string => t(`merc.${id}`)
+export const stationName = (id: string): string => t(`station.${id}`)
+export const stationShortName = (id: string): string => t(`station.short.${id}`)
+export const terrainName = (id: string): string => t(`body.terrain.${id}`)
+export const starClassName = (id: string): string => t(`starClass.${id}`)
+/** Roman numeral for a body's orbit, e.g. "IV". */
+export const orbitNumeral = (orbit: number): string => t(`body.numeral.${orbit}`)
 
 /**
  * Translate a log/encounter message, auto-localising known id params
