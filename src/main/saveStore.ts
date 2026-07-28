@@ -10,6 +10,7 @@ import { join } from 'path'
 import { readFile, writeFile, mkdir, rename, unlink, readdir, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { AUTO_SLOT, SAVE_SLOT_IDS, parseSaveFile, type SaveSlotId, type SaveSlotInfo } from '../shared/saves'
+import { createSlotQueue } from '../shared/saveQueue'
 
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
@@ -96,52 +97,16 @@ export function createSaveStore(getDir: () => string): SaveStore {
    * voyage back over a brand-new game. Reads and deletes join the same queue,
    * so a slot is never listed or removed while its own write is still in the
    * air.
+   *
+   * The queue itself is shared with the Android build, which fights the same
+   * race across the Capacitor bridge; only `writeSlot` below is Node-specific.
    */
-  const chain = new Map<SaveSlotId, Promise<void>>()
-  /** Every chain still outstanding, so a quit can wait for them. */
-  const active = new Set<Promise<void>>()
-
-  function enqueue<T>(slot: SaveSlotId, task: () => Promise<T>): Promise<T> {
-    // Both arms run `task`: one operation failing must not strand the queue.
-    const result = (chain.get(slot) ?? Promise.resolve()).then(task, task)
-    const done = result.then(
-      () => {},
-      () => {}
-    )
-    chain.set(slot, done)
-    active.add(done)
-    void done.then(() => {
-      active.delete(done)
-      if (chain.get(slot) === done) chain.delete(slot)
-    })
-    return result
-  }
-
-  /** The newest state waiting its turn per slot, and everyone awaiting its fate. */
-  const queued = new Map<SaveSlotId, { data: string; waiters: ((ok: boolean) => void)[] }>()
+  const queue = createSlotQueue()
+  const enqueue = queue.enqueue
 
   return {
     write(slot, data) {
-      const pending = queued.get(slot)
-      if (pending) {
-        // A newer state supersedes one that has not reached the disk yet: the
-        // stale bytes are dropped rather than written and instantly
-        // overwritten. Autosaves fire after every action, so this also spares
-        // the disk a great deal of pointless work during mining and combat.
-        pending.data = data
-        return new Promise<boolean>((resolve) => pending.waiters.push(resolve))
-      }
-
-      const job: { data: string; waiters: ((ok: boolean) => void)[] } = { data, waiters: [] }
-      queued.set(slot, job)
-      return enqueue(slot, async () => {
-        // Read the data at the last moment: anything that arrived while this
-        // job sat in the queue has already folded itself into `job.data`.
-        queued.delete(slot)
-        const ok = await writeSlot(slot, job.data)
-        for (const waiter of job.waiters) waiter(ok)
-        return ok
-      })
+      return queue.write(slot, data, writeSlot)
     },
 
     read(slot) {
@@ -258,18 +223,12 @@ export function createSaveStore(getDir: () => string): SaveStore {
       }
     },
 
-    async flush() {
-      // Awaiting the tail can let a queued write start a fresh one behind it,
-      // so this drains rather than waits once. Bounded: nothing new is queued
-      // once the window is gone, and a stuck disk must not hold a quit open
-      // forever.
-      for (let pass = 0; pass < 10 && active.size > 0; pass++) {
-        await Promise.allSettled([...active])
-      }
+    flush() {
+      return queue.flush()
     },
 
     hasPending() {
-      return active.size > 0
+      return queue.hasPending()
     }
   }
 }

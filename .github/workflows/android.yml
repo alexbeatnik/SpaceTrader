@@ -1,0 +1,113 @@
+name: Android
+
+# Builds the Android APK. The runners already carry a JDK and the Android SDK,
+# which is the whole reason this lives in CI rather than expecting every
+# contributor to install ~2 GB of toolchain to check that a UI change survives
+# contact with a phone.
+#
+# The artifact is a *debug* build: signed with the throwaway debug key that
+# ships with the SDK, so it installs on any device with "unknown sources"
+# enabled and needs no secrets. A Play Store upload needs an upload key instead
+# — see the release-signing note at the bottom of this file.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'vite.config.ts'
+      - 'package.json'
+      - '.github/workflows/android.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Capacitor 7 builds with Android Gradle Plugin 8.x, which refuses to run
+      # on anything older than JDK 17.
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Nothing in this job launches Electron — the mobile build only needs the
+      # renderer — so its ~100 MB binary download is skipped.
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build web bundle
+        run: npm run build:web
+
+      # Copies dist-web into the Android project and refreshes the native plugin
+      # registry. Without it the APK ships whatever assets were last committed.
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # gradlew is generated on a Windows machine, where git records no execute
+      # bit; without this the next step fails with "permission denied".
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Name the artifact after the version
+        run: |
+          mv android/app/build/outputs/apk/debug/app-debug.apk \
+             "SpaceTrader-${{ steps.version.outputs.version }}-debug.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceTrader-${{ steps.version.outputs.version }}-apk
+          path: SpaceTrader-${{ steps.version.outputs.version }}-debug.apk
+          if-no-files-found: error
+
+# --- Release signing -------------------------------------------------------
+# To publish on Play, generate an upload keystore once, keep it somewhere you
+# will not lose it, and add it as repository secrets:
+#
+#   keytool -genkey -v -keystore upload.jks -keyalg RSA -keysize 2048 \
+#           -validity 10000 -alias upload
+#   base64 -w0 upload.jks           # -> secret ANDROID_KEYSTORE_BASE64
+#
+# plus ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD.
+# The job then restores the keystore, adds a signingConfig to app/build.gradle,
+# and runs `bundleRelease` for an AAB instead of `assembleDebug`.
+#
+# The keystore is not recoverable: lose it and the listing can never be updated
+# again under the same package name.

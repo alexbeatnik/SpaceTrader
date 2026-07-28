@@ -84,6 +84,7 @@ import {
   type SaveSlotId,
   type SaveSlotInfo
 } from '@shared/saves'
+import { saves } from '../platform'
 
 export type Screen =
   | 'menu'
@@ -377,9 +378,8 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     loadGame: async (slot = AUTO_SLOT) => {
-      if (typeof window === 'undefined' || !window.api) return false
       try {
-        const data = await window.api.loadGame(slot)
+        const data = await saves().load(slot)
         // An empty slot is not an exception, but it is not nothing either: the
         // player asked for a game and must be told why they did not get one.
         if (!data) throw new Error('empty slot')
@@ -406,7 +406,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     saveGame: async (slot = AUTO_SLOT) => {
       const g = get().game
-      if (!g || typeof window === 'undefined' || !window.api) return false
+      if (!g) return false
       try {
         // The summary is written alongside the state so the slot list can be
         // built without the main process ever understanding a GameState.
@@ -422,7 +422,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           },
           state: g
         }
-        const ok = await window.api.saveGame(slot, JSON.stringify(file))
+        const ok = await saves().save(slot, JSON.stringify(file))
         // Autosaves are fired without being awaited, so a disk that has started
         // refusing them would otherwise stay invisible until the player reloaded
         // and found the run gone. Announced once on the way down and once on the
@@ -457,18 +457,16 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     listSaves: async () => {
-      if (typeof window === 'undefined' || !window.api) return []
       try {
-        return await window.api.listSaves()
+        return await saves().list()
       } catch {
         return []
       }
     },
 
     deleteSave: async (slot) => {
-      if (typeof window === 'undefined' || !window.api) return false
       try {
-        return await window.api.deleteSave(slot)
+        return await saves().remove(slot)
       } catch {
         return false
       }

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { atCapital, hasShipyard } from '@game/index'
 import { useGameStore, type Screen } from './store/gameStore'
 import { useI18n } from './hooks/useI18n'
+import { useBackButton } from './hooks/useBackButton'
 import { Hud } from './components/Hud'
 import { Nav } from './components/Nav'
 import { Toast } from './components/Toast'
@@ -41,6 +42,9 @@ export function App(): React.JSX.Element {
   const escort = useGameStore((s) => s.escort)
   const incident = useGameStore((s) => s.incident)
   useI18n() // subscribe to locale changes for the whole tree
+  // Before the menu's early return below: hooks cannot be called conditionally,
+  // and the menu is exactly where back has to mean "leave the app".
+  useBackButton()
 
   useEffect(() => {
     document.title = 'Space Trader'

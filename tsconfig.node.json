@@ -23,6 +23,9 @@
   },
   "include": [
     "electron.vite.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "capacitor.config.ts",
     "src/main/**/*",
     "src/preload/**/*",
     "src/game/**/*",

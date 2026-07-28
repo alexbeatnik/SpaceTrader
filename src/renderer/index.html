@@ -2,10 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the layout reach under a notch and the gesture
+         bar, which the safe-area insets in the stylesheet then pad back. Zoom
+         is off because the app is a fixed-height shell with its own scrolling
+         regions: a pinch cannot reveal anything, it can only misalign it. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <!-- connect-src names the origins the Android WebView serves the bundle
+         from; without them the Capacitor bridge is blocked by this very policy
+         and every save silently fails on device. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'"
+      content="default-src 'self'; connect-src 'self' https://localhost capacitor://localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'"
     />
     <title>Space Trader</title>
   </head>
