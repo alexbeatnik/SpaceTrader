@@ -7,6 +7,14 @@ import { setupUpdater } from './updater'
 
 const saves = createSaveStore(() => join(app.getPath('userData'), 'saves'))
 
+/**
+ * Where the saves sat while the app was called "star-trader". userData is
+ * derived from package.json's `name`, so renaming the game to "space-trader"
+ * pointed it at a fresh, empty folder — to the player that looks exactly like
+ * every commander they ever had being wiped by an update.
+ */
+const previousSaveDir = (): string => join(app.getPath('appData'), 'star-trader', 'saves')
+
 function createWindow(): void {
   // In dev the icon lives in the project's build/ dir; packaged builds embed it
   // into the exe (electron-builder), so a missing path here is harmless. The
@@ -21,7 +29,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#05060f',
-    title: 'Star Trader',
+    title: 'Space Trader',
     ...(existsSync(iconPath) ? { icon: iconPath } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -71,6 +79,7 @@ ipcMain.handle('save:delete', async (_e, slot: unknown) => {
 ipcMain.handle('save:list', (): Promise<SaveSlotInfo[]> => saves.list())
 
 app.whenReady().then(async () => {
+  await saves.adoptSavesFrom(previousSaveDir())
   await saves.migrateLegacySave()
   await saves.sweepScratchFiles()
   createWindow()

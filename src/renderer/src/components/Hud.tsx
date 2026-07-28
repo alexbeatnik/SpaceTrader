@@ -20,7 +20,7 @@ export function Hud(): React.JSX.Element {
 
   return (
     <div className="hud">
-      <span className="hud-brand">★ STAR TRADER</span>
+      <span className="hud-brand">★ SPACE TRADER</span>
 
       <div className="hud-stat">
         <span className="label">{t('hud.credits')}</span>

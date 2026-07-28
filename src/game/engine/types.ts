@@ -1,4 +1,4 @@
-// Core domain types for the Star Trader engine.
+// Core domain types for the Space Trader engine.
 // The engine is pure TypeScript with no UI/Electron dependencies.
 // All human-readable text lives in the i18n layer; the engine uses stable IDs.
 

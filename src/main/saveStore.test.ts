@@ -10,7 +10,7 @@ let dir: string
 let saves: SaveStore
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'star-trader-saves-'))
+  dir = await mkdtemp(join(tmpdir(), 'space-trader-saves-'))
   saves = createSaveStore(() => dir)
 })
 
@@ -164,5 +164,61 @@ describe('housekeeping', () => {
 
     expect(await whoIsInSlot()).toBe('current voyage')
     expect(existsSync(join(dir, 'savegame.json'))).toBe(true)
+  })
+})
+
+describe('adopting the folder from the previous app name', () => {
+  // Renaming the game from "star-trader" to "space-trader" moved userData, and
+  // with it every save the player had. These cover the carry-over.
+  let oldDir: string
+
+  beforeEach(async () => {
+    oldDir = await mkdtemp(join(tmpdir(), 'space-trader-old-'))
+  })
+
+  afterEach(async () => {
+    await rm(oldDir, { recursive: true, force: true })
+  })
+
+  it('brings every slot across and leaves the originals in place', async () => {
+    await writeFile(join(oldDir, 'slot-auto.json'), envelope('Jameson', 100), 'utf-8')
+    await writeFile(join(oldDir, 'slot-4.json'), envelope('Solo', 100), 'utf-8')
+
+    await saves.adoptSavesFrom(oldDir)
+
+    const slots = await saves.list()
+    expect(slots.find((s) => s.slot === 'auto')?.meta?.commanderName).toBe('Jameson')
+    expect(slots.find((s) => s.slot === '4')?.meta?.commanderName).toBe('Solo')
+    expect(slots.find((s) => s.slot === '2')?.meta).toBeNull()
+    // A rollback to an older build must still find the player's commanders.
+    expect(existsSync(join(oldDir, 'slot-auto.json'))).toBe(true)
+  })
+
+  it('never lands on top of a voyage started since the rename', async () => {
+    await saves.write('auto', envelope('new voyage', 100))
+    await writeFile(join(oldDir, 'slot-auto.json'), envelope('old voyage', 100), 'utf-8')
+
+    await saves.adoptSavesFrom(oldDir)
+
+    expect(await whoIsInSlot()).toBe('new voyage')
+  })
+
+  it('carries a pre-slots savegame.json over for the legacy migration to pick up', async () => {
+    await writeFile(
+      join(oldDir, 'savegame.json'),
+      JSON.stringify({ commanderName: 'Ancient', day: 3, credits: 5 }),
+      'utf-8'
+    )
+
+    await saves.adoptSavesFrom(oldDir)
+    await saves.migrateLegacySave()
+
+    const slots = await saves.list()
+    expect(slots.find((s) => s.slot === 'auto')?.meta?.commanderName).toBe('Ancient')
+  })
+
+  it('does nothing when there is no previous folder', async () => {
+    await saves.adoptSavesFrom(join(oldDir, 'never-existed'))
+    expect((await saves.list()).every((s) => s.meta === null)).toBe(true)
   })
 })

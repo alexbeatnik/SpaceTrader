@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in the **Star Trader** repository.
+Guidance for AI coding agents working in the **Space Trader** repository.
 
 ## What this project is
 
@@ -80,9 +80,15 @@ things are load-bearing and easy to break:
   `build.publish` in package.json (not by `--publish`, which only controls
   uploading) and is the only thing the updater reads to find a new version.
 - **The artifact name must not contain a space.** GitHub rewrites spaces in
-  asset names, so `Star Trader-...exe` would never resolve against the name
-  recorded in `latest.yml`; hence `StarTrader-${version}-setup.${ext}`. The
+  asset names, so `Space Trader-...exe` would never resolve against the name
+  recorded in `latest.yml`; hence `SpaceTrader-${version}-setup.${ext}`. The
   release job asserts the two match before publishing.
+- **`appId` still reads `com.alexbeatnik.startrader`.** It predates the rename
+  from *Star Trader* and is deliberately frozen: NSIS finds the previous install
+  through the key derived from it, so changing it would make the next setup.exe
+  install alongside the old game rather than replacing it, and every self-update
+  from 0.1.x would leave the player with two copies. It is never shown to
+  anyone; leave it alone.
 - **`allowScripts` in package.json** approves Electron's and esbuild's install
   scripts. npm 11 skips unapproved install scripts, and without them CI never
   downloads the Electron binary.
@@ -111,6 +117,14 @@ Slot ids cross the IPC boundary from the renderer, so they are untrusted: main
 validates every one with `isSaveSlotId` before it reaches a path. Writes go
 through a temp file and a rename, because the autosave fires constantly and a
 half-written file must never replace a good save.
+
+`userData` is derived from package.json's `name`, which means **renaming the app
+moves the save folder**. The rename from `star-trader` to `space-trader` did
+exactly that, so `adoptSavesFrom` copies the old folder's slots across on first
+launch (before `migrateLegacySave`, so a pre-slots file in there is still picked
+up) and bails the moment anything exists under the new name. Originals are
+copied, not moved, so a rollback still finds them. Any future rename of `name`
+needs the same treatment.
 
 ### Star systems have insides: bodies, stations, in-system travel
 

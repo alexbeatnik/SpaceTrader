@@ -7,7 +7,7 @@
  */
 
 import { join } from 'path'
-import { readFile, writeFile, mkdir, rename, unlink, readdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, rename, unlink, readdir, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { AUTO_SLOT, SAVE_SLOT_IDS, parseSaveFile, type SaveSlotId, type SaveSlotInfo } from '../shared/saves'
 
@@ -23,6 +23,8 @@ export interface SaveStore {
   list(): Promise<SaveSlotInfo[]>
   /** Move a pre-slots `savegame.json` into the autosave slot. */
   migrateLegacySave(): Promise<void>
+  /** Take over the save folder the app used under its previous name. */
+  adoptSavesFrom(oldDir: string): Promise<void>
   /** Delete scratch files abandoned by an earlier run. */
   sweepScratchFiles(): Promise<void>
   /** Wait for every queued write to reach the disk. */
@@ -198,6 +200,43 @@ export function createSaveStore(getDir: () => string): SaveStore {
       } catch {
         // A failed migration must never keep the app from starting; the legacy
         // file is left untouched and the player simply starts a new voyage.
+      }
+    },
+
+    /**
+     * Take over the save folder the app used under its previous name.
+     *
+     * Electron derives userData from package.json's `name`, so renaming the
+     * game from "star-trader" to "space-trader" moved the whole folder and left
+     * the player's voyages behind in the old one. They are copied, not moved:
+     * anyone who rolls back to an older build still finds their commander where
+     * they left them, and a copy that fails halfway cannot destroy the only
+     * surviving save.
+     */
+    async adoptSavesFrom(oldDir) {
+      try {
+        if (oldDir === getDir() || !existsSync(oldDir)) return
+        // Anything already written under the new name wins outright: this must
+        // never land on top of a voyage started since the rename.
+        if (SAVE_SLOT_IDS.some((slot) => existsSync(slotFile(slot)))) return
+        if (existsSync(legacyFile())) return
+
+        const legacySource = join(oldDir, 'savegame.json')
+        const sources = SAVE_SLOT_IDS.map(
+          (slot) => [join(oldDir, `slot-${slot}.json`), slotFile(slot)] as const
+        )
+        // A pre-slots save left in the old folder comes across as-is;
+        // migrateLegacySave promotes it to the autosave slot right after.
+        if (existsSync(legacySource)) sources.push([legacySource, legacyFile()] as const)
+        if (!sources.some(([from]) => existsSync(from))) return
+
+        await ensureDir()
+        for (const [from, to] of sources) {
+          if (existsSync(from)) await copyFile(from, to)
+        }
+      } catch {
+        // Saves that will not copy are not a reason to fail startup — the old
+        // folder is untouched, so nothing is lost that was not already there.
       }
     },
 
