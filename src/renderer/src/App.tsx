@@ -43,7 +43,7 @@ export function App(): React.JSX.Element {
   useI18n() // subscribe to locale changes for the whole tree
 
   useEffect(() => {
-    document.title = 'Star Trader'
+    document.title = 'Space Trader'
   }, [])
 
   // Leaving port takes the port's services with it. Rather than leave a stale

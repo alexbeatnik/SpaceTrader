@@ -2,8 +2,8 @@
 // fallback for any key a translation is missing.
 export const en = {
   app: {
-    title: 'Star Trader',
-    subtitle: 'A modern remake of the classic Space Trader'
+    title: 'Space Trader',
+    subtitle: 'A modern remake of Pieter Spronck\'s Palm OS classic'
   },
   common: {
     credits: 'credits',
@@ -44,7 +44,7 @@ export const en = {
   update: {
     title: 'Updates',
     blurb:
-      'Star Trader keeps itself up to date from its GitHub releases. A new version downloads quietly in the background and installs the next time you quit — you never have to reinstall anything by hand.',
+      'Space Trader keeps itself up to date from its GitHub releases. A new version downloads quietly in the background and installs the next time you quit — you never have to reinstall anything by hand.',
     idle: 'Not checked yet.',
     checking: 'Checking for updates…',
     current: 'You are on the latest version.',
@@ -57,7 +57,7 @@ export const en = {
     restart: 'Restart and install'
   },
   about: {
-    title: 'About Star Trader',
+    title: 'About Space Trader',
     lead: 'Buy low, sell high, dodge pirates, and work your way up from a second-hand Flea to a ship worth fearing.',
     inspirationTitle: 'What inspired it',
     inspiration:
@@ -67,7 +67,7 @@ export const en = {
       'This is not a port, and it shares no code with the originals — every system here was written from scratch. It also takes its own liberties: crew stations that go wrong when nobody mans them, warp and mining you sit through in real time, a job board on every planet, convoy escort contracts, and a standing the galaxy files you under, somewhere between outlaw and champion of justice.',
     freeTitle: 'Free, and free to inspect',
     free:
-      'Star Trader is free. There is nothing to buy, no accounts, and no telemetry — it runs entirely on your own machine, and your saves never leave it. The full source is published under the Apache-2.0 licence, so anyone can read it, build it, or fork it.',
+      'Space Trader is free. There is nothing to buy, no accounts, and no telemetry — it runs entirely on your own machine, and your saves never leave it. The full source is published under the Apache-2.0 licence, so anyone can read it, build it, or fork it.',
     repoTitle: 'Source code',
     repo: 'Bug reports, ideas and pull requests are all welcome on GitHub.',
     openRepo: 'Open the repository on GitHub',
@@ -844,7 +844,7 @@ export const en = {
     holdTooSmall: 'Your hold is too small for this contract.',
     contractEmbargo: 'This planet is short of it — that is why you were hired to bring it. Buy it elsewhere.',
     loadFailed: 'Could not load the save file — it may be corrupted.',
-    saveTooNew: 'This save was written by a newer version of Star Trader. Update the game to open it.',
+    saveTooNew: 'This save was written by a newer version of Space Trader. Update the game to open it.',
     noMarketHere: 'There is no market here. Trading is done at the planet\'s spaceport.',
     noShipyardHere: 'Nothing here will work on a ship. Try the planet, or a station.',
     noBankHere: 'The bank is planet-side.',

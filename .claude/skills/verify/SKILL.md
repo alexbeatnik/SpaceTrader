@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Run the full Star Trader verification suite (typecheck, engine tests, production build) and, when possible, a GUI smoke test. Use before considering any change complete, or whenever asked to "verify", "check", or "make sure it builds/runs".
+description: Run the full Space Trader verification suite (typecheck, engine tests, production build) and, when possible, a GUI smoke test. Use before considering any change complete, or whenever asked to "verify", "check", or "make sure it builds/runs".
 ---
 
-# Verify Star Trader
+# Verify Space Trader
 
 Run these from the repository root, in order. Stop and fix on the first failure.
 
@@ -57,7 +57,7 @@ Notes:
 npm run dist
 ```
 
-Produces `release/Star Trader-<version>-setup.exe` via electron-builder (NSIS),
+Produces `release/SpaceTrader-<version>-setup.exe` via electron-builder (NSIS),
 using the app icon in `build/icon.ico`. On Windows this can fail extracting the
 `winCodeSign` cache with a symlink-privilege error — see the workaround in
 `AGENTS.md` (pre-extract the archive excluding the macOS `darwin` folder). Code

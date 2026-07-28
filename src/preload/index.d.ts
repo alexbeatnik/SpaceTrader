@@ -1,8 +1,8 @@
-import type { StarTraderApi } from './index'
+import type { SpaceTraderApi } from './index'
 
 declare global {
   interface Window {
-    api: StarTraderApi
+    api: SpaceTraderApi
   }
 }
 

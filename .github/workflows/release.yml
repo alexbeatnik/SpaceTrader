@@ -98,8 +98,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $setup = "release/StarTrader-${{ steps.version.outputs.version }}-setup.exe"
-          $portable = "release/StarTrader-${{ steps.version.outputs.version }}-portable.exe"
+          $setup = "release/SpaceTrader-${{ steps.version.outputs.version }}-setup.exe"
+          $portable = "release/SpaceTrader-${{ steps.version.outputs.version }}-portable.exe"
           $latest = "release/latest.yml"
           foreach ($f in @($setup, $portable, $latest)) {
             if (-not (Test-Path $f)) {

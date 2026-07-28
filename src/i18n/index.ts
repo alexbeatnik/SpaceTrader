@@ -10,7 +10,7 @@ export const DEFAULT_LOCALE: Locale = 'en'
 const DICTS: Record<Locale, Dict> = { en, uk }
 // Order matters: this is the order the language toggle offers them in.
 export const LOCALES: Locale[] = ['en', 'uk']
-const STORAGE_KEY = 'star-trader:locale'
+const STORAGE_KEY = 'space-trader:locale'
 
 const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
 let current: Locale = LOCALES.includes(stored as Locale) ? (stored as Locale) : DEFAULT_LOCALE

@@ -30,7 +30,7 @@ export function MenuScreen(): React.JSX.Element {
 
   return (
     <div className="menu-screen">
-      <h1 className="menu-title">STAR TRADER</h1>
+Н      <h1 className="menu-title">SPACE TRADER</h1>
       <p className="menu-tagline">{t('menu.tagline')}</p>
 
       <div className="panel menu-card">

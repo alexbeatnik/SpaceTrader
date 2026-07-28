@@ -23,4 +23,4 @@ const api = {
 
 contextBridge.exposeInMainWorld('api', api)
 
-export type StarTraderApi = typeof api
+export type SpaceTraderApi = typeof api

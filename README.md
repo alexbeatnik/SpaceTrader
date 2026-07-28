@@ -1,4 +1,4 @@
-# Star Trader
+# Space Trader
 
 A modern remake of the classic **Space Trader** (originally by Pieter Spronck for
 Palm OS, later ported to Windows by Jay French). Built as a cross-platform desktop
@@ -150,7 +150,7 @@ Core systems implemented:
 
 ## Installing & updating (Windows)
 
-Download `Star Trader-<version>-setup.exe` from the
+Download `SpaceTrader-<version>-setup.exe` from the
 [Releases](https://github.com/alexbeatnik/SpaceTrader/releases) page and run it.
 
 **The game updates itself.** It checks its GitHub releases on start-up,
@@ -163,16 +163,18 @@ If you would rather update manually, just run the new installer:
 - **Do not uninstall the old version first.** The installer finds the previous
   install and replaces it in place. Uninstalling first only costs you time.
 - **Your saves are kept.** They live in
-  `%APPDATA%\star-trader\saves\` — your user profile, not the program folder —
+  `%APPDATA%\space-trader\saves\` — your user profile, not the program folder —
   so updating never touches them. Uninstalling leaves them alone too, which
-  means reinstalling later picks your commander back up.
+  means reinstalling later picks your commander back up. Coming from a build
+  that still called itself *Star Trader*? The first launch copies your saves
+  over from `%APPDATA%\star-trader\saves\` and leaves the originals there.
 - The installer is **per-user** and needs no administrator rights. It installs
   to `%LOCALAPPDATA%\Programs` by default; you can point it elsewhere.
 - The build is **unsigned** (no code-signing certificate), so Windows
   SmartScreen may warn on first run — *More info → Run anyway*.
 
-To remove the game, use *Settings → Apps → Star Trader*. If you also want the
-saves gone, delete `%APPDATA%\star-trader\` by hand.
+To remove the game, use *Settings → Apps → Space Trader*. If you also want the
+saves gone, delete `%APPDATA%\space-trader\` by hand.
 
 ## Tech stack
 
@@ -225,7 +227,7 @@ npm run dist       # package a distributable (electron-builder)
 
 Requires Node.js 18+.
 
-`npm run dist` produces `release/Star Trader-<version>-setup.exe`. The installer's
+`npm run dist` produces `release/SpaceTrader-<version>-setup.exe`. The installer's
 welcome page — the one that tells a returning player not to uninstall the old
 version first — lives in [build/installer.nsh](build/installer.nsh); everything
 else about the installer is the `build.nsis` block of `package.json`.
