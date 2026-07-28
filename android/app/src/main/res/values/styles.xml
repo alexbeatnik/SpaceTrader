@@ -13,6 +13,13 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!--
+          Inherited from DayNight, the window background is white in light mode.
+          That never showed before Android 15, which now keeps the system bars
+          transparent: the strip behind the clock became a white band with white
+          icons on it. The game is black in every mode, so the window is too.
+        -->
+        <item name="android:windowBackground">@color/spaceTraderBackground</item>
     </style>
 
 

@@ -14,7 +14,14 @@ const config: CapacitorConfig = {
   android: {
     // Matches the renderer's own background, so rotating the device or waiting
     // on a heavy screen never flashes white over a game that is black.
-    backgroundColor: '#05060f'
+    backgroundColor: '#05060f',
+    // Android 15 forces edge-to-edge on anything targeting SDK 35, and
+    // Capacitor 7 ships this as "disable" — so the WebView ran under the system
+    // bars while env(safe-area-inset-*) still reported 0, and the gesture pill
+    // sat on top of the bottom tab labels. "auto" applies the margins only
+    // where the platform actually enforces edge-to-edge, and is what Capacitor
+    // 8 defaults to.
+    adjustMarginsForEdgeToEdge: 'auto'
   },
   plugins: {
     SplashScreen: {

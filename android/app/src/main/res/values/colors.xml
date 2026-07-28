@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The game's own background, matching the bg custom property in the
+      renderer's stylesheet and backgroundColor in capacitor.config.ts.
+      Android 15 makes the status and navigation bars transparent and shows the
+      window behind them, so this is the colour the player actually sees up
+      there, not the WebView's.
+    -->
+    <color name="spaceTraderBackground">#FF05060F</color>
+</resources>

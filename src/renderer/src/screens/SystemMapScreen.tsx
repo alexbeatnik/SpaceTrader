@@ -90,7 +90,7 @@ export function SystemMapScreen(): React.JSX.Element {
         {t('systemMap.bodies', { count: bodies.length })} · {t('common.day')} {game.day}
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
+      <div className="grid grid-split">
         <div className="chart-canvas-wrap">
           <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} width="100%" style={{ display: 'block' }}>
             {/* orbit rings */}

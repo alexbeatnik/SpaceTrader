@@ -45,7 +45,10 @@ export function MarketScreen(): React.JSX.Element {
       <div className="screen-sub">{sys.nameId}</div>
 
       <div className="panel">
-        <table>
+        {/* data-label on every cell is what lets the narrow layout restack this
+            into one card per commodity: the label moves out of the header and
+            in beside its own value. */}
+        <table className="stacked-table">
           <thead>
             <tr>
               <th>{t('market.good')}</th>
@@ -76,12 +79,14 @@ export function MarketScreen(): React.JSX.Element {
               const profit = held > 0 && sellP > 0 ? (sellP - game.buyingPrice[id]) * held : 0
               return (
                 <tr key={id} className="row-hover">
-                  <td>
+                  <td className="stacked-title">
                     {goodName(id)}
                     {good.illegal && <span className="illegal-tag">{t('market.illegal')}</span>}
                   </td>
-                  <td className="num muted">{sys.qty[id] > 0 ? sys.qty[id] : '—'}</td>
-                  <td className="num">
+                  <td className="num muted" data-label={t('market.available')}>
+                    {sys.qty[id] > 0 ? sys.qty[id] : '—'}
+                  </td>
+                  <td className="num" data-label={t('market.buyPrice')}>
                     {buyP > 0 ? (
                       fmt(buyP)
                     ) : embargoed ? (
@@ -92,9 +97,11 @@ export function MarketScreen(): React.JSX.Element {
                       <span className="muted">{t('market.notSold')}</span>
                     )}
                   </td>
-                  <td className="num">{sellP > 0 ? fmt(sellP) : <span className="muted">{t('market.notWanted')}</span>}</td>
-                  <td className="num">{held > 0 ? held : '—'}</td>
-                  <td className="num">
+                  <td className="num" data-label={t('market.sellPrice')}>
+                    {sellP > 0 ? fmt(sellP) : <span className="muted">{t('market.notWanted')}</span>}
+                  </td>
+                  <td className="num" data-label={t('market.inHold')}>{held > 0 ? held : '—'}</td>
+                  <td className="num" data-label={t('market.questNeed')}>
                     {need ? (
                       <span
                         className={need.missing > 0 ? 'neg' : 'pos'}
@@ -112,11 +119,14 @@ export function MarketScreen(): React.JSX.Element {
                       <span className="muted">—</span>
                     )}
                   </td>
-                  <td className={`num ${profit > 0 ? 'pos' : profit < 0 ? 'neg' : 'muted'}`}>
+                  <td
+                    className={`num ${profit > 0 ? 'pos' : profit < 0 ? 'neg' : 'muted'}`}
+                    data-label={t('common.profit')}
+                  >
                     {held > 0 && sellP > 0 ? (profit >= 0 ? '+' : '') + fmt(profit) : '—'}
                   </td>
-                  <td className="num">
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <td className="num stacked-actions">
+                    <div className="stacked-actions-row">
                       <button
                         className="btn btn-sm btn-primary"
                         disabled={maxBuy(id) <= 0}

@@ -268,7 +268,9 @@ export function ShipyardScreen(): React.JSX.Element {
         <div className="screen-sub" style={{ marginBottom: 8 }}>
           {t('shipyard.ships')} · {t('shipyard.tradeIn')}: {fmt(shipValue(ship))} {t('common.cr')}
         </div>
-        <table>
+        {/* Ten columns, so on a phone this restacks into one card per hull;
+            data-label carries each header down to its own cell. */}
+        <table className="stacked-table">
           <thead>
             <tr>
               <th>{t('ship.type')}</th>
@@ -290,21 +292,28 @@ export function ShipyardScreen(): React.JSX.Element {
               const isCurrent = id === ship.type
               return (
                 <tr key={id} className="row-hover">
-                  <td>
+                  <td className="stacked-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <ShipArt type={id} size={30} />
                       {shipName(id)}
                     </div>
                   </td>
-                  <td className="muted">{shipClassName(st.shipClass)}</td>
-                  <td className="num">{st.cargoBays}</td>
-                  <td className="num">{st.hullStrength}</td>
-                  <td className="num">{st.weaponSlots}</td>
-                  <td className="num">{st.shieldSlots}</td>
-                  <td className="num">{st.gadgetSlots}</td>
-                  <td className="num">{st.fuelTanks}</td>
-                  <td className={`num ${net > 0 ? '' : 'pos'}`}>{isCurrent ? '—' : fmt(net)}</td>
-                  <td className="num">
+                  <td className="muted" data-label={t('ship.class')}>
+                    {shipClassName(st.shipClass)}
+                  </td>
+                  <td className="num" data-label={t('ship.cargoBays')}>{st.cargoBays}</td>
+                  <td className="num" data-label={t('ship.hull')}>{st.hullStrength}</td>
+                  <td className="num" data-label={t('shipyard.weapons')}>{st.weaponSlots}</td>
+                  <td className="num" data-label={t('shipyard.shields')}>{st.shieldSlots}</td>
+                  <td className="num" data-label={t('shipyard.gadgets')}>{st.gadgetSlots}</td>
+                  <td className="num" data-label={t('hud.fuel')}>{st.fuelTanks}</td>
+                  <td
+                    className={`num ${net > 0 ? '' : 'pos'}`}
+                    data-label={t('shipyard.netPrice')}
+                  >
+                    {isCurrent ? '—' : fmt(net)}
+                  </td>
+                  <td className="num stacked-actions">
                     <button
                       className="btn btn-sm btn-primary"
                       disabled={isCurrent}
