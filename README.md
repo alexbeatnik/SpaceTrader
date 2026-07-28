@@ -1,3 +1,5 @@
+![Space Trader — trade, explore, survive](docs/cover.png)
+
 # Space Trader
 
 A modern remake of the classic **Space Trader** (originally by Pieter Spronck for
@@ -147,6 +149,15 @@ Core systems implemented:
   written. Save, load and delete from the **Saves** tab in game or from the main
   menu.
 - **i18n** — English and Ukrainian, switchable at runtime.
+
+## Screenshots
+
+| | |
+| :---: | :---: |
+| ![The system map](docs/screenshots/system-map.png) **System map** — the capital planet, its uninhabited neighbours and the odd station, on their orbits around the star | ![The planet dossier](docs/screenshots/planet.png) **Planet** — tech level, government, economy and a news feed written from what is true of the world |
+| ![The commodity market](docs/screenshots/market.png) **Market** — buy and sell prices, illegal goods, and what your contracts still need | ![The star chart](docs/screenshots/star-chart.png) **Star chart** — 140 systems, wormhole links and a fuel-range ring |
+| ![The shipyard](docs/screenshots/shipyard.png) **Shipyard** — fuel, repairs, hull reinforcement, weapons, shields and gadgets | ![The job board](docs/screenshots/quests.png) **Quests** — a job board on every planet, across seven contract types |
+| ![The ship view](docs/screenshots/ship.png) **Ship** — fittings, commander skills, crew and standing, with a hand-built silhouette per hull | ![The main menu](docs/screenshots/menu.png) **Main menu** — name your commander and pick a language |
 
 ## Installing & updating (Windows)
 
