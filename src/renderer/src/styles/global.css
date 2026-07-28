@@ -573,6 +573,14 @@ tr:last-child td { border-bottom: none; }
 .combat-log .line { color: var(--text-dim); }
 .combat-log .line:first-child { color: var(--text); font-weight: 600; }
 
+/* Attack, flee, submit, bribe. */
+.combat-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
 .ship-visual {
   display: flex;
   gap: 16px;
@@ -1072,6 +1080,35 @@ tr:last-child td { border-bottom: none; }
     padding: 14px 16px;
   }
   .modal h2 { font-size: 17px; margin-bottom: 10px; }
+
+  /*
+   * Combat, compacted. Every modal here can scroll, but this is the one where
+   * that is not good enough: two ship cards at full size pushed Attack, Flee
+   * and Submit clean off the bottom, so the player had to go looking for
+   * "flee" mid-fight. The cards give up the room instead — the art is
+   * decoration, the buttons are the decision.
+   */
+  .ship-visual { padding: 8px 10px; gap: 10px; }
+  /* Width and height are SVG presentation attributes, which CSS outranks. */
+  .ship-visual svg { width: 44px; height: 44px; }
+  .side-label { font-size: 10px; margin-bottom: 0; }
+  .combat-log { max-height: 96px; padding: 8px 10px; font-size: 12px; }
+
+  /*
+   * And the actions pin themselves to the bottom of the modal. Compacting the
+   * cards alone only bought a few rounds: the log grows with every shot fired,
+   * and the buttons went back under the fold as soon as it did. Sticky, they
+   * cannot — however long the fight runs, the decision stays on screen and the
+   * log scrolls beneath it. Matches the modal's own background so the text
+   * passing behind does not show through.
+   */
+  .combat-actions {
+    position: sticky;
+    bottom: 0;
+    margin-top: 10px;
+    padding: 10px 0 2px;
+    background: var(--bg-panel-2);
+  }
 
   /* Same floor as portrait: a landscape phone has the width for these tables,
      but a smaller one may not, and scrolling across beats an unreachable

@@ -45,7 +45,8 @@ export function ChartScreen(): React.JSX.Element {
    * The map's extent is fixed by the galaxy's proportions, so the markers grow
    * instead.
    */
-  const markerScale = useMediaQuery(PHONE_PORTRAIT) ? 2.2 : 1
+  const compact = useMediaQuery(PHONE_PORTRAIT)
+  const markerScale = compact ? 2.2 : 1
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   // Active quests: their destination systems get a marker on the map. A marker
@@ -139,6 +140,13 @@ export function ChartScreen(): React.JSX.Element {
                   style={{ cursor: 'pointer' }}
                   onClick={() => setSelectedId(sys.id)}
                 >
+                  {/*
+                    Labels sit inside the clickable group, so a name reaching
+                    over a neighbouring star was swallowing that star's taps —
+                    selecting the system you were trying to steer away from.
+                    Magnifying them for phones made it routine rather than
+                    occasional. Only the markers should answer a tap.
+                  */}
                   {isQuest && (
                     <circle
                       className="quest-ring"
@@ -163,17 +171,27 @@ export function ChartScreen(): React.JSX.Element {
                       fontSize={11 * markerScale}
                       textAnchor="middle"
                       opacity={questDim ? 0.35 : 1}
+                      style={{ pointerEvents: 'none' }}
                     >
                       📋
                     </text>
                   )}
-                  {(isHere || sys.visited || isSel || isQuest) && (
+                  {/*
+                    Names are dropped for merely-visited systems on a phone.
+                    The labels are magnified along with the markers, and two
+                    neighbouring stars then print straight through each other —
+                    "Mordan" and "Tashkent" came out as one unreadable word.
+                    Here, selected and quest targets are the ones worth naming
+                    unprompted; any other system gives its name when tapped.
+                  */}
+                  {(isHere || isSel || isQuest || (sys.visited && !compact)) && (
                     <text
                       x={sys.x * SCALE + r + 3 * markerScale}
                       y={sys.y * SCALE + 3 * markerScale}
                       fontSize={9 * markerScale}
                       fill={isHere ? '#4fd1ff' : isQuest ? '#ffc04a' : '#8b95c4'}
                       opacity={questDim ? 0.5 : 1}
+                      style={{ pointerEvents: 'none' }}
                     >
                       {sys.nameId}
                     </text>

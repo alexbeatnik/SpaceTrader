@@ -150,8 +150,16 @@ export function SystemMapScreen(): React.JSX.Element {
                   ) : (
                     <circle cx={p.x} cy={p.y} r={r} fill={bodyColor(body)} />
                   )}
+                  {/* Labels sit inside the clickable group, so one reaching
+                      over a neighbouring body would swallow that body's taps.
+                      Only the markers answer a tap. */}
                   {bodyMineSite(sys, body) && (
-                    <text x={p.x + r + 2} y={p.y - r} fontSize={10}>
+                    <text
+                      x={p.x + r + 2}
+                      y={p.y - r}
+                      fontSize={10}
+                      style={{ pointerEvents: 'none' }}
+                    >
                       ⛏
                     </text>
                   )}
@@ -161,6 +169,7 @@ export function SystemMapScreen(): React.JSX.Element {
                     fontSize={10}
                     textAnchor="middle"
                     fill={isHere ? '#38e08a' : body.kind === 'station' ? STATION_COLOR : '#8b95c4'}
+                    style={{ pointerEvents: 'none' }}
                   >
                     {bodyDisplayName(sys.nameId, body)}
                   </text>
