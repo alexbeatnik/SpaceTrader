@@ -4,9 +4,11 @@ Guidance for AI coding agents working in the **Space Trader** repository.
 
 ## What this project is
 
-A modern desktop remake of the classic *Space Trader* game, built with
-**Electron + React + TypeScript** and bundled with **electron-vite**. See
-`README.md` for the feature overview and `src/` layout.
+A modern remake of the classic *Space Trader* game, built with **React +
+TypeScript** and shipped to two hosts from one renderer: a **desktop** app
+(Electron, bundled with electron-vite) and an **Android** app (Capacitor,
+bundled with Vite). See `README.md` for the feature overview and `src/` layout,
+and "Two hosts" below before touching anything platform-shaped.
 
 ## Golden rules
 
@@ -34,6 +36,13 @@ A modern desktop remake of the classic *Space Trader* game, built with
    Per-fight dice come from `Encounter.seed`, drawn once when the encounter is
    built; rounds resolve on `seed ^ round`. Deriving them from the calendar
    instead made two fights on one leg roll an identical sequence.
+5. **Never put layout in an inline `style`.** An inline style outranks every
+   media query, so anything written that way is frozen at its desktop value on a
+   phone. This has bitten five times — `grid-template-columns` on both maps,
+   `justify-content` on the market's buttons, `display: flex` on combat's, and a
+   `maxHeight` on the escort log — each one invisible to `tsc` and to every test.
+   Use a class. Inline styles are fine for values that are genuinely per-instance
+   and not layout (a computed meter width, a per-good colour).
 
 ## Architecture
 
@@ -59,11 +68,105 @@ A modern desktop remake of the classic *Space Trader* game, built with
   is lost on quit.
 - `src/main/` + `src/preload/` — Electron shell, the save-slot IPC
   (`window.api.saveGame/loadGame/listSaves/deleteSave`, all slot-addressed) and
-  the self-updater (`src/main/updater.ts`).
+  the self-updater (`src/main/updater.ts`). **Desktop only** — the Android build
+  serves the same renderer with no preload at all, which is why
+  `window.api` is typed optional.
+- `src/renderer/src/platform/` — the host abstraction. See "Two hosts" below.
 
-- `src/shared/` — code both processes need. Today that is `saves.ts`, the
-  on-disk save format. It imports nothing from the engine on purpose: main has
-  to list and validate slots without understanding a `GameState`.
+- `src/shared/` — code every host needs. `saves.ts` (the on-disk format),
+  `saveQueue.ts` (write ordering, used by both hosts) and `updates.ts` (the
+  `UpdateStatus` union). It imports nothing from the engine on purpose: main has
+  to list and validate slots without understanding a `GameState`, and the mobile
+  bundle has to name update states without pulling in electron-updater.
+
+### Two hosts: Electron and Android
+
+One renderer, two shells. `src/renderer/src/platform/` names everything that
+differs and gives each host its own answer; **nothing outside that folder may
+reach for `window.api`, Capacitor, or `navigator.userAgent` to decide where it
+is running.**
+
+- `getPlatform()` decides once and caches. The test is `window.api` — it exists
+  only because Electron's preload script put it there, which is a fact about the
+  build rather than a guess. Everything else goes through Capacitor, whose
+  plugins ship web implementations, so `npm run dev:web` in a browser exercises
+  the same storage code that ships in the APK.
+- `platform.saves` is the only way to touch a slot. Electron proxies the preload
+  bridge; Capacitor writes one JSON file per slot under `Directory.Data` with
+  the same filenames and the same envelope the desktop writes, so a save copied
+  between the two is readable.
+- `platform.updates` is **null on Android** — the Play Store owns installing
+  versions there, and a panel whose only possible answer is "not supported here"
+  is worse than no panel. `<UpdatePanel>` returns null when it is absent.
+- `platform.kind` is `electron | android | ios | web`; `platform.touch` is a
+  separate flag because a tablet in landscape is wide but has no cursor. Prefer
+  a CSS media query over either — see below.
+
+**The write queue is shared, deliberately.** `src/shared/saveQueue.ts` holds the
+ordering guarantees that used to live in `main/saveStore.ts`. Autosaves fire
+without being awaited on every host, and on Android every write is an async hop
+across the Capacitor bridge, so two writes racing for one slot are if anything
+likelier there. Both hosts use the same queue; the desktop's `saveStore` tests
+cover it through the unchanged public API.
+
+**Android has no `before-quit`.** The system kills a backgrounded app whenever
+it wants the memory, so `initPlatform()` drains the queue on `appStateChange`.
+That is the last moment anything is guaranteed to run — a save queued by the
+player's final action is lost without it.
+
+`useBackButton()` maps the hardware back gesture onto the game's own idea of
+back: outwards one screen at a time, and swallowed entirely while combat, a
+jump, or a quest offer is on screen. Android treats an unhandled press as "leave
+the app", which for a game with no browser history means one careless swipe
+drops the player out of a voyage.
+
+`capacitor.config.ts` sets `adjustMarginsForEdgeToEdge: 'auto'`. Capacitor 7
+defaults it to `'disable'`, and Android 15 forces edge-to-edge on anything
+targeting SDK 35 — so the WebView ran under the system bars while
+`env(safe-area-inset-*)` still reported 0 and the gesture pill sat on top of the
+bottom tab labels. Related: `android/app/src/main/res/values/colors.xml` sets
+the window background, because the transparent bars show the *window* through
+them, not the WebView, and the inherited DayNight theme's is white.
+
+`appId` is `com.alexbeatnik.spacetrader` — **not** the desktop's
+`com.alexbeatnik.startrader` (see below for why that one is frozen). Once a
+build is on Play under an id it can never be changed.
+
+### Responsive layout
+
+The renderer is one stylesheet serving a desktop window and a phone in both
+orientations. Three rules make that work; breaking any of them shows up only on
+a device.
+
+- **Key off the scarce dimension, not the width.** Upright the side rail becomes
+  a bottom tab strip (`(orientation: portrait) and (max-width: 860px)`); on its
+  side it stays a rail but pairs its twelve tabs into two columns
+  (`(orientation: landscape) and (max-height: 560px)`). A width-only query
+  caught landscape phones too — they are ~850px wide — and spent a sixth of
+  their 411px height on a bottom strip.
+- **An action must never need scrolling to reach.** The market and the shipyard
+  restack as one card per row below 860px (`.stacked-table`, with `data-label`
+  on each cell carrying the header down beside its value) because eight and ten
+  columns cannot fit 411px, and scrolling sideways to reach Buy means the thing
+  the screen exists for is the thing you cannot see. Read-only tables keep a
+  scrolling fallback — nothing is hidden there but a number. Combat's buttons go
+  `position: sticky` in landscape, because the log grows with every shot fired
+  and would otherwise push them under the fold mid-fight.
+- **Centring clips.** A flex child centred in a box it overflows spills past
+  *both* edges, and the half above the top cannot be scrolled back to. Use
+  `margin: auto` on the child instead — it centres while there is room and
+  scrolls when there is not. `.warp-overlay` and the menu both had this bug;
+  `.warp-core` also needs `align-self: stretch` on its rows, or
+  `align-items: center` shrinks them to their content and a `space-between` row
+  has no space to put between.
+
+Hover states live inside `@media (hover: hover)`. A touchscreen has no way to
+leave an element, so the browser holds the last tapped button lit until
+something else is tapped — misleading on a screen where every button spends
+money. Touch targets get 44px under `(pointer: coarse)`.
+
+Emoji are not a safe icon set: Android has no glyph for `⏻` and draws an empty
+box, exactly as Windows renders `ℹ️` as a serif "i". Check any new icon on both.
 
 ### Releases and self-update
 
@@ -376,7 +479,11 @@ record must iterate `GOOD_IDS`, never hard-code the good keys.
 npm run dev        # dev with hot reload (opens an Electron window)
 npm run typecheck  # tsc for both the node (main/preload/engine) and web projects
 npm test           # Vitest engine tests (headless, always runnable)
-npm run build      # production build into out/
+npm run build      # production desktop build into out/
+
+npm run dev:web    # the renderer in a browser, on the Capacitor web shims
+npm run build:web  # static bundle into dist-web/ (what the APK packages)
+npm run apk        # build:web + cap sync + gradle assembleDebug
 ```
 
 `npm test` also runs `src/i18n/locales.test.ts`, which fails if `en.ts` and
@@ -384,9 +491,18 @@ npm run build      # production build into out/
 side. That is the enforcement behind golden rule 2.
 
 Always run `npm run typecheck` and `npm test` before considering a change done.
-`tsconfig.node.json` covers `main`/`preload`/`game`; `tsconfig.web.json` covers
-the renderer. Both use `strict` + `noUnusedLocals`/`noUnusedParameters`, so keep
-imports tidy.
+`tsconfig.node.json` covers `main`/`preload`/`game` plus the four root configs;
+`tsconfig.web.json` covers the renderer. Both use `strict` +
+`noUnusedLocals`/`noUnusedParameters`, so keep imports tidy.
+
+**There are four build configs and they are not interchangeable.**
+`electron.vite.config.ts` builds the desktop into `out/`; `vite.config.ts`
+builds the same renderer into `dist-web/` for Capacitor, rooted at
+`src/renderer` with `base: './'`; `capacitor.config.ts` is the native shell;
+`vitest.config.ts` exists **only** to stop the runner adopting `vite.config.ts`
+— it did, silently narrowed the suite to a directory with no tests, and reported
+"no test files" rather than failing. If you add a root Vite config, check
+`npm test` still collects 4 files.
 
 ## Environment gotchas
 
@@ -407,6 +523,21 @@ imports tidy.
   `create()` closure, so edits to `gameStore.ts` actions (e.g. `warpTo`) may keep
   running the old implementation until `npm run dev` is restarted. If new UI
   behavior "doesn't take", restart dev before assuming a bug.
+- **The Android build needs `JAVA_HOME` and an SDK.** `npm run apk` shells out
+  to Gradle, which needs a JDK 17+ (AGP 8 refuses older) on `JAVA_HOME` and an
+  SDK path in `android/local.properties` (gitignored, so it is per-machine).
+  `org.gradle.java.home` alone is **not** enough — that configures the daemon,
+  but the `gradlew` launcher still needs a JVM to start. Note that a shell
+  spawned before you set a user-scope variable will not see it: Windows only
+  hands new ones to processes launched afterwards.
+- **Driving the APK on an emulator.** `adb shell input tap` plus
+  `adb exec-out screencap -p` is enough for most screens. For states that are
+  random or terminal (mining, escort, game over) the practical route is a
+  throwaway build that exposes the store on `window`, driven over the debug
+  WebView's DevTools socket — `adb forward tcp:9222
+  localabstract:webview_devtools_remote_<pid>`, then `Runtime.evaluate`. **Take
+  the hook back out and prove it:** grep the packaged JS chunks inside the APK
+  before shipping the build.
 - **Packaging on Windows (`npm run dist`)** can fail while extracting
   electron-builder's `winCodeSign` cache with `Cannot create symbolic link: A
   required privilege is not held by the client` — that archive contains macOS

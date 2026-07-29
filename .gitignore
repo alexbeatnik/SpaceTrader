@@ -4,6 +4,7 @@ node_modules/
 # Build output
 out/
 dist/
+dist-web/
 release/
 .vite/
 
@@ -24,6 +25,25 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# Android signing keys.
+# Capacitor generates android/.gitignore with these patterns present but
+# commented out, i.e. its default is to commit your signing key. An upload key
+# cannot be rotated: whoever holds it can publish builds that Play and every
+# installed device accept as genuine, and losing it means the listing can never
+# be updated again. Kept at the repo root so the rule survives regenerating
+# android/ and covers keys left anywhere else in the tree.
+*.jks
+*.keystore
+keystore.properties
+
+# Packaged Android builds. android/.gitignore covers the ones Gradle writes in
+# place; this catches copies dropped elsewhere, such as the versioned APK next
+# to the desktop installers in release/.
+*.apk
+*.aab
+
 # Editor / OS
 .DS_Store
 Thumbs.db
+.idea/
+*.iml

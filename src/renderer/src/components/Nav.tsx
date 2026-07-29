@@ -63,7 +63,9 @@ export function Nav(): React.JSX.Element {
         )
       })}
       <button className="nav-quit" onClick={quitToMenu}>
-        <span className="nav-icon">⏻</span>
+        {/* Not ⏻: Android has no glyph for it and draws an empty box, the same
+            trap as ℹ️ on Windows above. 🚪 is a full-colour emoji everywhere. */}
+        <span className="nav-icon">🚪</span>
         {t('common.back')}
       </button>
     </nav>

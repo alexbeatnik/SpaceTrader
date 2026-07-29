@@ -22,6 +22,7 @@ import {
 } from '@i18n/index'
 import { fmt } from '../util/format'
 import { questTypeLabel } from '../util/questText'
+import { useMediaQuery, PHONE_PORTRAIT } from '../hooks/useMediaQuery'
 
 const VIEW_W = 760
 const VIEW_H = Math.round((VIEW_W * GALAXY_HEIGHT) / GALAXY_WIDTH)
@@ -33,6 +34,19 @@ export function ChartScreen(): React.JSX.Element {
   const { t } = useI18n()
   const here = currentSystem(game)
   const range = maxRange(game)
+
+  /**
+   * How much bigger the markers are drawn than the map they sit on.
+   *
+   * The galaxy is wider than it is tall, so on a phone held upright the map can
+   * only ever be as large as the screen is wide — about half its desktop size.
+   * Everything inside scaled down with it, which left the system dots around
+   * two pixels across: too small to read, and far too small to put a thumb on.
+   * The map's extent is fixed by the galaxy's proportions, so the markers grow
+   * instead.
+   */
+  const compact = useMediaQuery(PHONE_PORTRAIT)
+  const markerScale = compact ? 2.2 : 1
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   // Active quests: their destination systems get a marker on the map. A marker
@@ -61,7 +75,7 @@ export function ChartScreen(): React.JSX.Element {
         {t('chart.range')}: {range} {t('common.pc')} · {t('hud.fuel')}: {game.ship.fuel}/{range}
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
+      <div className="grid grid-split">
         <div className="chart-canvas-wrap">
           <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} width="100%" style={{ display: 'block' }}>
             {/* fuel range ring */}
@@ -112,7 +126,7 @@ export function ChartScreen(): React.JSX.Element {
               const isSel = sys.id === selectedId
               const isQuest = questReadyAt.has(sys.id)
               const questDim = isQuest && !questReadyAt.get(sys.id)
-              const r = isHere ? 6 : 4
+              const r = (isHere ? 6 : 4) * markerScale
               const color = isHere
                 ? '#4fd1ff'
                 : reachable
@@ -126,41 +140,58 @@ export function ChartScreen(): React.JSX.Element {
                   style={{ cursor: 'pointer' }}
                   onClick={() => setSelectedId(sys.id)}
                 >
+                  {/*
+                    Labels sit inside the clickable group, so a name reaching
+                    over a neighbouring star was swallowing that star's taps —
+                    selecting the system you were trying to steer away from.
+                    Magnifying them for phones made it routine rather than
+                    occasional. Only the markers should answer a tap.
+                  */}
                   {isQuest && (
                     <circle
                       className="quest-ring"
                       cx={sys.x * SCALE}
                       cy={sys.y * SCALE}
-                      r={r + 6}
+                      r={r + 6 * markerScale}
                       fill="none"
                       stroke="#ffc04a"
-                      strokeWidth={1.6}
+                      strokeWidth={1.6 * markerScale}
                       strokeDasharray="3 3"
                       opacity={questDim ? 0.3 : 1}
                     />
                   )}
                   {isSel && (
-                    <circle cx={sys.x * SCALE} cy={sys.y * SCALE} r={r + 5} fill="none" stroke="#fff" strokeWidth={1.5} />
+                    <circle cx={sys.x * SCALE} cy={sys.y * SCALE} r={r + 5 * markerScale} fill="none" stroke="#fff" strokeWidth={1.5 * markerScale} />
                   )}
                   <circle cx={sys.x * SCALE} cy={sys.y * SCALE} r={r} fill={color} />
                   {isQuest && (
                     <text
                       x={sys.x * SCALE}
-                      y={sys.y * SCALE - r - 6}
-                      fontSize={11}
+                      y={sys.y * SCALE - r - 6 * markerScale}
+                      fontSize={11 * markerScale}
                       textAnchor="middle"
                       opacity={questDim ? 0.35 : 1}
+                      style={{ pointerEvents: 'none' }}
                     >
                       📋
                     </text>
                   )}
-                  {(isHere || sys.visited || isSel || isQuest) && (
+                  {/*
+                    Names are dropped for merely-visited systems on a phone.
+                    The labels are magnified along with the markers, and two
+                    neighbouring stars then print straight through each other —
+                    "Mordan" and "Tashkent" came out as one unreadable word.
+                    Here, selected and quest targets are the ones worth naming
+                    unprompted; any other system gives its name when tapped.
+                  */}
+                  {(isHere || isSel || isQuest || (sys.visited && !compact)) && (
                     <text
-                      x={sys.x * SCALE + r + 3}
-                      y={sys.y * SCALE + 3}
-                      fontSize={9}
+                      x={sys.x * SCALE + r + 3 * markerScale}
+                      y={sys.y * SCALE + 3 * markerScale}
+                      fontSize={9 * markerScale}
                       fill={isHere ? '#4fd1ff' : isQuest ? '#ffc04a' : '#8b95c4'}
                       opacity={questDim ? 0.5 : 1}
+                      style={{ pointerEvents: 'none' }}
                     >
                       {sys.nameId}
                     </text>

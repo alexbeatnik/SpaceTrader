@@ -55,6 +55,10 @@ button {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Overrides the line above where supported. On a phone `100vh` is the height
+     the viewport has with the system bars hidden, so the bottom tab strip ends
+     up underneath the gesture bar until the player scrolls. */
+  height: 100dvh;
 }
 
 /* --- Star field background --- */
@@ -170,9 +174,11 @@ button {
   align-items: center;
   gap: 10px;
 }
-.nav button:hover {
-  background: rgba(79, 209, 255, 0.08);
-  color: var(--text);
+@media (hover: hover) {
+  .nav button:hover {
+    background: rgba(79, 209, 255, 0.08);
+    color: var(--text);
+  }
 }
 .nav button.active {
   background: linear-gradient(90deg, rgba(79, 209, 255, 0.18), transparent);
@@ -232,6 +238,11 @@ button {
 }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
+/* A map or chart beside the panel describing whatever is selected in it. A
+   class rather than an inline style so the narrow layouts can collapse it —
+   an inline `grid-template-columns` outranks every media query, which left
+   this splitting a phone screen into two unreadable columns. */
+.grid-split { grid-template-columns: 2fr 1fr; }
 @media (max-width: 1100px) {
   .grid-3 { grid-template-columns: repeat(2, 1fr); }
 }
@@ -247,21 +258,30 @@ button {
   font-weight: 600;
   transition: all 0.15s ease;
 }
-.btn:hover:not(:disabled) {
-  border-color: var(--accent-dim);
-  background: #232a55;
-}
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-primary {
   background: linear-gradient(180deg, var(--accent), var(--accent-dim));
   color: #04121a;
   border-color: transparent;
 }
-.btn-primary:hover:not(:disabled) { filter: brightness(1.1); background: var(--accent); }
 .btn-danger { color: var(--bad); border-color: rgba(255, 93, 108, 0.4); }
-.btn-danger:hover:not(:disabled) { background: rgba(255, 93, 108, 0.12); }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-block { width: 100%; }
+
+/*
+ * Hover states, only where a pointer can genuinely hover. A touchscreen has no
+ * way to leave an element, so the browser holds the last tapped button lit up
+ * until something else is tapped — which reads as "this button is still armed"
+ * on a screen where every button spends money.
+ */
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    border-color: var(--accent-dim);
+    background: #232a55;
+  }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.1); background: var(--accent); }
+  .btn-danger:hover:not(:disabled) { background: rgba(255, 93, 108, 0.12); }
+}
 
 /* --- Checkbox row --- */
 .checkbox-row {
@@ -279,7 +299,9 @@ button {
   accent-color: var(--accent);
   cursor: pointer;
 }
-.checkbox-row:hover { color: var(--text); }
+@media (hover: hover) {
+  .checkbox-row:hover { color: var(--text); }
+}
 
 /* --- Tables --- */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -299,7 +321,9 @@ td {
   font-variant-numeric: tabular-nums;
 }
 tr:last-child td { border-bottom: none; }
-tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
+@media (hover: hover) {
+  tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
+}
 .num { text-align: right; }
 .muted { color: var(--text-faint); }
 .pos { color: var(--good); }
@@ -312,6 +336,10 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
   padding: 1px 5px;
   margin-left: 6px;
 }
+
+/* The action buttons at the end of a table row. A class, not an inline style,
+   so the narrow layout can spread them across the width of a card. */
+.stacked-actions-row { display: flex; gap: 6px; justify-content: flex-end; }
 
 /* --- Stat rows / meters --- */
 .meter {
@@ -363,7 +391,9 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
 
 /* A tab whose services are not available where the ship is docked. */
 .nav button.nav-off { opacity: 0.35; cursor: not-allowed; }
-.nav button.nav-off:hover { background: transparent; }
+@media (hover: hover) {
+  .nav button.nav-off:hover { background: transparent; }
+}
 
 /* --- Toast --- */
 .toast {
@@ -430,12 +460,17 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
   position: relative;
   z-index: 1;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
   text-align: center;
+  padding: 16px;
+  /* body is overflow: hidden, so without this a menu taller than the viewport
+     is simply cut off at both ends with no way to reach either. */
+  overflow-y: auto;
 }
 .menu-title {
   font-size: 56px;
@@ -538,6 +573,14 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
 .combat-log .line { color: var(--text-dim); }
 .combat-log .line:first-child { color: var(--text); font-weight: 600; }
 
+/* Attack, flee, submit, bribe. */
+.combat-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
 .ship-visual {
   display: flex;
   gap: 16px;
@@ -579,9 +622,15 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
   inset: 0;
   z-index: 60;
   display: flex;
-  align-items: center;
+  /* Not `align-items: center` — see the margin on .warp-core below. */
+  align-items: flex-start;
   justify-content: center;
-  overflow: hidden;
+  padding: 16px;
+  /* The warp animation always fits, but an escort run reuses this shell and
+     adds a log, a tally and a button to it. Left hidden, the overflow was
+     clipped at both ends with no way to reach either — the contract's payout
+     and the button to collect it were simply gone. */
+  overflow-y: auto;
   background: radial-gradient(circle at 50% 50%, #0a1030 0%, #04060f 60%, #01020a 100%);
   animation: warp-fade-in 0.25s ease;
 }
@@ -613,7 +662,27 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
   align-items: center;
   gap: 16px;
   text-align: center;
+  /*
+   * Centres while there is room and simply scrolls when there is not. Doing it
+   * with `align-items: center` on the overlay looks identical until the
+   * content outgrows the screen, at which point it spills past both edges and
+   * the top half becomes unreachable — a jump animation is fine either way,
+   * but an escort run is not.
+   */
+  margin: auto;
 }
+/*
+ * `align-items: center` shrinks every child to the width of its own content,
+ * which for a space-between row means there is no space to put between: the
+ * escort tally read "Attackers destroyed1", label and value touching. These
+ * take the column's full width so the two ends are actually at the ends.
+ */
+.warp-core .kv,
+.warp-core .escort-log,
+.warp-core .btn-block {
+  align-self: stretch;
+}
+.escort-log { max-height: 240px; margin-top: 14px; }
 .warp-route {
   display: flex;
   align-items: center;
@@ -749,3 +818,362 @@ tr.row-hover:hover td { background: rgba(255, 255, 255, 0.02); }
 .update-line { font-size: 13px; margin-top: 10px; font-weight: 600; }
 .update-actions { margin-top: 12px; }
 .warn-text { color: var(--warn); font-size: 12px; }
+
+/* =========================================================================
+   Touch input
+   Keyed off the pointer rather than the screen size: a small desktop window
+   still has a mouse, and a tablet in landscape is wide but has no cursor.
+   ========================================================================= */
+@media (pointer: coarse) {
+  /* Android's minimum comfortable tap target. The desktop sizes come from what
+     the text needs, which lands well under it. */
+  .btn,
+  .nav button {
+    min-height: 44px;
+  }
+  .btn-sm { min-height: 36px; }
+
+  /* A grey flash on every tap, and a text cursor on every long-press, both
+     read as "this is a web page" — the two things most likely to break the
+     illusion that this is an app. */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .checkbox-row input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Pulling past the end of a scrollable list must not drag the whole app, and
+     must never trigger a pull-to-refresh that would restart the game. */
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+/* =========================================================================
+   Portrait handhelds: the side rail becomes a bottom tab strip
+
+   Scoped to portrait on purpose. A phone in landscape is around 850px wide,
+   so a width-only query caught it too — and spending ~60px of a 390px-tall
+   viewport on a bottom strip is the one thing that layout cannot afford.
+   ========================================================================= */
+@media (orientation: portrait) and (max-width: 860px) {
+  .main {
+    flex-direction: column;
+  }
+
+  /* Content first in the flow, tabs pinned under it: a thumb reaches the
+     bottom of a phone and not the side of it. */
+  .content {
+    order: 1;
+    padding: 16px 14px;
+  }
+
+  .nav {
+    order: 2;
+    width: 100%;
+    flex-direction: row;
+    flex-shrink: 0;
+    gap: 2px;
+    padding: 6px 8px;
+    /* Thirteen destinations do not fit across a phone and must not be cut: the
+       strip scrolls sideways rather than hiding half the game behind a menu. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    border-right: none;
+    border-top: 1px solid var(--border-soft);
+    background: rgba(9, 11, 24, 0.92);
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+  .nav::-webkit-scrollbar { display: none; }
+
+  .nav button {
+    position: relative;
+    flex-direction: column;
+    flex-shrink: 0;
+    justify-content: center;
+    gap: 3px;
+    min-width: 62px;
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+  .nav .nav-icon { font-size: 19px; width: auto; }
+
+  /* The active marker moves from the rail's left edge to the strip's top one. */
+  .nav button.active {
+    background: rgba(79, 209, 255, 0.12);
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  /* `margin-top: auto` pushed quit to the bottom of a column; in a row it would
+     do nothing useful, so it simply sits last. */
+  .nav-quit { margin-top: 0; }
+
+  .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    margin-left: 0;
+  }
+
+  .hud {
+    padding: 8px 12px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    gap: 6px;
+  }
+  .hud-stat { min-width: 62px; padding: 3px 9px; }
+  .hud-stat .value { font-size: 13px; }
+
+  .modal {
+    max-width: 96vw;
+    max-height: 86vh;
+    padding: 18px;
+  }
+
+  .screen-title { font-size: 19px; }
+  .grid-2,
+  .grid-3,
+  .grid-split { grid-template-columns: 1fr; }
+
+  /* Tables sit directly inside a panel on every screen that has one, and
+     `table { width: 100% }` obediently squeezed their columns into a phone.
+     The floor below keeps them legible and lets the panel scroll across. The
+     market gets a real layout of its own instead — see below. */
+  .panel { overflow-x: auto; }
+  table { min-width: 640px; }
+
+  /* --- Tables you act on, restacked as one card per row --------------------
+     The market has eight columns and the shipyard ten; neither can be made to
+     fit 411px, and scrolling sideways to reach Buy means the thing the screen
+     exists for is the thing you cannot see. So the row stops being a row: the
+     subject becomes a heading, each cell becomes a labelled line beneath it,
+     and the buttons span the card. One render path still feeds both shapes —
+     the labels are the same strings as the table header, carried on
+     data-label. Read-only tables elsewhere keep the scrolling fallback above;
+     nothing is hidden there but a number. */
+  .stacked-table { min-width: 0; }
+  .stacked-table thead { display: none; }
+  .stacked-table,
+  .stacked-table tbody,
+  .stacked-table tr,
+  .stacked-table td { display: block; }
+
+  /* Stats one per line made a card tall enough that only two rows fit on
+     screen, trading sideways scrolling for just as much vertical. Paired up
+     they read just as clearly in half the height. */
+  .stacked-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 18px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .stacked-table tr:last-child { border-bottom: none; }
+  .stacked-table td.stacked-title,
+  .stacked-table td.stacked-actions { grid-column: 1 / -1; }
+
+  .stacked-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    border-bottom: none;
+    text-align: right;
+  }
+  .stacked-table td::before {
+    content: attr(data-label);
+    color: var(--text-faint);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    text-align: left;
+  }
+  /* The subject heads the card and the buttons close it; neither is a labelled
+     field, and an empty ::before would still take up a gap. */
+  .stacked-table td:not([data-label])::before { display: none; }
+  .stacked-table td.stacked-title {
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+    padding-bottom: 8px;
+  }
+  .stacked-table td.stacked-actions { padding-top: 10px; }
+  /* Covers both shapes: a row of buttons, and a lone one sitting bare in the
+     cell as the shipyard's does. */
+  .stacked-actions-row { width: 100%; }
+  .stacked-actions-row .btn { flex: 1; }
+  .stacked-table td.stacked-actions > .btn { width: 100%; }
+}
+
+/* =========================================================================
+   Short viewports: a phone in landscape, and any window wider than it is tall
+
+   Here the scarce resource is height, not width, so the rail stays at the side
+   where it costs no vertical space at all — and everything that stacks
+   downwards gets tightened instead.
+   ========================================================================= */
+@media (orientation: landscape) and (max-height: 560px) {
+  .nav {
+    /* Two columns rather than one long list: twelve 44px tabs plus the way out
+       to ~600px against the ~350px a landscape phone leaves once the HUD has
+       its share, so a single column would always be a scrolling one. Paired
+       up they fit on screen, which is the difference between glancing at the
+       tabs and hunting through them. */
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    align-content: start;
+    width: 172px;
+    gap: 3px;
+    padding: 6px;
+    padding-left: calc(6px + env(safe-area-inset-left));
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+
+  .nav button {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 4px;
+    text-align: center;
+    font-size: 9.5px;
+    line-height: 1.15;
+  }
+  .nav .nav-icon { font-size: 16px; width: auto; }
+  .nav button.active { box-shadow: inset 2px 0 0 var(--accent); }
+  .nav-badge { position: absolute; top: 2px; right: 5px; margin-left: 0; }
+
+  /* Quit is not a destination, so it gets the full width under the grid
+     rather than a cell that implies it is one more place to go. */
+  .nav-quit {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: center;
+    margin-top: 0;
+  }
+
+  .hud {
+    /* Seven stats wrapping onto a second row would cost a sixth of the height
+       this layout has. One row that scrolls sideways instead. */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 5px;
+    padding: 4px 10px;
+    padding-top: calc(4px + env(safe-area-inset-top));
+    padding-left: calc(10px + env(safe-area-inset-left));
+    padding-right: calc(10px + env(safe-area-inset-right));
+  }
+  .hud::-webkit-scrollbar { display: none; }
+  /* Decoration is the first thing to go when the language toggle is at risk of
+     being pushed off the end of a scrolling row. */
+  .hud-brand { display: none; }
+  /* Without this the stats compress into each other instead of overflowing,
+     which is what makes the row scrollable in the first place. */
+  .hud-stat,
+  .lang-toggle { flex-shrink: 0; }
+  .hud-stat { min-width: 0; padding: 2px 8px; }
+  .hud-stat .label { font-size: 9px; letter-spacing: 0.5px; }
+  .hud-stat .value { font-size: 12px; }
+
+  .content {
+    padding: 10px 14px;
+    padding-right: calc(14px + env(safe-area-inset-right));
+  }
+
+  .screen-title { font-size: 16px; margin-bottom: 2px; }
+  .screen-sub { font-size: 12px; margin-bottom: 10px; }
+
+  .panel-pad { padding: 12px 14px; }
+  .grid { gap: 10px; }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+
+  /* A modal is the one thing allowed to use nearly all of it — but it has to
+     scroll internally, because 94vh of a 390px screen is still only 366px. */
+  .modal {
+    max-width: 92vw;
+    max-height: 94vh;
+    padding: 14px 16px;
+  }
+  .modal h2 { font-size: 17px; margin-bottom: 10px; }
+
+  /*
+   * Combat, compacted. Every modal here can scroll, but this is the one where
+   * that is not good enough: two ship cards at full size pushed Attack, Flee
+   * and Submit clean off the bottom, so the player had to go looking for
+   * "flee" mid-fight. The cards give up the room instead — the art is
+   * decoration, the buttons are the decision.
+   */
+  .ship-visual { padding: 8px 10px; gap: 10px; }
+  /* Width and height are SVG presentation attributes, which CSS outranks. */
+  .ship-visual svg { width: 44px; height: 44px; }
+  .side-label { font-size: 10px; margin-bottom: 0; }
+  .combat-log { max-height: 96px; padding: 8px 10px; font-size: 12px; }
+
+  /* Same reasoning for the escort log, which is taller still: 240px of a
+     411px viewport leaves nothing for the payout underneath it. */
+  .escort-log { max-height: 104px; margin-top: 8px; }
+  .warp-core { gap: 10px; }
+
+  /*
+   * And the actions pin themselves to the bottom of the modal. Compacting the
+   * cards alone only bought a few rounds: the log grows with every shot fired,
+   * and the buttons went back under the fold as soon as it did. Sticky, they
+   * cannot — however long the fight runs, the decision stays on screen and the
+   * log scrolls beneath it. Matches the modal's own background so the text
+   * passing behind does not show through.
+   */
+  .combat-actions {
+    position: sticky;
+    bottom: 0;
+    margin-top: 10px;
+    padding: 10px 0 2px;
+    background: var(--bg-panel-2);
+  }
+
+  /* Same floor as portrait: a landscape phone has the width for these tables,
+     but a smaller one may not, and scrolling across beats an unreachable
+     action column. Costs nothing when everything already fits. */
+  .panel { overflow-x: auto; }
+  table { min-width: 640px; }
+
+  /* The tables you act on stay tables here — there is width for them — but the
+     shipyard's ten columns plus a Buy button came to just over what a
+     landscape phone has, leaving the button a few pixels past the edge. That
+     is the same unreachable-action trap the portrait cards exist to avoid, so
+     these two tighten up rather than overflow. */
+  .stacked-table th,
+  .stacked-table td { padding: 6px 5px; font-size: 12px; }
+  .stacked-table th { font-size: 9.5px; }
+  .stacked-table .btn-sm { padding: 4px 8px; font-size: 11px; }
+}
+
+/* =========================================================================
+   The menu on a short viewport
+
+   Not folded into the landscape block above: the menu renders outside the app
+   shell, and a cramped window in any orientation hits this. Centring is what
+   does the damage — a column centred in a box it overflows spills equally past
+   both ends, and the half above the top edge cannot be scrolled back to. Above
+   this height there is room to centre and it stays centred.
+   ========================================================================= */
+@media (max-height: 620px) {
+  .menu-screen {
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 18px 16px;
+  }
+  .menu-title { font-size: 34px; letter-spacing: 1px; }
+  .menu-tagline { margin-bottom: 14px; font-size: 13px; }
+  .menu-card { padding: 16px 18px; gap: 10px; }
+}

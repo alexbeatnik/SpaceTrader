@@ -67,7 +67,7 @@ export function EscortOverlay(): React.JSX.Element | null {
           <div style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
 
-        <div className="combat-log" ref={logRef} style={{ maxHeight: 240, marginTop: 14 }}>
+        <div className="combat-log escort-log" ref={logRef}>
           {visible.flatMap((leg) =>
             leg.messages.map((m, i) => (
               <div className="line" key={`${leg.index}-${i}`}>

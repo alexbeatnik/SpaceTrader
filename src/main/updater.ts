@@ -1,5 +1,8 @@
 import { app, ipcMain, type BrowserWindow } from 'electron'
 import electronUpdater from 'electron-updater'
+import type { UpdateStatus } from '../shared/updates'
+
+export type { UpdateStatus }
 
 /**
  * Self-update from GitHub Releases.
@@ -16,17 +19,6 @@ import electronUpdater from 'electron-updater'
 // electron-updater ships as CommonJS with a default export; main is bundled as
 // CJS too, so the named import has to come off the default object.
 const { autoUpdater } = electronUpdater
-
-/** What the renderer is told about the update process. */
-export type UpdateStatus =
-  | { state: 'idle' }
-  | { state: 'unsupported' }
-  | { state: 'checking' }
-  | { state: 'current' }
-  | { state: 'available'; version: string }
-  | { state: 'downloading'; version: string; percent: number }
-  | { state: 'ready'; version: string }
-  | { state: 'error'; message: string }
 
 let status: UpdateStatus = { state: 'idle' }
 let target: BrowserWindow | null = null

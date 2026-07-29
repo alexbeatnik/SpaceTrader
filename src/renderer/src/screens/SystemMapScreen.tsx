@@ -90,7 +90,7 @@ export function SystemMapScreen(): React.JSX.Element {
         {t('systemMap.bodies', { count: bodies.length })} · {t('common.day')} {game.day}
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
+      <div className="grid grid-split">
         <div className="chart-canvas-wrap">
           <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} width="100%" style={{ display: 'block' }}>
             {/* orbit rings */}
@@ -150,8 +150,16 @@ export function SystemMapScreen(): React.JSX.Element {
                   ) : (
                     <circle cx={p.x} cy={p.y} r={r} fill={bodyColor(body)} />
                   )}
+                  {/* Labels sit inside the clickable group, so one reaching
+                      over a neighbouring body would swallow that body's taps.
+                      Only the markers answer a tap. */}
                   {bodyMineSite(sys, body) && (
-                    <text x={p.x + r + 2} y={p.y - r} fontSize={10}>
+                    <text
+                      x={p.x + r + 2}
+                      y={p.y - r}
+                      fontSize={10}
+                      style={{ pointerEvents: 'none' }}
+                    >
                       ⛏
                     </text>
                   )}
@@ -161,6 +169,7 @@ export function SystemMapScreen(): React.JSX.Element {
                     fontSize={10}
                     textAnchor="middle"
                     fill={isHere ? '#38e08a' : body.kind === 'station' ? STATION_COLOR : '#8b95c4'}
+                    style={{ pointerEvents: 'none' }}
                   >
                     {bodyDisplayName(sys.nameId, body)}
                   </text>

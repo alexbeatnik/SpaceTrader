@@ -210,8 +210,10 @@ export function CombatModal(): React.JSX.Element | null {
           ))}
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+        {/* Actions. A class, not an inline style: on a short screen these pin
+            themselves to the bottom of the modal, which a media query has to be
+            able to reach. */}
+        <div className="combat-actions">
           {!terminal && (
             <>
               <button className="btn btn-danger" onClick={() => combatAction('attack')}>

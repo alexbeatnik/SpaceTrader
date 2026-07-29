@@ -1,32 +1,40 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '../hooks/useI18n'
-import type { UpdateStatus } from '../../../main/updater'
+import { getPlatform } from '../platform'
+import type { UpdateStatus } from '@shared/updates'
 
 /**
  * Update state, shown on the About screen. The download runs by itself in the
  * background and installs on quit, so this is mostly a window onto what is
  * already happening — plus a way to apply it now rather than later.
+ *
+ * Absent entirely on hosts that install their own versions: on Android that is
+ * the Play Store's job, and a panel whose only possible answer is "not
+ * supported here" is worse than no panel at all.
  */
-export function UpdatePanel(): React.JSX.Element {
+export function UpdatePanel(): React.JSX.Element | null {
   const { t } = useI18n()
+  const updates = getPlatform().updates
   const [status, setStatus] = useState<UpdateStatus>({ state: 'idle' })
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.api) return
-    void window.api.updateStatus().then(setStatus)
-    return window.api.onUpdateStatus(setStatus)
-  }, [])
+    if (!updates) return
+    void updates.status().then(setStatus)
+    return updates.subscribe(setStatus)
+  }, [updates])
 
   const check = useCallback(async () => {
-    if (!window.api) return
+    if (!updates) return
     setBusy(true)
     try {
-      setStatus(await window.api.checkForUpdate())
+      setStatus(await updates.check())
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [updates])
+
+  if (!updates) return null
 
   const line = ((): string => {
     switch (status.state) {
@@ -64,7 +72,7 @@ export function UpdatePanel(): React.JSX.Element {
       )}
       <div className="update-actions">
         {status.state === 'ready' ? (
-          <button className="btn btn-primary" onClick={() => void window.api.installUpdate()}>
+          <button className="btn btn-primary" onClick={() => void updates.install()}>
             ⟳ {t('update.restart')}
           </button>
         ) : (
