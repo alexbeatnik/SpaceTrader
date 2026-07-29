@@ -1,15 +1,24 @@
 name: Release
 
-# Builds the Windows installer and portable exe and publishes them as a GitHub
-# Release whenever the version in package.json changes on main. Safe to run on
-# every push: it no-ops if a release for the current version already exists.
-# Can also be triggered manually to (re)build and publish the current version.
+# Builds the Windows installer, the portable exe and the Android APK, and
+# publishes all three as a GitHub Release whenever the version in package.json
+# changes on main. Safe to run on every push: it no-ops if a release for the
+# current version already exists. Can also be triggered manually to (re)build
+# and publish the current version.
+#
+# Three jobs rather than one. The version check is split out so neither build
+# starts for a version that is already released, and the APK is built on Linux
+# — the Android SDK is preinstalled there, and the Windows runner has no
+# business compiling it just because that is where electron-builder has to run.
 on:
   push:
     branches: [main]
     paths:
       - 'src/**'
       - 'build/**'
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'vite.config.ts'
       - 'package.json'
   workflow_dispatch:
 
@@ -17,46 +26,117 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  check:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      skip: ${{ steps.check.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Read version from package.json
         id: version
-        shell: pwsh
         run: |
-          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if (-not $ver) {
-            Write-Error "Could not read version from package.json"
+          ver=$(node -p "require('./package.json').version")
+          if [ -z "$ver" ]; then
+            echo "Could not read version from package.json" >&2
             exit 1
-          }
-          Write-Host "Version: $ver"
-          "version=$ver" >> $env:GITHUB_OUTPUT
-          "tag=v$ver" >> $env:GITHUB_OUTPUT
+          fi
+          echo "Version: $ver"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "tag=v$ver" >> "$GITHUB_OUTPUT"
 
       - name: Skip if this version was already released
         id: check
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${{ steps.version.outputs.tag }}" *> $null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Release ${{ steps.version.outputs.tag }} already exists, skipping."
-            "skip=true" >> $env:GITHUB_OUTPUT
-          } else {
-            Write-Host "No release yet for ${{ steps.version.outputs.tag }} - will create one."
-            "skip=false" >> $env:GITHUB_OUTPUT
-          }
-          # pwsh steps exit with the last-seen $LASTEXITCODE, which `gh release view`
-          # deliberately left non-zero above (that's how we detect "no release yet") -
-          # without this the step itself would be reported as failed.
-          exit 0
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Release ${{ steps.version.outputs.tag }} already exists, skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release yet for ${{ steps.version.outputs.tag }} - will create one."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  android:
+    name: Android APK
+    needs: check
+    if: needs.check.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        if: steps.check.outputs.skip == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Capacitor 7 builds with Android Gradle Plugin 8.x, which refuses to run
+      # on anything older than JDK 17.
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Nothing in this job launches Electron — the mobile build only needs the
+      # renderer — so its ~100 MB binary download is skipped.
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - name: Build web bundle
+        run: npm run build:web
+
+      # Copies dist-web into the Android project and refreshes the native
+      # plugin registry. Without it the APK ships stale assets.
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # gradlew is generated on a Windows machine, where git records no execute
+      # bit; without this the next step fails with "permission denied".
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Name the artifact after the version
+        run: |
+          mv android/app/build/outputs/apk/debug/app-debug.apk \
+             "SpaceTrader-${{ needs.check.outputs.version }}-debug.apk"
+
+      - name: Upload APK for the release job
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: SpaceTrader-${{ needs.check.outputs.version }}-debug.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Windows build and publish
+    needs: [check, android]
+    if: needs.check.outputs.skip == 'false'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -66,19 +146,15 @@ jobs:
       # approvals live in the allowScripts field of package.json - without them
       # Electron never downloads its binary and the build fails.
       - name: Install dependencies
-        if: steps.check.outputs.skip == 'false'
         run: npm ci
 
       - name: Typecheck
-        if: steps.check.outputs.skip == 'false'
         run: npm run typecheck
 
       - name: Test
-        if: steps.check.outputs.skip == 'false'
         run: npm test
 
       - name: Build
-        if: steps.check.outputs.skip == 'false'
         run: npx electron-vite build
 
       # --publish never: the release is created by gh below, so electron-builder
@@ -89,19 +165,25 @@ jobs:
       # not from this flag) and MUST be uploaded with the installer - it is the
       # file the in-app updater reads to discover a new version.
       - name: Package
-        if: steps.check.outputs.skip == 'false'
         run: npx electron-builder --win nsis portable --publish never
 
+      - name: Download the APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: release
+
       - name: Create tag and GitHub Release
-        if: steps.check.outputs.skip == 'false'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $setup = "release/SpaceTrader-${{ steps.version.outputs.version }}-setup.exe"
-          $portable = "release/SpaceTrader-${{ steps.version.outputs.version }}-portable.exe"
+          $version = "${{ needs.check.outputs.version }}"
+          $setup = "release/SpaceTrader-$version-setup.exe"
+          $portable = "release/SpaceTrader-$version-portable.exe"
           $latest = "release/latest.yml"
-          foreach ($f in @($setup, $portable, $latest)) {
+          $apk = "release/SpaceTrader-$version-debug.apk"
+          foreach ($f in @($setup, $portable, $latest, $apk)) {
             if (-not (Test-Path $f)) {
               Write-Error "Expected artifact not found: $f"
               exit 1
@@ -114,6 +196,6 @@ jobs:
             Write-Error "latest.yml points at '$expected' but the installer is '$(Split-Path $setup -Leaf)' - the updater would 404."
             exit 1
           }
-          gh release create "${{ steps.version.outputs.tag }}" $setup $portable $latest `
-            --title "${{ steps.version.outputs.tag }}" `
+          gh release create "${{ needs.check.outputs.tag }}" $setup $portable $latest $apk `
+            --title "${{ needs.check.outputs.tag }}" `
             --generate-notes

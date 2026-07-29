@@ -190,15 +190,14 @@ saves gone, delete `%APPDATA%\space-trader\` by hand.
 
 ## Installing (Android)
 
-There is **no published Android release yet** — the desktop Releases page carries
-only the Windows installer. To get an APK today, either build one (see
-[Development](#android) below) or download it from a CI run: open the latest
-[Android workflow](https://github.com/alexbeatnik/SpaceTrader/actions/workflows/android.yml)
-run and take the `SpaceTrader-<version>-apk` artifact.
+Download `SpaceTrader-<version>-debug.apk` from the
+[Releases](https://github.com/alexbeatnik/SpaceTrader/releases) page, copy it to
+your phone and open it. Android will ask you to allow installs from your browser
+or file manager the first time.
 
-Copy it to your phone and open it. Android will ask you to allow installs from
-your browser or file manager the first time — this build is signed with the
-standard debug key, not a Play Store one.
+**This is a debug-signed build**, not a Play Store one: it carries the standard
+Android debug key and is marked debuggable, so treat it as a sideload for
+yourself rather than something to hand around. There is no Play listing yet.
 
 The game runs in both orientations and lays itself out for each: upright the
 navigation sits along the bottom under your thumb, on its side it moves to a
@@ -292,10 +291,11 @@ per-machine). Android Studio provides both; command-line tools alone are enough.
 The APK lands in `android/app/build/outputs/apk/debug/`.
 
 Neither is needed to contribute: `.github/workflows/android.yml` builds the APK
-on branch pushes and pull requests and attaches it to the run, and
-`npm run dev:web` gives you the mobile layout in a browser with no toolchain at
-all — narrow the window under 860px for the portrait layout, or make it shorter
-than 560px and wider than it is tall for the landscape one.
+on branch pushes and pull requests and attaches it to the run (`release.yml`
+builds it again for the release itself), and `npm run dev:web` gives you the
+mobile layout in a browser with no toolchain at all — narrow the window under
+860px for the portrait layout, or make it shorter than 560px and wider than it
+is tall for the landscape one.
 
 The version comes from `package.json` in both directions: Gradle reads it for
 `versionName`, and derives `versionCode` as `major*10000 + minor*100 + patch`.
