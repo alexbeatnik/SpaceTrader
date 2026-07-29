@@ -622,9 +622,15 @@ tr:last-child td { border-bottom: none; }
   inset: 0;
   z-index: 60;
   display: flex;
-  align-items: center;
+  /* Not `align-items: center` — see the margin on .warp-core below. */
+  align-items: flex-start;
   justify-content: center;
-  overflow: hidden;
+  padding: 16px;
+  /* The warp animation always fits, but an escort run reuses this shell and
+     adds a log, a tally and a button to it. Left hidden, the overflow was
+     clipped at both ends with no way to reach either — the contract's payout
+     and the button to collect it were simply gone. */
+  overflow-y: auto;
   background: radial-gradient(circle at 50% 50%, #0a1030 0%, #04060f 60%, #01020a 100%);
   animation: warp-fade-in 0.25s ease;
 }
@@ -656,7 +662,27 @@ tr:last-child td { border-bottom: none; }
   align-items: center;
   gap: 16px;
   text-align: center;
+  /*
+   * Centres while there is room and simply scrolls when there is not. Doing it
+   * with `align-items: center` on the overlay looks identical until the
+   * content outgrows the screen, at which point it spills past both edges and
+   * the top half becomes unreachable — a jump animation is fine either way,
+   * but an escort run is not.
+   */
+  margin: auto;
 }
+/*
+ * `align-items: center` shrinks every child to the width of its own content,
+ * which for a space-between row means there is no space to put between: the
+ * escort tally read "Attackers destroyed1", label and value touching. These
+ * take the column's full width so the two ends are actually at the ends.
+ */
+.warp-core .kv,
+.warp-core .escort-log,
+.warp-core .btn-block {
+  align-self: stretch;
+}
+.escort-log { max-height: 240px; margin-top: 14px; }
 .warp-route {
   display: flex;
   align-items: center;
@@ -995,7 +1021,7 @@ tr:last-child td { border-bottom: none; }
    ========================================================================= */
 @media (orientation: landscape) and (max-height: 560px) {
   .nav {
-    /* Two columns rather than one long list: thirteen 44px tabs stacked come
+    /* Two columns rather than one long list: twelve 44px tabs plus the way out
        to ~600px against the ~350px a landscape phone leaves once the HUD has
        its share, so a single column would always be a scrolling one. Paired
        up they fit on screen, which is the difference between glancing at the
@@ -1093,6 +1119,11 @@ tr:last-child td { border-bottom: none; }
   .ship-visual svg { width: 44px; height: 44px; }
   .side-label { font-size: 10px; margin-bottom: 0; }
   .combat-log { max-height: 96px; padding: 8px 10px; font-size: 12px; }
+
+  /* Same reasoning for the escort log, which is taller still: 240px of a
+     411px viewport leaves nothing for the payout underneath it. */
+  .escort-log { max-height: 104px; margin-top: 8px; }
+  .warp-core { gap: 10px; }
 
   /*
    * And the actions pin themselves to the bottom of the modal. Compacting the

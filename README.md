@@ -3,9 +3,10 @@
 # Space Trader
 
 A modern remake of the classic **Space Trader** (originally by Pieter Spronck for
-Palm OS, later ported to Windows by Jay French). Built as a cross-platform desktop
-app with **Electron + React + TypeScript**, a clean sci-fi UI, and full
-localization (English by default, Ukrainian included).
+Palm OS, later ported to Windows by Jay French). Built with **React +
+TypeScript** and shipped to the **desktop** (Electron) and to **Android**
+(Capacitor) from one codebase, with a clean sci-fi UI and full localization
+(English by default, Ukrainian included).
 
 > This is an *ambitious* remake: it keeps the spirit and economy model of the
 > original while adding a modern interface, an interactive star map, and a
@@ -187,13 +188,38 @@ If you would rather update manually, just run the new installer:
 To remove the game, use *Settings → Apps → Space Trader*. If you also want the
 saves gone, delete `%APPDATA%\space-trader\` by hand.
 
+## Installing (Android)
+
+There is **no published Android release yet** — the desktop Releases page carries
+only the Windows installer. To get an APK today, either build one (see
+[Development](#android) below) or download it from a CI run: open the latest
+[Android workflow](https://github.com/alexbeatnik/SpaceTrader/actions/workflows/android.yml)
+run and take the `SpaceTrader-<version>-apk` artifact.
+
+Copy it to your phone and open it. Android will ask you to allow installs from
+your browser or file manager the first time — this build is signed with the
+standard debug key, not a Play Store one.
+
+The game runs in both orientations and lays itself out for each: upright the
+navigation sits along the bottom under your thumb, on its side it moves to a
+two-column rail so all twelve destinations stay visible at once. The hardware
+back button steps back one screen at a time and will not interrupt a fight, a
+jump or a contract offer.
+
+**Saves live in the app's private storage** and use the same format as the
+desktop, so a file copied across is readable by either. Uninstalling deletes
+them — there is no cloud sync. The app does not update itself on Android; that
+is the store's job, and there is no store listing yet, so new versions mean a
+new APK.
+
 ## Tech stack
 
 | Layer      | Choice                                   |
 | ---------- | ---------------------------------------- |
 | Desktop    | Electron 33                              |
+| Mobile     | Capacitor 7 (Android)                    |
 | UI         | React 19 + TypeScript                    |
-| Build      | electron-vite (Vite 5)                   |
+| Build      | electron-vite (desktop) + Vite 5 (mobile)|
 | State      | Zustand                                  |
 | Engine     | Pure TypeScript, no UI dependencies      |
 | Tests      | Vitest                                   |
@@ -204,7 +230,8 @@ saves gone, delete `%APPDATA%\space-trader\` by hand.
 src/
   main/        Electron main process (window + save-slot IPC)
   preload/     Context-bridge API exposed to the renderer
-  shared/      Save-file format shared by main and renderer
+  shared/      Save format, write-ordering queue and update states, shared by
+               every host
   game/        Pure game engine (no React/Electron imports)
     data/      Static data: goods, ships, equipment, stations, governments,
                economies, names
@@ -218,21 +245,29 @@ src/
       screens/     Menu, System Map, Planet, Market, Shipyard, Bank, Crew,
                    Quests, Star Chart, Ship, Log, Saves
       store/       Zustand store wiring the engine to the UI
+      platform/    Host abstraction: saves and updates, per platform
+android/       Capacitor's native Android project
+assets/        Source art for the generated launcher icons and splashes
 build/         App icon (icon.png / icon.ico) for packaging
 ```
 
 The **engine is fully decoupled** from the UI: it takes and mutates a plain
 `GameState` object and returns typed results, which makes it unit-testable and
-reusable (e.g. for a future web build).
+portable.
+
+The **renderer is decoupled from its host** the same way. Everything that
+differs between Electron and Android — where saves are written, whether the app
+can update itself — is named in `renderer/src/platform/` and answered once per
+platform; no screen or store action knows which shell it is running in.
 
 ## Development
 
 ```bash
 npm install        # install dependencies
-npm run dev        # launch the app with hot reload
+npm run dev        # launch the desktop app with hot reload
 npm run typecheck  # type-check main + renderer
 npm test           # run engine unit tests
-npm run build      # production build into out/
+npm run build      # production desktop build into out/
 npm run dist       # package a distributable (electron-builder)
 ```
 
@@ -242,6 +277,28 @@ Requires Node.js 18+.
 welcome page — the one that tells a returning player not to uninstall the old
 version first — lives in [build/installer.nsh](build/installer.nsh); everything
 else about the installer is the `build.nsis` block of `package.json`.
+
+### Android
+
+```bash
+npm run dev:web    # the renderer in a browser, on Capacitor's web shims
+npm run build:web  # static bundle into dist-web/
+npm run apk        # build:web + cap sync + assembleDebug
+```
+
+`npm run apk` needs a **JDK 17+** on `JAVA_HOME` and an Android SDK — put its
+path in `android/local.properties` as `sdk.dir=...` (gitignored, so it is
+per-machine). Android Studio provides both; command-line tools alone are enough.
+The APK lands in `android/app/build/outputs/apk/debug/`.
+
+Neither is needed to contribute: `.github/workflows/android.yml` builds the APK
+on branch pushes and pull requests and attaches it to the run, and
+`npm run dev:web` gives you the mobile layout in a browser with no toolchain at
+all — narrow the window under 860px for the portrait layout, or make it shorter
+than 560px and wider than it is tall for the landscape one.
+
+The version comes from `package.json` in both directions: Gradle reads it for
+`versionName`, and derives `versionCode` as `major*10000 + minor*100 + patch`.
 
 ## Localization
 
