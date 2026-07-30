@@ -22,7 +22,7 @@ export function CrewIncidentModal(): React.JSX.Element | null {
 
   return (
     <div className="overlay">
-      <div className="modal" style={{ maxWidth: 460 }}>
+      <div className="modal modal-narrow">
         <h2>
           {ICON[incident.role] ?? '⚠'} {t(incident.titleKey)}
         </h2>

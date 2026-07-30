@@ -78,6 +78,18 @@ Core systems implemented:
   scale with your wealth, combat reputation, and criminal record. Blow-by-blow
   combat logs call out **critical hits**, shields soaking a volley, shields
   collapsing, and a hull breached and venting.
+- **Fighting a group, ship by ship** — an ambush is not one enemy at a time on a
+  counter: every hull in it is on screen, each sitting at **its own range**, and
+  you pick which one the guns are laid on. Range is the reason it matters —
+  closing buys accuracy and opening costs it, **for both sides alike**, so the
+  straggler at 30 km is the safe one to leave until last. The odds are quoted
+  before you commit: your shot, their shot, the distance.
+- **Actions come from the crew** — a round is not one move. Every hand not
+  needed at the helm works a gun, so a commander flying alone chooses between
+  manoeuvring *or* firing, while a crewed ship can close the range **and** fire,
+  or put two volleys into two different ships. Gunners cannot outnumber the guns
+  aboard, which is what makes a second weapon mount worth buying rather than
+  just another body.
 - **Hull size matters** — a small ship **outruns** a heavier one, but a pack of
   big hulls can pin it in a **tractor beam**: while the lock holds there is no
   escape and you are an easier target, until you overload the emitters and slip
@@ -159,6 +171,18 @@ Core systems implemented:
 | ![The commodity market](docs/screenshots/market.png) **Market** — buy and sell prices, illegal goods, and what your contracts still need | ![The star chart](docs/screenshots/star-chart.png) **Star chart** — 140 systems, wormhole links and a fuel-range ring |
 | ![The shipyard](docs/screenshots/shipyard.png) **Shipyard** — fuel, repairs, hull reinforcement, weapons, shields and gadgets | ![The job board](docs/screenshots/quests.png) **Quests** — a job board on every planet, across seven contract types |
 | ![The ship view](docs/screenshots/ship.png) **Ship** — fittings, commander skills, crew and standing, with a hand-built silhouette per hull | ![The main menu](docs/screenshots/menu.png) **Main menu** — name your commander and pick a language |
+
+### On a phone
+
+The same renderer, laid out for a 411px screen: the navigation drops to a
+thumb-height strip along the bottom, and the market's ten columns restack as one
+card per commodity so Buy and Sell are never off the edge.
+
+| | | |
+| :---: | :---: | :---: |
+| ![A pirate ambush](docs/screenshots/mobile/combat.png) **Combat** — the whole group, each ship with its range and your odds against it | ![The commodity market](docs/screenshots/mobile/market.png) **Market** — one card per good, with prices, hold and contract needs | ![The system map](docs/screenshots/mobile/system-map.png) **System map** — the star, its planets and where you are docked |
+| ![The star chart](docs/screenshots/mobile/star-chart.png) **Star chart** — fuel-range ring, and the destination dossier before you commit | ![A warp jump](docs/screenshots/mobile/warp.png) **Warp** — every jump is flown, not skipped | ![The planet dossier](docs/screenshots/mobile/planet.png) **Planet** — government, economy, a wormhole and news written from the world's own crisis |
+| ![The shipyard](docs/screenshots/mobile/shipyard.png) **Shipyard** — fuel, repairs, hull reinforcement and fittings | ![A contract offer](docs/screenshots/mobile/quest-offer.png) **Contracts** — the job, the reward, and what it needs in the hold | ![Landscape layout](docs/screenshots/mobile/landscape.png) **Landscape** — the rail pairs its twelve tabs into two columns rather than eating the short axis |
 
 ## Installing & updating (Windows)
 

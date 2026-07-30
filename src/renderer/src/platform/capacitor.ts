@@ -101,6 +101,31 @@ export async function sweepScratchFiles(): Promise<void> {
   }
 }
 
+/**
+ * The hardware back gesture, as a plain subscribe/unsubscribe.
+ *
+ * `@capacitor/app` is loaded lazily — the desktop bundle serves the same
+ * renderer and must not pay for a plugin it will never call — which makes
+ * registering asynchronous while callers want a synchronous unsubscribe. Hence
+ * the `cancelled` flag: a component that unmounts before the import resolves
+ * still gets its listener removed rather than leaking one.
+ */
+function subscribeBackButton(handler: () => void): () => void {
+  let remove: (() => void) | undefined
+  let cancelled = false
+
+  void import('@capacitor/app').then(async ({ App }) => {
+    const handle = await App.addListener('backButton', () => handler())
+    if (cancelled) void handle.remove()
+    else remove = () => void handle.remove()
+  })
+
+  return () => {
+    cancelled = true
+    remove?.()
+  }
+}
+
 export function createCapacitorPlatform(): Platform {
   // The same ordering guarantees the desktop relies on. The store fires
   // autosaves without awaiting them here too, and every call is an async hop
@@ -109,9 +134,13 @@ export function createCapacitorPlatform(): Platform {
   const queue = createSlotQueue()
 
   const platform = Capacitor.getPlatform()
+  // Android is the only host here with a back gesture at all: iOS has none, and
+  // the App plugin's web shim registers a `backButton` listener that can never
+  // fire while `exitApp` throws outright. Both are no-ops instead.
+  const isAndroid = platform === 'android'
 
   return {
-    kind: platform === 'android' ? 'android' : platform === 'ios' ? 'ios' : 'web',
+    kind: isAndroid ? 'android' : platform === 'ios' ? 'ios' : 'web',
     touch: Capacitor.isNativePlatform(),
     saves: {
       save: (slot, data) => queue.write(slot, data, writeSlot),
@@ -174,6 +203,12 @@ export function createCapacitorPlatform(): Platform {
 
     // Play Store installs new versions on Android, and a browser tab just
     // reloads. Nothing here to drive, so the About screen drops the panel.
-    updates: null
+    updates: null,
+
+    onBackButton: isAndroid ? subscribeBackButton : () => () => {},
+
+    exitApp: isAndroid
+      ? () => void import('@capacitor/app').then(({ App }) => App.exitApp())
+      : () => {}
   }
 }

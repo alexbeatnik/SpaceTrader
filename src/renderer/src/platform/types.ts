@@ -47,4 +47,17 @@ export interface Platform {
    * ever say "unsupported" is worse than showing nothing.
    */
   updates: UpdatesPort | null
+  /**
+   * Subscribe to the host's system-level "back" gesture; returns an
+   * unsubscribe. Hosts that have no such gesture — a desktop window, a browser
+   * tab — return a no-op, so `useBackButton` never has to ask which host it is
+   * running in.
+   */
+  onBackButton(handler: () => void): () => void
+  /**
+   * Leave the app, where leaving is a thing the app can do at all. Android's
+   * back press out of the menu is the only caller; everywhere else the window
+   * or tab belongs to the user, so this does nothing.
+   */
+  exitApp(): void
 }

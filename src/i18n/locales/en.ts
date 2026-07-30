@@ -705,6 +705,29 @@ export const en = {
       broke: 'You overload the beam emitters and slip the tractor lock!',
       badge: 'Tractor lock'
     },
+    range: {
+      label: 'Range',
+      unit: 'km',
+      closed: 'You burn in to {distance} km.',
+      opened: 'You pull back to {distance} km.',
+      atPointBlank: 'Any closer and you would be trading paint — {distance} km.',
+      atMax: 'Open any further and they are out of the fight — {distance} km.'
+    },
+    targetSwitched: 'Guns re-laid on the {ship}.',
+    yourShot: 'Your shot',
+    theirShot: 'Their shot',
+    actionsLeft: 'Actions',
+    stations: {
+      gunners: '{count} on the guns',
+      helm: 'helm manned',
+      helmEmpty: 'nobody spare to fly'
+    },
+    fleet: {
+      engaged: 'Engaged',
+      waiting: 'Holding off',
+      wreck: 'Wreck',
+      pickTarget: 'Tap a ship to lay the guns on it'
+    },
     alien: {
       appear: 'An unknown alien vessel ({ship}-class) closes in, weapons hot!'
     },
@@ -722,7 +745,10 @@ export const en = {
       hidden: 'The hidden compartment held — the contraband went unnoticed.'
     },
     action: {
-      attack: 'Attack',
+      attack: 'Fire',
+      closeIn: 'Close in',
+      openRange: 'Open range',
+      endTurn: 'End turn',
       flee: 'Flee',
       breakFree: 'Break the tractor lock',
       surrenderCargo: 'Surrender the cargo',

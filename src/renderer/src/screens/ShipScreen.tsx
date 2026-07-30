@@ -35,7 +35,7 @@ export function ShipScreen(): React.JSX.Element {
 
       <div className="ship-visual" style={{ marginBottom: 16 }}>
         <ShipArt type={ship.type} size={84} />
-        <div style={{ flex: 1 }}>
+        <div className="ship-info">
           <div className="kv">
             <span className="k">{t('ship.hull')}</span>
             <span className="v">{ship.hull}/{maxHull(ship)}</span>

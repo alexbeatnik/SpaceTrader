@@ -15,6 +15,7 @@ import {
   releaseLocalSourcing,
   type ActionResult
 } from './game'
+import { battleStations } from './crew'
 import { completeBounty } from './quests'
 import {
   applyKarma,
@@ -46,6 +47,22 @@ export const CRIT_MULTIPLIER = 2
 /** Accuracy a shooter gains against a ship pinned in a tractor beam. */
 export const TRACTOR_ACCURACY_BONUS = 0.15
 
+/**
+ * Engagement range, in kilometres.
+ *
+ * Every ship in a group closes on its own line, so a pack arrives spread out
+ * rather than in a rank: the nearest is the easy shot and the stragglers are the
+ * safe ones, which is what makes picking a target a decision instead of a
+ * formality. Range costs accuracy — nothing inside `POINT_BLANK_RANGE`, up to
+ * `RANGE_ACCURACY_PENALTY` at the far end — and it costs it *symmetrically*: a
+ * shot you can barely make is one they can barely make back.
+ */
+export const POINT_BLANK_RANGE = 6
+export const MAX_ENGAGEMENT_RANGE = 40
+export const RANGE_ACCURACY_PENALTY = 0.3
+/** How far one helm manoeuvre moves the engaged pair, in km. */
+export const RANGE_MANOEUVRE_STEP = 7
+
 export interface Opponent {
   kind: EncounterKind
   shipType: ShipTypeId
@@ -58,6 +75,11 @@ export interface Opponent {
   fighter: number
   cargo: Record<GoodId, number>
   fleeing: boolean
+  /**
+   * How far off this ship is, in km — rolled when the group is built, and closed
+   * a little every round it and the player trade fire.
+   */
+  distance: number
 }
 
 /** A trader's willingness to deal: what it sells to, and buys from, the player. */
@@ -84,7 +106,25 @@ export interface Encounter {
   fleetSize: number
   /** How many ships have been destroyed / dealt with so far. */
   defeated: number
+  /**
+   * The hulls already out of the fight, in the order they went down. `defeated`
+   * counts them; this remembers *what* they were, so the group can be drawn as
+   * the ships it is made of rather than as a tally.
+   */
+  downed: ShipTypeId[]
   status: EncounterStatus
+  /**
+   * Actions the player has left before the other side gets its turn, and the
+   * budget they are drawn from. Both come from `battleStations` — the crew is
+   * what buys a ship the room to close *and* shoot in one exchange.
+   */
+  actionsLeft: number
+  actionsPerRound: number
+  /**
+   * Counts every action resolved, not every exchange: the store seeds each
+   * roll off `seed ^ round`, so it has to move for a second volley in the same
+   * turn to roll different dice from the first.
+   */
   round: number
   /**
    * Seed for this encounter's dice, drawn from the galaxy's own rng when the
@@ -111,6 +151,9 @@ export interface Encounter {
 
 export type CombatAction =
   | 'attack'
+  | 'closeIn'
+  | 'openRange'
+  | 'endTurn'
   | 'flee'
   | 'submit' // police inspection
   | 'bribe'
@@ -225,7 +268,8 @@ function makeOpponent(kind: EncounterKind, rng: Rng, threat: number): Opponent {
     pilot: Math.min(13, rng.int(3, 8) + threat + skillBonus),
     fighter: Math.min(13, rng.int(3, 8) + threat + skillBonus),
     cargo,
-    fleeing: false
+    fleeing: false,
+    distance: rng.int(POINT_BLANK_RANGE, MAX_ENGAGEMENT_RANGE)
   }
 }
 
@@ -286,9 +330,13 @@ function makeEncounter(
   if (kind === 'pirate' && rng.chance(0.35)) fleetSize = rng.int(2, 5)
   else if (kind === 'trader' && rng.chance(0.3)) fleetSize = rng.int(2, 4)
 
-  const opponent = makeOpponent(kind, rng, threat)
-  const reserves: Opponent[] = []
-  for (let i = 1; i < fleetSize; i++) reserves.push(makeOpponent(kind, rng, threat))
+  // Nearest ship first: the one that got close enough to hail you is the one you
+  // are engaged with, and `engageNext` then walks the group outwards.
+  const group: Opponent[] = []
+  for (let i = 0; i < fleetSize; i++) group.push(makeOpponent(kind, rng, threat))
+  group.sort((a, b) => a.distance - b.distance)
+  const opponent = group[0]
+  const reserves = group.slice(1)
 
   // A lone trader will deal; a caravan just passes (loot only if attacked).
   let trade: TradeOffer | undefined
@@ -332,7 +380,10 @@ function makeEncounter(
     reserves,
     fleetSize,
     defeated: 0,
+    downed: [],
     status: 'ongoing',
+    actionsLeft: battleStations(state).actions,
+    actionsPerRound: battleStations(state).actions,
     round: 0,
     seed: rng.int(0, 0x7fffffff),
     bribeCost,
@@ -343,13 +394,40 @@ function makeEncounter(
   }
 }
 
+/** Hand the player a fresh budget of actions for the coming exchange. */
+function startTurn(state: GameState, enc: Encounter): void {
+  const stations = battleStations(state)
+  enc.actionsPerRound = stations.actions
+  enc.actionsLeft = stations.actions
+}
+
 /** Promote the next reserve ship to active; returns false if the group is spent. */
-function engageNext(enc: Encounter): boolean {
+function engageNext(state: GameState, enc: Encounter): boolean {
   const next = enc.reserves.shift()
   if (!next) return false
   enc.opponent = next
   enc.status = 'ongoing'
+  // A new ship in front of the guns is a new exchange, so the watch resets.
+  startTurn(state, enc)
   enc.messages.push({ key: 'encounter.fleetNext', params: { remaining: enc.reserves.length + 1 } })
+  return true
+}
+
+/**
+ * Re-point the guns at another ship in the group: `index` is a position in
+ * `reserves`, which trades places with whatever is engaged now.
+ *
+ * Aiming is free — it is who the guns point at, not a manoeuvre — and nobody
+ * leaves the fight, so a ship left half-wrecked and picked up again later is
+ * still half-wrecked. Returns false when there is nothing at that index.
+ */
+export function setTarget(enc: Encounter, index: number): boolean {
+  if (enc.status !== 'ongoing') return false
+  const chosen = enc.reserves[index]
+  if (!chosen) return false
+  enc.reserves[index] = enc.opponent
+  enc.opponent = chosen
+  enc.messages.push({ key: 'encounter.targetSwitched', params: { ship: chosen.shipType } })
   return true
 }
 
@@ -514,10 +592,44 @@ export function createBountyEncounter(
 }
 
 // --- Combat resolution -------------------------------------------------------
-function hitChance(attackerFighter: number, defenderPilot: number): number {
-  // Logistic-ish curve based on the fighter/pilot differential.
+/** Accuracy lost to range: none at point blank, the full penalty at the far end. */
+function rangePenalty(distance: number): number {
+  const span = MAX_ENGAGEMENT_RANGE - POINT_BLANK_RANGE
+  const over = Math.max(0, Math.min(span, distance - POINT_BLANK_RANGE))
+  return (over / span) * RANGE_ACCURACY_PENALTY
+}
+
+function hitChance(
+  attackerFighter: number,
+  defenderPilot: number,
+  distance = POINT_BLANK_RANGE
+): number {
+  // Logistic-ish curve based on the fighter/pilot differential, less whatever
+  // the range between the two hulls costs.
   const diff = attackerFighter - defenderPilot
-  return Math.min(0.95, Math.max(0.15, 0.55 + diff * 0.05))
+  return Math.min(0.95, Math.max(0.1, 0.55 + diff * 0.05 - rangePenalty(distance)))
+}
+
+/**
+ * The odds the player's guns land on a given ship — the engaged one by default.
+ *
+ * Exported because the combat screen quotes it before the player commits, and
+ * the number shown has to be the number the dice are rolled against: the same
+ * function feeds both, so they cannot drift.
+ */
+export function playerHitChance(
+  state: GameState,
+  enc: Encounter,
+  target: Opponent = enc.opponent
+): number {
+  return hitChance(effectiveSkills(state).fighter, target.pilot, target.distance)
+}
+
+/** The odds the engaged ship lands a shot on the player, tractor lock included. */
+export function opponentHitChance(state: GameState, enc: Encounter): number {
+  const opp = enc.opponent
+  const raw = hitChance(opp.fighter, effectiveSkills(state).pilot, opp.distance)
+  return Math.min(0.95, raw + (enc.tractorLocked ? TRACTOR_ACCURACY_BONUS : 0))
 }
 
 /** Chance a landed hit finds a weak point and doubles its damage. */
@@ -588,8 +700,15 @@ export interface CombatContext {
 }
 
 /**
- * Resolve a single combat round given the player's chosen action.
- * Mutates both the game state and the encounter in place.
+ * Resolve one player action, and the other side's reply once the player's
+ * actions for this exchange are spent. Mutates state and encounter in place.
+ *
+ * A round is no longer one action: `battleStations` decides how many the crew
+ * can take — closing the range *and* firing, or firing twice at two different
+ * ships — and only when the last one is spent (or the player calls `endTurn`)
+ * does the opponent shoot back. Anything that ends the engagement outright —
+ * fleeing, surrendering, a bribe, an inspection — ignores the budget and
+ * resolves on the spot.
  */
 export function resolveRound(
   state: GameState,
@@ -721,20 +840,21 @@ export function resolveRound(
         // Held fast: the round is spent, and a pinned target is an easy shot.
         msg('encounter.tractor.held')
         if (opp.weaponPower > 0) {
-          if (rng.chance(hitChance(opp.fighter, skills.pilot) + TRACTOR_ACCURACY_BONUS)) {
+          if (rng.chance(opponentHitChance(state, enc))) {
             dealDamageToPlayer(state, opp, rng, msg)
           } else {
             msg('encounter.oppMiss')
           }
         }
         checkPlayerDestroyed(state, enc, msg)
+        if (enc.status === 'ongoing') startTurn(state, enc)
         return
       }
     }
 
     // Opponent gets a parting shot if it can attack.
     if (opp.weaponPower > 0 && !opp.fleeing) {
-      if (rng.chance(hitChance(opp.fighter, skills.pilot))) {
+      if (rng.chance(opponentHitChance(state, enc))) {
         dealDamageToPlayer(state, opp, rng, msg)
       }
     }
@@ -745,14 +865,37 @@ export function resolveRound(
       msg('encounter.fledFail')
     }
     checkPlayerDestroyed(state, enc, msg)
+    // A run that failed cost the whole turn: the ship was manoeuvring, not
+    // fighting, so nobody got a shot off but the one taking the parting shot.
+    if (enc.status === 'ongoing') startTurn(state, enc)
     return
+  }
+
+  // --- Manoeuvring ---
+  // The helm changes the range. Closing buys accuracy for both sides; opening
+  // costs it for both, which is how a wounded ship backs out of a knife fight.
+  if (action === 'closeIn' || action === 'openRange') {
+    const before = opp.distance
+    opp.distance =
+      action === 'closeIn'
+        ? Math.max(POINT_BLANK_RANGE, opp.distance - RANGE_MANOEUVRE_STEP)
+        : Math.min(MAX_ENGAGEMENT_RANGE, opp.distance + RANGE_MANOEUVRE_STEP)
+    if (opp.distance === before) {
+      msg(action === 'closeIn' ? 'encounter.range.atPointBlank' : 'encounter.range.atMax', {
+        distance: opp.distance
+      })
+    } else {
+      msg(action === 'closeIn' ? 'encounter.range.closed' : 'encounter.range.opened', {
+        distance: opp.distance
+      })
+    }
   }
 
   // --- Attack ---
   if (action === 'attack') {
     if (playerWeapon <= 0) {
       msg('encounter.noWeapons')
-    } else if (rng.chance(hitChance(skills.fighter, opp.pilot))) {
+    } else if (rng.chance(playerHitChance(state, enc))) {
       let dmg = playerWeapon + rng.int(0, Math.round(playerWeapon * 0.3))
       const fireControl =
         state.ship.gadgets.includes('targeting') || state.ship.gadgets.includes('battleComputer')
@@ -787,9 +930,10 @@ export function resolveRound(
       // The wreck spills its cargo into your hold.
       dropLoot(state, opp, rng, msg)
       enc.defeated++
+      enc.downed.push(opp.shipType)
       msg('encounter.oppDestroyed')
       // Another ship in the group steps up, if any remain.
-      if (!engageNext(enc)) enc.status = 'oppDestroyed'
+      if (!engageNext(state, enc)) enc.status = 'oppDestroyed'
       return
     }
 
@@ -806,6 +950,15 @@ export function resolveRound(
     }
   }
 
+  // --- End of the player's phase ---
+  // Every action but `endTurn` costs one; while any are left the other side is
+  // still waiting, so the player can close the range and *then* fire, or put two
+  // volleys into two different ships.
+  if (action !== 'endTurn') {
+    enc.actionsLeft = Math.max(0, enc.actionsLeft - 1)
+    if (enc.actionsLeft > 0) return
+  }
+
   // --- Opponent's turn (attacks back unless a trader who won't provoke) ---
   const oppWillFight =
     enc.kind === 'pirate' ||
@@ -816,9 +969,7 @@ export function resolveRound(
 
   if (oppWillFight && opp.weaponPower > 0) {
     // A ship held in a tractor beam is a far easier target.
-    const accuracy =
-      hitChance(opp.fighter, skills.pilot) + (enc.tractorLocked ? TRACTOR_ACCURACY_BONUS : 0)
-    if (rng.chance(accuracy)) {
+    if (rng.chance(opponentHitChance(state, enc))) {
       dealDamageToPlayer(state, opp, rng, msg)
     } else {
       msg('encounter.oppMiss')
@@ -836,6 +987,8 @@ export function resolveRound(
   }
 
   checkPlayerDestroyed(state, enc, msg)
+  // Their turn is over: the watch stands to again.
+  if (enc.status === 'ongoing') startTurn(state, enc)
 }
 
 function dealDamageToPlayer(
@@ -905,8 +1058,9 @@ export function plunder(state: GameState, enc: Encounter): number {
     pushLog(state, 'log.plunderedTrader', { qty: taken })
   }
   enc.defeated++
+  enc.downed.push(enc.opponent.shipType)
   // A surrendered ship dealt with — the next of the group engages, if any.
-  if (!engageNext(enc)) enc.status = 'ignored'
+  if (!engageNext(state, enc)) enc.status = 'ignored'
   return taken
 }
 

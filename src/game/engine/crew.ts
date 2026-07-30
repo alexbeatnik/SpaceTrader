@@ -205,6 +205,40 @@ export function assignRoles(state: GameState): Record<CrewRole, RoleAssignment> 
   return result
 }
 
+// --- Battle stations ---------------------------------------------------------
+/** What the watch bill lets the ship do in one round of a fight. */
+export interface BattleStations {
+  /** Volleys the ship can loose in a round: one per gunner, capped by its guns. */
+  shots: number
+  /** True when a hand is free to fly while the guns are being worked. */
+  helm: boolean
+  /** Actions the player may spend before the other side replies. */
+  actions: number
+}
+
+/**
+ * Battle stations.
+ *
+ * The daily watch bill puts one hand on each of the four posts, but a fight is
+ * not a day: everyone not flying the ship is on a gun. So a round's actions come
+ * straight off the roster — one to manoeuvre with, and one volley for every
+ * remaining pair of hands.
+ *
+ * Two limits keep it honest. A lone commander gets no helm action: one pair of
+ * hands cannot fly the ship and lay the guns in the same breath, so they choose.
+ * And gunners cannot outnumber the guns — a Flea with one laser fires once
+ * however many people are aboard, which is what makes a second weapon mount
+ * worth buying rather than just another body.
+ */
+export function battleStations(state: GameState): BattleStations {
+  const hands = crewCount(state)
+  const guns = Math.max(1, state.ship.weapons.length)
+  const helm = hands > 1
+  const gunners = helm ? hands - 1 : 1
+  const shots = Math.max(1, Math.min(gunners, guns))
+  return { shots, helm, actions: shots + (helm ? 1 : 0) }
+}
+
 // --- Hiring hall -------------------------------------------------------------
 /**
  * Who is looking for a berth at the current planet today. Refreshed on every

@@ -39,9 +39,9 @@ export function QuestOfferModal(): React.JSX.Element | null {
 
   return (
     <div className="overlay">
-      <div className="modal" style={{ width: 460, textAlign: 'center' }}>
+      <div className="modal modal-narrow modal-center">
         <div className="ship-emoji" style={{ fontSize: 44, marginBottom: 6 }}>{ICON[offer.type]}</div>
-        <h2 style={{ justifyContent: 'center' }}>{t('quest.offerTitle')}</h2>
+        <h2>{t('quest.offerTitle')}</h2>
         <div className="badge" style={{ margin: '4px 0 12px' }}>{questTypeLabel(offer)}</div>
         <p style={{ color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 16 }}>
           {questDescription(offer, game)}
@@ -60,11 +60,11 @@ export function QuestOfferModal(): React.JSX.Element | null {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={accept}>
+        <div className="modal-actions">
+          <button className="btn btn-primary" onClick={accept}>
             {t('quest.accept')}
           </button>
-          <button className="btn" style={{ flex: 1 }} onClick={decline}>
+          <button className="btn" onClick={decline}>
             {t('quest.decline')}
           </button>
         </div>
