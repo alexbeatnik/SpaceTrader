@@ -63,7 +63,13 @@ import {
   tractorChance,
   fleeChance,
   spawnPirates,
-  rollEncounter
+  rollEncounter,
+  setTarget,
+  playerHitChance,
+  opponentHitChance,
+  POINT_BLANK_RANGE,
+  MAX_ENGAGEMENT_RANGE,
+  RANGE_MANOEUVRE_STEP
 } from './combat'
 import type { Encounter, EncounterKind, Opponent } from './combat'
 import {
@@ -116,6 +122,7 @@ import { escortShipProblem, canEscort, buyRobot, freeQuarters } from './game'
 import {
   assignRoles,
   berthsUsed,
+  battleStations,
   crewCount,
   crewLoad,
   crewRepairPerDay,
@@ -152,6 +159,9 @@ function testEncounter(kind: EncounterKind, opp: Partial<Opponent> = {}): Encoun
     fighter: 5,
     cargo: emptyCargo(),
     fleeing: false,
+    // Point blank unless a test says otherwise, so range never quietly moves
+    // the hit chances a test is asserting on.
+    distance: POINT_BLANK_RANGE,
     ...opp
   }
   return {
@@ -160,7 +170,10 @@ function testEncounter(kind: EncounterKind, opp: Partial<Opponent> = {}): Encoun
     reserves: [],
     fleetSize: 1,
     defeated: 0,
+    downed: [],
     status: 'ongoing',
+    actionsLeft: 1,
+    actionsPerRound: 1,
     round: 0,
     seed: 1,
     bribeCost: 0,
@@ -1426,6 +1439,153 @@ describe('combat log detail', () => {
     const g = newGame({ commanderName: 'Test', seed: 97 })
     const enc = spawnPirates(g, new Rng(4))
     expect(enc.messages.some((m) => m.key === 'encounter.pirate.demandEmpty')).toBe(true)
+  })
+})
+
+describe('engagement range', () => {
+  it('every ship in a group has its own range, nearest one engaged first', () => {
+    const g = newGame({ commanderName: 'Test', seed: 610 })
+    // Enough rolls to land at least one multi-ship ambush.
+    const packs = Array.from({ length: 60 }, (_, i) => spawnPirates(g, new Rng(i + 1))).filter(
+      (e) => e.fleetSize > 1
+    )
+    expect(packs.length).toBeGreaterThan(0)
+    for (const enc of packs) {
+      const all = [enc.opponent, ...enc.reserves]
+      for (const o of all) {
+        expect(o.distance).toBeGreaterThanOrEqual(POINT_BLANK_RANGE)
+        expect(o.distance).toBeLessThanOrEqual(MAX_ENGAGEMENT_RANGE)
+      }
+      // The one that got close enough to hail you is the one you are fighting.
+      expect(enc.opponent.distance).toBe(Math.min(...all.map((o) => o.distance)))
+    }
+  })
+
+  it('range costs accuracy, and costs it to both sides alike', () => {
+    const g = newGame({ commanderName: 'Test', seed: 611 })
+    const near = testEncounter('pirate', { distance: POINT_BLANK_RANGE, weaponPower: 10 })
+    const far = testEncounter('pirate', { distance: MAX_ENGAGEMENT_RANGE, weaponPower: 10 })
+
+    expect(playerHitChance(g, far)).toBeLessThan(playerHitChance(g, near))
+    expect(opponentHitChance(g, far)).toBeLessThan(opponentHitChance(g, near))
+  })
+
+  it('the helm closes and opens the range, and cannot pass either stop', () => {
+    const g = newGame({ commanderName: 'Test', seed: 612 })
+    const enc = testEncounter('pirate', { distance: 20, weaponPower: 0 })
+    const rng = new Rng(7)
+
+    resolveRound(g, enc, 'closeIn', rng)
+    expect(enc.opponent.distance).toBe(20 - RANGE_MANOEUVRE_STEP)
+
+    resolveRound(g, enc, 'openRange', rng)
+    expect(enc.opponent.distance).toBe(20)
+
+    for (let i = 0; i < 20; i++) resolveRound(g, enc, 'closeIn', rng)
+    expect(enc.opponent.distance).toBe(POINT_BLANK_RANGE)
+    expect(enc.messages.some((m) => m.key === 'encounter.range.atPointBlank')).toBe(true)
+
+    for (let i = 0; i < 20; i++) resolveRound(g, enc, 'openRange', rng)
+    expect(enc.opponent.distance).toBe(MAX_ENGAGEMENT_RANGE)
+    expect(enc.messages.some((m) => m.key === 'encounter.range.atMax')).toBe(true)
+  })
+})
+
+describe('picking a target out of a group', () => {
+  it('swaps the chosen ship into the fight and keeps the damage already done', () => {
+    const enc = testEncounter('pirate', { shipType: 'gnat', hull: 40, weaponPower: 0 })
+    enc.fleetSize = 3
+    enc.reserves = [
+      { ...enc.opponent, shipType: 'ant', hull: 55, distance: 30 },
+      { ...enc.opponent, shipType: 'bumblebee', hull: 70, distance: 12 }
+    ]
+
+    expect(setTarget(enc, 1)).toBe(true)
+    expect(enc.opponent.shipType).toBe('bumblebee')
+    // The one that was engaged goes back to the group, damage and all.
+    expect(enc.reserves[1].shipType).toBe('gnat')
+    expect(enc.reserves[1].hull).toBe(40)
+    expect(enc.messages.some((m) => m.key === 'encounter.targetSwitched')).toBe(true)
+  })
+
+  it('refuses an index with no ship at it, and a fight already over', () => {
+    const g = newGame({ commanderName: 'Test', seed: 621 })
+    const enc = testEncounter('pirate', { weaponPower: 0 })
+    expect(setTarget(enc, 0)).toBe(false)
+
+    enc.reserves = [{ ...enc.opponent, shipType: 'ant' }]
+    enc.status = 'oppDestroyed'
+    expect(setTarget(enc, 0)).toBe(false)
+    expect(g.ship.hull).toBeGreaterThan(0)
+  })
+
+  it('records what went down, not just how many', () => {
+    const g = newGame({ commanderName: 'Test', seed: 622 })
+    g.skills.fighter = 13
+    const enc = testEncounter('pirate', { shipType: 'gnat', hull: 1, weaponPower: 0, pilot: 0 })
+    enc.fleetSize = 2
+    enc.reserves = [{ ...enc.opponent, shipType: 'ant', hull: 1 }]
+
+    const rng = new Rng(31)
+    for (let i = 0; i < 40 && enc.status === 'ongoing'; i++) resolveRound(g, enc, 'attack', rng)
+
+    expect(enc.downed.length).toBe(enc.defeated)
+    expect(enc.downed).toContain('gnat')
+  })
+})
+
+describe('actions per round come from the crew', () => {
+  it('a lone commander gets one action; a second hand buys the helm one', () => {
+    const g = newGame({ commanderName: 'Test', seed: 630 })
+    expect(crewCount(g)).toBe(1)
+    expect(battleStations(g)).toMatchObject({ shots: 1, helm: false, actions: 1 })
+
+    g.ship.type = 'gnat' // two berths
+    g.ship.crew = ['nox'] // a gunner
+    expect(battleStations(g)).toMatchObject({ shots: 1, helm: true, actions: 2 })
+  })
+
+  it('a second gunner only pays off with a second gun to work', () => {
+    const g = newGame({ commanderName: 'Test', seed: 631 })
+    g.ship.type = 'grasshopper'
+    g.ship.crew = ['nox', 'dex'] // pilot at the helm, two hands left over
+    g.ship.weapons = ['pulse']
+    expect(battleStations(g)).toMatchObject({ shots: 1, actions: 2 })
+
+    g.ship.weapons = ['pulse', 'pulse']
+    expect(battleStations(g)).toMatchObject({ shots: 2, helm: true, actions: 3 })
+  })
+
+  it('the opponent waits until the whole budget is spent', () => {
+    const g = newGame({ commanderName: 'Test', seed: 632 })
+    g.ship.type = 'gnat'
+    g.ship.crew = ['nox']
+    const hullBefore = g.ship.hull
+    const enc = testEncounter('pirate', { weaponPower: 40, fighter: 13, pilot: 0, hull: 9000 })
+    enc.actionsLeft = 2
+    enc.actionsPerRound = 2
+    const rng = new Rng(33)
+
+    // First action of the exchange: they have not had their turn yet.
+    resolveRound(g, enc, 'closeIn', rng)
+    expect(enc.actionsLeft).toBe(1)
+    expect(g.ship.hull).toBe(hullBefore)
+
+    // Second spends the budget, so the reply lands and the watch stands to again.
+    resolveRound(g, enc, 'attack', rng)
+    expect(g.ship.hull).toBeLessThan(hullBefore)
+    expect(enc.actionsLeft).toBe(battleStations(g).actions)
+  })
+
+  it('ending the turn early hands the round over with actions unspent', () => {
+    const g = newGame({ commanderName: 'Test', seed: 633 })
+    const hullBefore = g.ship.hull
+    const enc = testEncounter('pirate', { weaponPower: 40, fighter: 13, pilot: 0, hull: 9000 })
+    enc.actionsLeft = 3
+    enc.actionsPerRound = 3
+
+    resolveRound(g, enc, 'endTurn', new Rng(34))
+    expect(g.ship.hull).toBeLessThan(hullBefore)
   })
 })
 

@@ -118,7 +118,11 @@ player's final action is lost without it.
 back: outwards one screen at a time, and swallowed entirely while combat, a
 jump, or a quest offer is on screen. Android treats an unhandled press as "leave
 the app", which for a game with no browser history means one careless swipe
-drops the player out of a voyage.
+drops the player out of a voyage. The gesture reaches it through
+`platform.onBackButton(handler)` / `platform.exitApp()`, which are no-ops on
+every host without one — the hook holds the *policy* and never touches
+`@capacitor/app` itself, because that import belongs inside `platform/` like
+every other host-shaped thing.
 
 `capacitor.config.ts` sets `adjustMarginsForEdgeToEdge: 'auto'`. Capacitor 7
 defaults it to `'disable'`, and Android 15 forces edge-to-edge on anything
@@ -443,6 +447,36 @@ loan past `BANK_BOUNTY_DEBT` — with `hunterEmployer` deciding whether the law 
 the bank is paying (it changes the encounter's opening lines). The two ways out
 are `payFine` (fast, expensive) and `serveSentence` (surrendering to a hunter:
 days on the calendar plus a fine, contraband seized, record wiped).
+
+### Combat: a turn is a budget, and range is a number
+
+`resolveRound` no longer resolves "one action then the enemy replies". Each call
+spends **one action** off `Encounter.actionsLeft`, and only when the budget hits
+zero (or the player sends `endTurn`) does the opponent fire back and
+`startTurn` refill it. The budget comes from `battleStations(state)` in
+`crew.ts`: one volley per hand not needed at the helm, capped by the weapons
+mounted, plus a manoeuvre if there is a second pair of hands at all. A lone
+commander therefore gets exactly one action and must choose between closing and
+firing. Anything that ends the engagement — `flee`, `surrender`, `submit`,
+`bribe`, `ignore` — ignores the budget and resolves on the spot.
+
+**`enc.round` counts actions, not exchanges.** The store seeds every roll off
+`seed ^ round`, so a second volley in the same turn would otherwise roll the
+first one's dice again. Keep incrementing it once per `resolveRound` call.
+
+Every `Opponent` carries a `distance` in km, rolled when the group is built and
+moved only by the `closeIn`/`openRange` actions. `rangePenalty` costs accuracy
+symmetrically — the shot you can barely make is one they can barely make back —
+and `playerHitChance`/`opponentHitChance` are exported **because the UI quotes
+them before the player commits**: the same function feeds the display and the
+dice, so the two cannot drift. Never re-derive the odds in a component.
+
+`makeEncounter` sorts the group by distance and engages the nearest, so
+`reserves` runs outwards. `setTarget(enc, i)` swaps a reserve into the fight and
+is **free** — aiming is not a manoeuvre — and nobody leaves, so a ship left
+half-wrecked and picked up again later is still half-wrecked. `enc.downed`
+records the hulls already destroyed (`defeated` only counts them), which is what
+lets the fleet strip draw wrecks rather than empty dots.
 
 ### Combat: hull size, tractor beams, criticals
 

@@ -11,7 +11,7 @@ export function GameOverModal(): React.JSX.Element {
 
   return (
     <div className="overlay">
-      <div className="modal" style={{ width: 440, textAlign: 'center' }}>
+      <div className="modal modal-narrow modal-center">
         <h2 style={{ color: 'var(--bad)' }}>
           💥 {cause ? t(cause.titleKey) : t('encounter.playerDestroyed')}
         </h2>

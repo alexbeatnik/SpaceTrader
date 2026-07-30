@@ -16,7 +16,7 @@ export function AboutScreen(): React.JSX.Element {
       <div className="screen-title">📘 {t('about.title')}</div>
       <div className="screen-sub">{t('about.lead')}</div>
 
-      <div className="grid" style={{ gap: 12 }}>
+      <div className="grid grid-tight">
         <UpdatePanel />
 
         <div className="panel panel-pad about-section">

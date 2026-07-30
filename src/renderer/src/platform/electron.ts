@@ -24,6 +24,10 @@ export function createElectronPlatform(): Platform {
       check: () => api.checkForUpdate(),
       install: () => api.installUpdate(),
       subscribe: (cb) => api.onUpdateStatus(cb)
-    }
+    },
+    // A desktop window has no back gesture, and closing it is the title bar's
+    // job — not something a game screen decides.
+    onBackButton: () => () => {},
+    exitApp: () => {}
   }
 }

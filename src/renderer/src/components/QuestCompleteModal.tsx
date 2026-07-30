@@ -14,9 +14,9 @@ export function QuestCompleteModal(): React.JSX.Element | null {
 
   return (
     <div className="overlay">
-      <div className="modal" style={{ width: 420, textAlign: 'center' }}>
+      <div className="modal modal-narrow modal-center">
         <div className="ship-emoji" style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
-        <h2 style={{ justifyContent: 'center' }}>{t('quest.rewardTitle')}</h2>
+        <h2>{t('quest.rewardTitle')}</h2>
         <div className="badge" style={{ margin: '4px 0 12px' }}>{questTypeLabel(quest)}</div>
         <p style={{ color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 16 }}>
           {questDescription(quest, game)}

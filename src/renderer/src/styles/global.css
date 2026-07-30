@@ -238,6 +238,10 @@ button {
 }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
+/* Stacked cards want less air between them than side-by-side panels do. Named
+   here because an inline `gap` sailed straight past the landscape breakpoint
+   that tightens `.grid` to 10px on a short screen. */
+.grid-tight { gap: 12px; }
 /* A map or chart beside the panel describing whatever is selected in it. A
    class rather than an inline style so the narrow layouts can collapse it —
    an inline `grid-template-columns` outranks every media query, which left
@@ -442,8 +446,22 @@ tr:last-child td { border-bottom: none; }
 }
 .modal h2 { font-size: 20px; margin-bottom: 14px; }
 
+/* The short single-message modals — an amount, an event, a reward, an offer —
+   which read badly at the full 560px. One class rather than an inline `width`
+   per component: those outrank the breakpoints below, and 440px of a 390px
+   phone is not a width any of them can afford. */
+.modal-narrow { width: 440px; }
+.modal-center { text-align: center; }
+
+/* A row of equal-width choices along the bottom of a modal. Was `display: flex`
+   plus `flex: 1` inline on every button, which is precisely the shape rule 5
+   exists to stop — the narrow layouts could never stack them. */
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions .btn { flex: 1; }
+
 /* --- Amount stepper --- */
 .stepper { display: flex; align-items: center; gap: 6px; }
+.stepper-center { justify-content: center; margin: 18px 0; }
 .stepper input {
   width: 64px;
   text-align: center;
@@ -501,16 +519,76 @@ tr:last-child td { border-bottom: none; }
 .field-label { font-size: 12px; color: var(--text-dim); text-align: left; margin-bottom: -6px; }
 
 /* --- Fleet indicator (multi-ship encounters) --- */
-.fleet-dots { display: flex; gap: 6px; align-items: center; }
-.fleet-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid var(--border);
+/* --- The group, drawn as ships --- */
+/* Scrolls sideways rather than wrapping: five hulls plus their range and odds
+   do not fit 390px, and a formation that reflows into two rows stops reading as
+   a formation. Nothing is hidden — the engaged ship is repeated in the card
+   below, and the tiles are only a shortcut for switching between them. */
+.fleet-strip {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  overflow-x: auto;
+  margin-bottom: 12px;
+  padding-bottom: 4px;
 }
-.fleet-dot.active { background: var(--bad); border-color: var(--bad); box-shadow: 0 0 8px var(--bad); }
-.fleet-dot.down { background: transparent; opacity: 0.3; }
+.fleet-ship {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+}
+.fleet-ship.engaged {
+  border-color: var(--bad);
+  box-shadow: 0 0 10px rgba(255, 93, 108, 0.35);
+}
+.fleet-ship.down { opacity: 0.35; }
+.fleet-ship:disabled { cursor: default; }
+.fleet-tag {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fleet-tag.odds { color: var(--accent); font-weight: 700; }
+@media (hover: hover) {
+  button.fleet-ship:hover:not(:disabled) { border-color: var(--accent); }
+}
+
+/* --- Odds and the round's action budget --- */
+.combat-odds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.odds-item b { color: var(--text); font-variant-numeric: tabular-nums; }
+.action-budget {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.action-pips { display: flex; gap: 4px; }
+.action-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+}
+.action-pip.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 6px var(--accent-dim); }
+.action-stations { font-size: 11px; color: var(--text-dim); }
 
 /* --- Trader marketplace (inside the encounter modal) --- */
 .trade-panel {
@@ -779,6 +857,10 @@ tr:last-child td { border-bottom: none; }
    Identical hull types on both sides used to be indistinguishable, so each
    side is marked three ways over: a coloured edge, a labelled row, and (for the
    opponent) a hull tinted by encounter kind. */
+/* The readout beside the art: takes the rest of the row. A class, so the
+   compacted landscape rules further down can restack the card if they ever need
+   to — an inline `flex` here could not be overridden at all. */
+.ship-info { flex: 1; }
 .ship-visual.side-player { border-left: 3px solid var(--accent); }
 .ship-visual.side-opponent { border-left: 3px solid var(--bad); }
 .side-label {

@@ -29,6 +29,7 @@ import {
   payFine,
   warp,
   resolveRound,
+  setTarget,
   plunder,
   tradeBuy,
   tradeSell,
@@ -224,6 +225,11 @@ interface GameStore {
   mineTick: () => void
   stopMining: () => void
   combatAction: (action: CombatAction) => void
+  /**
+   * Lay the guns on another ship in the group. Free: aiming is not a manoeuvre,
+   * so it spends none of the round's actions.
+   */
+  selectTarget: (index: number) => void
   plunderNow: () => void
   tradeBuyFromTrader: (good: GoodId, amount: number) => void
   tradeSellToTrader: (good: GoodId, amount: number) => void
@@ -751,6 +757,14 @@ export const useGameStore = create<GameStore>((set, get) => {
         set({ game: clone(g), encounter: clone(enc) })
         void get().saveGame()
       }),
+
+    selectTarget: (index) => {
+      const enc = get().encounter
+      // No game mutation and nothing to save: which ship the guns point at is
+      // not a fact about the world until the trigger is pulled.
+      if (!enc || !setTarget(enc, index)) return
+      set({ encounter: clone(enc) })
+    },
 
     plunderNow: () =>
       withGame((g) => {

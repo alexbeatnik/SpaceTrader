@@ -8,6 +8,11 @@ import {
   totalShieldPower,
   currentShieldCharge,
   freeCargoBays,
+  battleStations,
+  playerHitChance,
+  opponentHitChance,
+  POINT_BLANK_RANGE,
+  MAX_ENGAGEMENT_RANGE,
   GOOD_IDS,
   type GoodId,
   type EncounterKind
@@ -35,6 +40,7 @@ export function CombatModal(): React.JSX.Element | null {
   const game = useGameStore((s) => s.game)!
   const enc = useGameStore((s) => s.encounter)!
   const combatAction = useGameStore((s) => s.combatAction)
+  const selectTarget = useGameStore((s) => s.selectTarget)
   const plunderNow = useGameStore((s) => s.plunderNow)
   const tradeBuyFromTrader = useGameStore((s) => s.tradeBuyFromTrader)
   const tradeSellToTrader = useGameStore((s) => s.tradeSellToTrader)
@@ -62,6 +68,16 @@ export function CombatModal(): React.JSX.Element | null {
         : ''
   const oppAccent = OPPONENT_ACCENT[enc.kind]
 
+  const pct = (v: number): string => `${Math.round(v * 100)}%`
+  const stations = battleStations(game)
+  // The group as a formation: everyone still flying, nearest first, so the strip
+  // reads the way the fight looks. The engaged ship carries index -1 — it is the
+  // one you are already shooting at, so there is nothing to switch to.
+  const formation = [
+    { ship: opp, index: -1 },
+    ...enc.reserves.map((r, i) => ({ ship: r, index: i }))
+  ].sort((a, b) => a.ship.distance - b.ship.distance)
+
   return (
     <div className="overlay">
       <div className="modal">
@@ -82,14 +98,52 @@ export function CombatModal(): React.JSX.Element | null {
           )}
         </h2>
 
+        {/* The group, ship by ship rather than as a tally of dots: wrecks first,
+            then everyone still flying in order of range. Tapping one lays the
+            guns on it — free, and the reason range is worth reading. */}
         {enc.fleetSize > 1 && (
-          <div className="fleet-dots" style={{ marginBottom: 12 }}>
-            {Array.from({ length: enc.fleetSize }).map((_, i) => (
-              <span
-                key={i}
-                className={`fleet-dot ${i < enc.defeated ? 'down' : i === enc.defeated ? 'active' : ''}`}
-              />
+          <div className="fleet-strip">
+            {enc.downed.map((type, i) => (
+              <div
+                className="fleet-ship down"
+                key={`down-${i}`}
+                title={`${shipName(type)} · ${t('encounter.fleet.wreck')}`}
+              >
+                <ShipArt type={type} size={28} flip accent="#5a6396" />
+                <span className="fleet-tag">✕</span>
+              </div>
             ))}
+
+            {formation.map(({ ship: s, index }) => {
+              const engaged = index < 0
+              const label = `${shipName(s.shipType)} · ${t(
+                engaged ? 'encounter.fleet.engaged' : 'encounter.fleet.waiting'
+              )}`
+              const body = (
+                <>
+                  <ShipArt type={s.shipType} size={28} flip accent={oppAccent} />
+                  <span className="fleet-tag">
+                    {s.distance} {t('encounter.range.unit')}
+                  </span>
+                  <span className="fleet-tag odds">{pct(playerHitChance(game, enc, s))}</span>
+                </>
+              )
+              return engaged ? (
+                <div className="fleet-ship engaged" key="engaged" title={label}>
+                  {body}
+                </div>
+              ) : (
+                <button
+                  className="fleet-ship"
+                  key={`res-${index}`}
+                  disabled={terminal}
+                  title={`${label} — ${t('encounter.fleet.pickTarget')}`}
+                  onClick={() => selectTarget(index)}
+                >
+                  {body}
+                </button>
+              )
+            })}
           </div>
         )}
 
@@ -99,7 +153,7 @@ export function CombatModal(): React.JSX.Element | null {
           style={{ marginBottom: 12, borderLeftColor: oppAccent }}
         >
           <ShipArt type={opp.shipType} size={64} flip accent={oppAccent} />
-          <div style={{ flex: 1 }}>
+          <div className="ship-info">
             <div className="side-label" style={{ color: oppAccent }}>
               ⚔ {t(`encounter.kind.${enc.kind}`)}
             </div>
@@ -121,10 +175,29 @@ export function CombatModal(): React.JSX.Element | null {
           </div>
         </div>
 
+        {/* The odds, before the trigger is pulled. These are the very numbers
+            `resolveRound` rolls against, so what is quoted is what happens. */}
+        {!terminal && (
+          <div className="combat-odds">
+            <span className="odds-item">
+              📏 {t('encounter.range.label')}{' '}
+              <b>
+                {opp.distance} {t('encounter.range.unit')}
+              </b>
+            </span>
+            <span className="odds-item">
+              🎯 {t('encounter.yourShot')} <b>{pct(playerHitChance(game, enc))}</b>
+            </span>
+            <span className="odds-item">
+              🛡 {t('encounter.theirShot')} <b>{pct(opponentHitChance(game, enc))}</b>
+            </span>
+          </div>
+        )}
+
         {/* Player status */}
         <div className="ship-visual side-player" style={{ marginBottom: 12 }}>
           <ShipArt type={ship.type} size={64} />
-          <div style={{ flex: 1 }}>
+          <div className="ship-info">
             <div className="side-label player">
               👤 {t('encounter.you')} · {game.commanderName}
             </div>
@@ -213,12 +286,49 @@ export function CombatModal(): React.JSX.Element | null {
         {/* Actions. A class, not an inline style: on a short screen these pin
             themselves to the bottom of the modal, which a media query has to be
             able to reach. */}
+        {/* What the crew can still do this exchange. One volley per gunner plus a
+            manoeuvre if anyone is spare to fly — spend them in any order, and
+            the other side waits until the last one is gone. */}
+        {!terminal && (
+          <div className="action-budget">
+            <span className="action-pips">
+              {Array.from({ length: enc.actionsPerRound }).map((_, i) => (
+                <span key={i} className={`action-pip${i < enc.actionsLeft ? ' on' : ''}`} />
+              ))}
+            </span>
+            <span className="action-stations">
+              {t('encounter.actionsLeft')} {enc.actionsLeft}/{enc.actionsPerRound} ·{' '}
+              {t('encounter.stations.gunners', { count: stations.shots })} ·{' '}
+              {t(stations.helm ? 'encounter.stations.helm' : 'encounter.stations.helmEmpty')}
+            </span>
+          </div>
+        )}
+
         <div className="combat-actions">
           {!terminal && (
             <>
               <button className="btn btn-danger" onClick={() => combatAction('attack')}>
                 ⚔ {t('encounter.action.attack')}
               </button>
+              <button
+                className="btn"
+                disabled={opp.distance <= POINT_BLANK_RANGE}
+                onClick={() => combatAction('closeIn')}
+              >
+                ▶ {t('encounter.action.closeIn')}
+              </button>
+              <button
+                className="btn"
+                disabled={opp.distance >= MAX_ENGAGEMENT_RANGE}
+                onClick={() => combatAction('openRange')}
+              >
+                ◀ {t('encounter.action.openRange')}
+              </button>
+              {enc.actionsLeft < enc.actionsPerRound && (
+                <button className="btn" onClick={() => combatAction('endTurn')}>
+                  ⏭ {t('encounter.action.endTurn')}
+                </button>
+              )}
               <button
                 className="btn"
                 title={enc.tractorLocked ? t('encounter.tractor.held') : undefined}

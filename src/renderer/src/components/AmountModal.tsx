@@ -26,9 +26,9 @@ export function AmountModal({
 
   return (
     <div className="overlay" onClick={onCancel}>
-      <div className="modal" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-narrow" onClick={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
-        <div className="stepper" style={{ justifyContent: 'center', margin: '18px 0' }}>
+        <div className="stepper stepper-center">
           <button className="btn btn-sm" onClick={() => setAmount(clamp(amount - 1))}>
             −
           </button>
@@ -50,16 +50,15 @@ export function AmountModal({
             <span className="v">{fmt(amount * unitPrice)} {t('common.cr')}</span>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        <div className="modal-actions">
           <button
             className="btn btn-primary"
-            style={{ flex: 1 }}
             disabled={amount <= 0}
             onClick={() => onConfirm(amount)}
           >
             {confirmLabel}
           </button>
-          <button className="btn" style={{ flex: 1 }} onClick={onCancel}>
+          <button className="btn" onClick={onCancel}>
             {t('common.cancel')}
           </button>
         </div>
