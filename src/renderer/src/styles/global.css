@@ -232,6 +232,15 @@ button {
   margin-bottom: 20px;
 }
 
+.quest-sections {
+  display: flex;
+  flex-direction: column;
+}
+
+.quest-active { order: 1; }
+.quest-board { order: 2; }
+.quest-completed { order: 3; }
+
 .grid {
   display: grid;
   gap: 16px;

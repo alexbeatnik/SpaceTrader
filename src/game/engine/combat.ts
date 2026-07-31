@@ -179,7 +179,7 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
   }
 
   // Base probabilities derived from government strengths.
-  const pPirate = gov.strengthPirates * 0.03
+  const pPirate = pirateEncounterChance(state, gov.strengthPirates * 0.03)
   const pPolice = gov.strengthPolice * 0.025
   const pTrader = gov.strengthTraders * 0.02
   const roll = rng.next()
@@ -204,12 +204,30 @@ function threatLevel(kind: EncounterKind, state: GameState): number {
   if (kind === 'bountyHunter') {
     worth += notoriety(state) * 9000 + (wantedByBank(state) ? state.debt : 0)
   }
+  if (kind === 'pirate') worth += pirateCargoValue(state)
   if (worth > 150000) return 5
   if (worth > 80000) return 4
   if (worth > 40000) return 3
   if (worth > 15000) return 2
   if (worth > 5000) return 1
   return 0
+}
+
+/** Base-price value of the cargo currently visible to a would-be pirate. */
+export function pirateCargoValue(state: GameState): number {
+  return GOOD_IDS.reduce((total, good) => total + state.ship.cargo[good] * TRADE_GOODS[good].basePrice, 0)
+}
+
+/** Extra pirate chance caused by cargo, capped to keep encounters non-certain. */
+export function pirateCargoChance(state: GameState): number {
+  const quantityRisk = Math.min(0.12, (usedCargoBays(state.ship) / totalCargoBays(state.ship)) * 0.12)
+  const valueRisk = Math.min(0.28, (pirateCargoValue(state) / 50000) * 0.28)
+  return quantityRisk + valueRisk
+}
+
+/** Add cargo risk to an encounter's base pirate probability. */
+export function pirateEncounterChance(state: GameState, baseChance: number): number {
+  return Math.min(0.95, Math.max(0, baseChance) + pirateCargoChance(state))
 }
 
 function shipForThreat(threat: number): ShipTypeId {
@@ -327,7 +345,9 @@ function makeEncounter(
 
   // Some encounters arrive as a group: a pirate ambush or a trader caravan.
   let fleetSize = 1
-  if (kind === 'pirate' && rng.chance(0.35)) fleetSize = rng.int(2, 5)
+  if (kind === 'pirate' && rng.chance(0.2 + threat * 0.05)) {
+    fleetSize = rng.int(2, Math.min(5, 2 + threat))
+  }
   else if (kind === 'trader' && rng.chance(0.3)) fleetSize = rng.int(2, 4)
 
   // Nearest ship first: the one that got close enough to hail you is the one you
@@ -540,11 +560,13 @@ export function tradeSell(
 
   const have = state.ship.cargo[good]
   if (have <= 0) return { ok: false, error: 'error.nothingToSell' }
+  if (amount <= 0) return { ok: false, error: 'error.cannotBuy' }
 
   const qty = Math.min(amount, have)
   const revenue = qty * unit
   state.ship.cargo[good] -= qty
   state.credits += revenue
+  releaseLocalSourcing(state, good, qty)
   if (state.ship.cargo[good] === 0) state.buyingPrice[good] = 0
   enc.opponent.cargo[good] = (enc.opponent.cargo[good] ?? 0) + qty
 
