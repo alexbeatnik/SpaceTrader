@@ -2,6 +2,7 @@ import type { GameState, GoodId } from './types'
 import { Rng } from './rng'
 import {
   currentMineSite,
+  atCapital,
   freeCargoBays,
   maxFuel,
   advanceDay,
@@ -10,7 +11,7 @@ import {
   INDUSTRIAL_MINING_YIELD
 } from './game'
 import { SHIP_TYPES } from '../data/ships'
-import { spawnPirates, type Encounter } from './combat'
+import { pirateEncounterChance, spawnPirates, type Encounter } from './combat'
 import type { CrewIncident } from './crew'
 
 export interface MineResult {
@@ -59,8 +60,9 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
   } else {
     amount = Math.min(yieldPerDay, freeCargoBays(state.ship))
     state.ship.cargo[site.resource] += amount
-    // Mined right here, so it cannot settle a contract due at this planet.
-    noteLocalSourcing(state, site.resource, amount)
+    // Mining at the capital is local sourcing; mining at another body in the
+    // system is cargo hauled in from elsewhere and may fulfil a port contract.
+    if (atCapital(state)) noteLocalSourcing(state, site.resource, amount)
     pushLog(state, 'log.mined', { good: site.resource })
     // Asteroid fields occasionally yield a rare gem.
     if (
@@ -69,13 +71,13 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
       rng.chance(0.05 + site.richness * 0.004)
     ) {
       state.ship.cargo.gems += 1
-      noteLocalSourcing(state, 'gems', 1)
+      if (atCapital(state)) noteLocalSourcing(state, 'gems', 1)
       bonus = 'gems'
       pushLog(state, 'log.minedBonus', { good: 'gems' })
     }
   }
 
   // Raiders sometimes pounce on an exposed mining operation.
-  const encounter = rng.chance(0.12) ? spawnPirates(state, rng) : null
+  const encounter = rng.chance(pirateEncounterChance(state, 0.12)) ? spawnPirates(state, rng) : null
   return { ok: true, resource: site.resource, amount, bonus, encounter, incident }
 }

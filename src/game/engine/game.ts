@@ -376,6 +376,7 @@ export function buyGood(state: GameState, good: GoodId, amount: number): ActionR
 }
 
 export function sellGood(state: GameState, good: GoodId, amount: number): ActionResult {
+  if (amount <= 0) return fail('error.nothingToSell')
   if (!atCapital(state)) return fail('error.noMarketHere')
   const sys = currentSystem(state)
   const have = state.ship.cargo[good]
@@ -396,6 +397,7 @@ export function sellGood(state: GameState, good: GoodId, amount: number): Action
 
 /** Dump cargo into space (may incur a fine if noticed). */
 export function dumpGood(state: GameState, good: GoodId, amount: number): ActionResult {
+  if (amount <= 0) return fail('error.nothingToDump')
   const have = state.ship.cargo[good]
   if (have <= 0) return fail('error.nothingToDump')
   const qty = Math.min(amount, have)
@@ -561,6 +563,7 @@ export function shipsForSale(state: GameState): ShipTypeId[] {
 /** Buy a new ship, trading in the old hull + equipment (cargo must be empty). */
 export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
   if (!atCapital(state)) return fail('error.noShipyardHere')
+  if (!SHIP_TYPES[target] || !shipsForSale(state).includes(target)) return fail('error.notSold')
   if (target === state.ship.type) return fail('error.sameShip')
   if (usedCargoBays(state.ship) > 0) return fail('error.cargoNotEmpty')
 

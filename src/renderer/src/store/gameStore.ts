@@ -688,6 +688,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     startMining: () =>
       withGame((g) => {
+        if (get().mining) return
         const site = currentMineSite(g)
         if (!site) {
           set({ toast: { id: ++toastCounter, type: 'error', text: renderMessage('error.noMineSite') } })

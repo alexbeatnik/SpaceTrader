@@ -63,6 +63,8 @@ import {
   tractorChance,
   fleeChance,
   spawnPirates,
+  pirateCargoChance,
+  pirateCargoValue,
   rollEncounter,
   setTarget,
   playerHitChance,
@@ -1440,6 +1442,19 @@ describe('combat log detail', () => {
     const enc = spawnPirates(g, new Rng(4))
     expect(enc.messages.some((m) => m.key === 'encounter.pirate.demandEmpty')).toBe(true)
   })
+
+  it('cargo raises pirate interest and valuable cargo raises their threat', () => {
+    const poor = newGame({ commanderName: 'Test', seed: 98 })
+    const rich = newGame({ commanderName: 'Test', seed: 98 })
+    rich.ship.cargo.gems = 20
+
+    expect(pirateCargoValue(rich)).toBeGreaterThan(pirateCargoValue(poor))
+    expect(pirateCargoChance(rich)).toBeGreaterThan(pirateCargoChance(poor))
+
+    const weak = spawnPirates(poor, new Rng(17))
+    const strong = spawnPirates(rich, new Rng(17))
+    expect(strong.opponent.shipType).not.toBe(weak.opponent.shipType)
+  })
 })
 
 describe('engagement range', () => {
@@ -2312,6 +2327,32 @@ describe('crossing a system on impulse', () => {
     g.currentBody = 1 // out at the belt
     expect(currentMineSite(g)?.resource).toBe('ore')
     expect(mineOnce(g, new Rng(1)).ok).toBe(true)
+  })
+
+  it('counts resources mined at another body as hauled to the capital', () => {
+    const g = withBodies()
+    const quest: Quest = {
+      id: 'body-mining-relief',
+      type: 'relief',
+      giverSystem: 1,
+      targetSystem: g.currentSystem,
+      reward: 500,
+      status: 'offered',
+      good: 'ore',
+      amount: 1
+    }
+    acceptQuest(g, quest)
+    g.systems[g.currentSystem].mineSite = null
+    g.currentBody = 1
+
+    expect(mineOnce(g, new Rng(1)).ok).toBe(true)
+    expect(g.ship.cargo.ore).toBe(1)
+    expect(canTurnIn(g, quest)).toBe(false)
+
+    travelToBody(g, 0, new Rng(2))
+    expect(deliverableUnits(g, 'ore')).toBe(1)
+    expect(canTurnIn(g, quest)).toBe(true)
+    expect(turnInQuest(g, quest.id)?.id).toBe(quest.id)
   })
 })
 
