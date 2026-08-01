@@ -1142,6 +1142,78 @@ export const en = {
     quietWeek: {
       headline: 'A quiet week, and the papers say so',
       body: 'No crisis, no scandal, no shortage. The lead story is a lost cat.'
+    },
+    droughtWaterTrain: {
+      headline: 'Water trains arrive under guard',
+      body: 'The first tankers made orbit before dawn. Armed escorts now patrol the route from the docks to the ration depots.'
+    },
+    cropFailureSeedVault: {
+      headline: 'Seed vault opened in emergency session',
+      body: 'Agronomists are counting every viable grain. The next planting will depend on shipments from worlds that still have a harvest.'
+    },
+    plagueClinicShip: {
+      headline: 'Hospital ship converted from a freighter',
+      body: 'A cargo hauler has been fitted with isolation wards overnight. Its crew is asking for medicine, filters and hazard pay.'
+    },
+    warRefugeeCorridor: {
+      headline: 'Civilian corridor opens through the war zone',
+      body: 'The port is processing evacuees around the clock. Captains with spare berths are being asked to volunteer.'
+    },
+    thermalShelters: {
+      headline: 'Thermal shelters open in the capital',
+      body: 'The cold has driven thousands indoors. Public halls are running on emergency power while crews repair the failing grid.'
+    },
+    workerAutomation: {
+      headline: 'Factories promise a robotic solution',
+      body: 'With too few hands for the shifts, local firms are importing robots in bulk. The union says the shortage is being used as an excuse.'
+    },
+    pollingDay: {
+      headline: 'Polling stations open across the planet',
+      body: 'Turnout is high and docking lanes are full of campaign shuttles. Traders are betting on who will control the next budget.'
+    },
+    shareholderPanic: {
+      headline: 'Share prices tumble after leaked forecast',
+      body: 'The exchange halted trading twice before noon. Executives blame rumours; brokers blame executives.'
+    },
+    mineAutomation: {
+      headline: 'Autonomous drills reach the lower galleries',
+      body: 'New machines are cutting through rock without a shift change. Ore output is rising, though the miners are not celebrating.'
+    },
+    refineryCatalyst: {
+      headline: 'Refinery announces a cleaner catalyst',
+      body: 'A new catalyst promises more fuel from every barrel. The plant is buying specialist equipment before rivals can copy it.'
+    },
+    resortCelebrity: {
+      headline: 'Celebrity liner docks for the season',
+      body: 'Fans have filled the orbital hotels and emptied the boutiques. Security teams are hiring fast ships to keep up with the schedule.'
+    },
+    factoryRobots: {
+      headline: 'Robot production hits a new record',
+      body: 'The assembly lines are turning out workers faster than the employment office can register them. Export orders are already queued.'
+    },
+    patentAuction: {
+      headline: 'Patent auction draws bidders from six systems',
+      body: 'The winning design could change the cost of a jump. Every major manufacturer has sent a representative and a very large cheque.'
+    },
+    mineralSurvey: {
+      headline: 'Survey crews map a promising belt',
+      body: 'Remote probes have marked dozens of targets beyond the old claims. Prospectors are arriving before the maps are even public.'
+    },
+    mushroomCuisine: {
+      headline: 'Mushroom cuisine becomes the latest craze',
+      body: 'Chefs are charging fortunes for the rarest caps. Xenobiologists advise visitors not to eat anything that glows.'
+    },
+    herbClinic: {
+      headline: 'Herbal clinics report a medical breakthrough',
+      body: 'A local extract is showing promise against several common ailments. Pharmaceutical buyers are circling the growers.'
+    },
+    hologramAuction: {
+      headline: 'Lost artist catalogue appears at auction',
+      body: 'A private archive has surfaced after a century in storage. Collectors are arriving with empty holds and discreet security.'
+    },
+    waterExport: {
+      headline: 'Spring consortium signs an export deal',
+      body: 'The first long-term contract will send bottled water to three dry worlds. Local bottlers are expanding before the next launch window.'
     }
   }
 } as const

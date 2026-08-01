@@ -57,6 +57,13 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => s.status === 'drought'
   },
   {
+    id: 'droughtWaterTrain',
+    weight: 3,
+    tone: 'bad',
+    crisis: true,
+    when: (s) => s.status === 'drought'
+  },
+  {
     id: 'cropFailureGranary',
     weight: 4,
     tone: 'bad',
@@ -69,6 +76,13 @@ const TEMPLATES: NewsTemplate[] = [
     tone: 'bad',
     crisis: true,
     when: (s) => s.status === 'cropFailure' && s.economyType === 'agricultural'
+  },
+  {
+    id: 'cropFailureSeedVault',
+    weight: 3,
+    tone: 'bad',
+    crisis: true,
+    when: (s) => s.status === 'cropFailure'
   },
   {
     id: 'plagueQuarantine',
@@ -85,6 +99,13 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => s.status === 'plague' && isAuthoritarian(s)
   },
   {
+    id: 'plagueClinicShip',
+    weight: 3,
+    tone: 'bad',
+    crisis: true,
+    when: (s) => s.status === 'plague'
+  },
+  {
     id: 'warLevy',
     weight: 4,
     tone: 'bad',
@@ -99,9 +120,23 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => s.status === 'war'
   },
   {
+    id: 'warRefugeeCorridor',
+    weight: 3,
+    tone: 'bad',
+    crisis: true,
+    when: (s) => s.status === 'war'
+  },
+  {
     id: 'coldSnap',
     weight: 4,
     tone: 'bad',
+    crisis: true,
+    when: (s) => s.status === 'cold'
+  },
+  {
+    id: 'thermalShelters',
+    weight: 3,
+    tone: 'neutral',
     crisis: true,
     when: (s) => s.status === 'cold'
   },
@@ -119,10 +154,23 @@ const TEMPLATES: NewsTemplate[] = [
     crisis: true,
     when: (s) => s.status === 'lackOfWorkers'
   },
+  {
+    id: 'workerAutomation',
+    weight: 3,
+    tone: 'neutral',
+    crisis: true,
+    when: (s) => s.status === 'lackOfWorkers'
+  },
 
   // --- Who is in charge, and how it feels ------------------------------------
   {
     id: 'electionSeason',
+    weight: 3,
+    tone: 'neutral',
+    when: (s) => s.politics === 'democracy' || s.politics === 'confederacy'
+  },
+  {
+    id: 'pollingDay',
     weight: 3,
     tone: 'neutral',
     when: (s) => s.politics === 'democracy' || s.politics === 'confederacy'
@@ -137,6 +185,12 @@ const TEMPLATES: NewsTemplate[] = [
     id: 'corporateMerger',
     weight: 3,
     tone: 'neutral',
+    when: (s) => s.politics === 'corporate' || s.politics === 'capitalist'
+  },
+  {
+    id: 'shareholderPanic',
+    weight: 3,
+    tone: 'bad',
     when: (s) => s.politics === 'corporate' || s.politics === 'capitalist'
   },
   {
@@ -196,9 +250,21 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => s.economyType === 'mining'
   },
   {
+    id: 'mineAutomation',
+    weight: 3,
+    tone: 'good',
+    when: (s) => s.economyType === 'mining'
+  },
+  {
     id: 'refineryFlare',
     weight: 3,
     tone: 'neutral',
+    when: (s) => s.economyType === 'refinery'
+  },
+  {
+    id: 'refineryCatalyst',
+    weight: 3,
+    tone: 'good',
     when: (s) => s.economyType === 'refinery'
   },
   {
@@ -208,9 +274,21 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => s.economyType === 'resort'
   },
   {
+    id: 'resortCelebrity',
+    weight: 3,
+    tone: 'good',
+    when: (s) => s.economyType === 'resort'
+  },
+  {
     id: 'factoryQuota',
     weight: 3,
     tone: 'good',
+    when: (s) => s.economyType === 'industrial'
+  },
+  {
+    id: 'factoryRobots',
+    weight: 3,
+    tone: 'neutral',
     when: (s) => s.economyType === 'industrial'
   },
   {
@@ -225,6 +303,12 @@ const TEMPLATES: NewsTemplate[] = [
     tone: 'good',
     when: (s) => s.economyType === 'hiTech'
   },
+  {
+    id: 'patentAuction',
+    weight: 3,
+    tone: 'good',
+    when: (s) => s.economyType === 'hiTech'
+  },
 
   // --- Local oddities ---------------------------------------------------------
   {
@@ -234,9 +318,21 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => s.specialResource === 'mineralRich'
   },
   {
+    id: 'mineralSurvey',
+    weight: 3,
+    tone: 'neutral',
+    when: (s) => s.specialResource === 'mineralRich'
+  },
+  {
     id: 'mushroomBloom',
     weight: 4,
     tone: 'neutral',
+    when: (s) => s.specialResource === 'weirdMushrooms'
+  },
+  {
+    id: 'mushroomCuisine',
+    weight: 3,
+    tone: 'good',
     when: (s) => s.specialResource === 'weirdMushrooms'
   },
   {
@@ -246,9 +342,21 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => s.specialResource === 'lotsOfHerbs'
   },
   {
+    id: 'herbClinic',
+    weight: 3,
+    tone: 'good',
+    when: (s) => s.specialResource === 'lotsOfHerbs'
+  },
+  {
     id: 'artFestival',
     weight: 4,
     tone: 'good',
+    when: (s) => s.specialResource === 'artistic'
+  },
+  {
+    id: 'hologramAuction',
+    weight: 3,
+    tone: 'neutral',
     when: (s) => s.specialResource === 'artistic'
   },
   {
@@ -260,6 +368,12 @@ const TEMPLATES: NewsTemplate[] = [
   {
     id: 'springBottling',
     weight: 4,
+    tone: 'good',
+    when: (s) => s.specialResource === 'sweetwater'
+  },
+  {
+    id: 'waterExport',
+    weight: 3,
     tone: 'good',
     when: (s) => s.specialResource === 'sweetwater'
   },
