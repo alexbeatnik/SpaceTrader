@@ -31,7 +31,7 @@ import { bodyDisplayName } from '../util/bodyText'
 
 function StrengthBar({ value }: { value: number }): React.JSX.Element {
   return (
-    <div style={{ display: 'flex', gap: 2 }}>
+    <div className="row" style={{ gap: 2 }}>
       {Array.from({ length: 7 }).map((_, i) => (
         <span
           key={i}
@@ -76,9 +76,9 @@ export function SystemScreen(): React.JSX.Element {
 
       {!docked && (
         <div className="panel panel-pad" style={{ marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div className="row-wrap" style={{ gap: 14 }}>
             <span style={{ fontSize: 26 }}>{here?.kind === 'station' ? '🛰️' : '🪨'}</span>
-            <div style={{ flex: 1, minWidth: 200 }}>
+            <div className="col-fill" style={{ minWidth: 200 }}>
               <div style={{ fontWeight: 600 }}>
                 {here?.kind === 'station'
                   ? stationName(here.station ?? 'science')
@@ -166,7 +166,7 @@ export function SystemScreen(): React.JSX.Element {
               {docked ? t('body.capital') : `#${currentBodyIndex(game)}`}
             </span>
           </div>
-          <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div className="row-wrap" style={{ marginTop: 16, gap: 10 }}>
             <button
               className="btn btn-primary"
               disabled={!docked}
@@ -198,11 +198,11 @@ export function SystemScreen(): React.JSX.Element {
 
       {mine && (
         <div className="panel panel-pad" style={{ marginTop: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="row" style={{ gap: 14 }}>
             <span style={{ fontSize: 30 }}>
               {mine.kind === 'asteroidField' ? '☄️' : mine.kind === 'gasGiant' ? '🪐' : '🧊'}
             </span>
-            <div style={{ flex: 1 }}>
+            <div className="col-fill">
               <div style={{ fontWeight: 600 }}>{t(`mining.kind.${mine.kind}`)}</div>
               <div className="muted" style={{ fontSize: 13 }}>
                 {t('mining.yields', {

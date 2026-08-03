@@ -1681,6 +1681,7 @@ describe('standing and hired hunters', () => {
     expect(g.credits).toBe(0)
     expect(g.record.policeRecord).toBe(0)
     expect(hunterChance(g)).toBe(0)
+    expect(g.log.some((entry) => entry.key === 'log.standingChanged')).toBe(true)
   })
 
   it('a deeper record costs more to clear and more days to serve', () => {
@@ -1703,8 +1704,9 @@ describe('standing and hired hunters', () => {
 
     expect(served.days).toBe(expectedDays)
     expect(g.day).toBe(dayBefore + served.days)
-    expect(g.debt).toBeGreaterThan(1000) // interest kept running behind bars
+    expect(g.credits).toBeLessThan(20000) // interest was paid behind bars
     expect(g.record.policeRecord).toBe(0)
+    expect(g.log.some((entry) => entry.key === 'log.standingChanged')).toBe(true)
   })
 })
 
@@ -1770,9 +1772,27 @@ describe('daily tick', () => {
     const dayBefore = g.day
     advanceDay(g)
     expect(g.day).toBe(dayBefore + 1)
-    // 10% interest is added to the debt and taken from credits.
+    // 10% interest is paid from credits when available, leaving debt unchanged.
+    expect(g.debt).toBe(1000)
+    expect(g.credits).toBe(9900)
+  })
+
+  it('advanceDay adds unpaid interest to debt when credits are insufficient', () => {
+    const g = newGame({ commanderName: 'Test', seed: 86 })
+    g.credits = 0
+    g.debt = 1000
+    advanceDay(g)
+    // Unpaid 100 cr interest compounds onto debt.
     expect(g.debt).toBe(1100)
-    expect(g.credits).toBeLessThan(10000)
+    expect(g.credits).toBe(0)
+
+    // Partial credits test
+    g.credits = 40
+    g.debt = 1000
+    advanceDay(g)
+    // 40 cr paid from credits, remaining 60 cr added to debt.
+    expect(g.credits).toBe(0)
+    expect(g.debt).toBe(1060)
   })
 })
 

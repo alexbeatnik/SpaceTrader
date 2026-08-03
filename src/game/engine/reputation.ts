@@ -126,7 +126,7 @@ export function payFine(state: GameState): ActionResult {
   if (cost <= 0) return { ok: false, error: 'error.recordClean' }
   if (state.credits < cost) return { ok: false, error: 'error.notEnoughCredits' }
   state.credits -= cost
-  state.record.policeRecord = 0
+  applyKarma(state, -state.record.policeRecord)
   pushLog(state, 'log.finePaid', { amount: cost })
   return { ok: true, info: { key: 'info.finePaid', params: { amount: cost } } }
 }
@@ -162,7 +162,7 @@ export function serveSentence(state: GameState): Sentence {
   state.credits -= fine
   for (let i = 0; i < days; i++) advanceDay(state)
   // Time served wipes the slate.
-  state.record.policeRecord = 0
+  applyKarma(state, -state.record.policeRecord)
   pushLog(state, 'log.servedSentence', { days, fine })
   return { days, fine, confiscated }
 }

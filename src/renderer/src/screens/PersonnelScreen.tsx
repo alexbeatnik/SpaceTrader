@@ -29,7 +29,7 @@ import { fmt } from '../util/format'
 function SkillRow({ m }: { m: Skills }): React.JSX.Element {
   const { t } = useI18n()
   return (
-    <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-dim)', flexWrap: 'wrap' }}>
+    <div className="skill-tags">
       <span>{t('skill.pilot')} {m.pilot}</span>
       <span>{t('skill.fighter')} {m.fighter}</span>
       <span>{t('skill.trader')} {m.trader}</span>

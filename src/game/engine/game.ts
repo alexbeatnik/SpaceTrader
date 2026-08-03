@@ -756,12 +756,12 @@ export function advanceDay(state: GameState, rng?: Rng): CrewIncident | null {
   // Daily loan interest (10%).
   if (state.debt > 0) {
     const interest = Math.ceil(state.debt * 0.1)
-    state.debt += interest
-    state.credits -= interest
-    if (state.credits < 0) {
-      // Overdue debt is not forgiven; it simply accrues.
-      state.debt += -state.credits
+    if (state.credits >= interest) {
+      state.credits -= interest
+    } else {
+      const unpaid = interest - state.credits
       state.credits = 0
+      state.debt += unpaid
     }
   }
 

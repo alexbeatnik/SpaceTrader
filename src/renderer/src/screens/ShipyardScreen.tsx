@@ -293,7 +293,7 @@ export function ShipyardScreen(): React.JSX.Element {
               return (
                 <tr key={id} className="row-hover">
                   <td className="stacked-title">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="ship-name-cell">
                       <ShipArt type={id} size={30} />
                       {shipName(id)}
                     </div>
