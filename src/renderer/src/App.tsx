@@ -96,7 +96,8 @@ export function App(): React.JSX.Element {
       {mining && !encounter && !escort && <MiningOverlay />}
       {/* Combat may interrupt a jump, so this one renders over the warp too. */}
       {!mining && !escort && encounter && !gameOver && <CombatModal />}
-      {!travel && !mining && !escort && !encounter && !gameOver && <CrewIncidentModal />}
+      {/* Mishaps may strike mid-extraction: the modal outranks the overlay. */}
+      {!travel && !escort && !encounter && !gameOver && <CrewIncidentModal />}
       {!travel && !mining && !escort && !encounter && !incident && !gameOver && <EventModal />}
       {!travel && !mining && !escort && !encounter && !incident && !gameOver && <QuestOfferModal />}
       {!travel && !mining && !escort && !encounter && !incident && !gameOver && <QuestCompleteModal />}

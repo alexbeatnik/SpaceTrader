@@ -291,8 +291,14 @@ npm run dev        # launch the desktop app with hot reload
 npm run typecheck  # type-check main + renderer
 npm test           # run engine unit tests
 npm run build      # production desktop build into out/
+npm run build:web  # production web bundle into dist-web/
 npm run dist       # package a distributable (electron-builder)
 ```
+
+Before opening a pull request, run `npm run typecheck`, `npm test`, `npm run
+build`, and `npm run build:web`. The test suite includes engine, save-format,
+write-queue, and locale-parity tests. On Windows PowerShell, use `npm.cmd`
+instead if execution policy blocks `npm.ps1`, for example `npm.cmd test`.
 
 Requires Node.js 18+.
 

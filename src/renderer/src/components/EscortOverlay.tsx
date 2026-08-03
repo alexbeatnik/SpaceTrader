@@ -50,7 +50,7 @@ export function EscortOverlay(): React.JSX.Element | null {
 
   return (
     <div className="warp-overlay">
-      <div className="warp-core" style={{ maxWidth: 620, width: '90%' }}>
+      <div className="warp-core escort-warp-core">
         <div className="warp-route">
           <span className="warp-from">🛡 {t('escort.title')}</span>
         </div>

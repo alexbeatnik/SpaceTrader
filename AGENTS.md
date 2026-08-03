@@ -520,6 +520,10 @@ npm run build:web  # static bundle into dist-web/ (what the APK packages)
 npm run apk        # build:web + cap sync + gradle assembleDebug
 ```
 
+On Windows PowerShell, use `npm.cmd` if the execution policy blocks
+`npm.ps1`, for example `npm.cmd test`. The equivalent scripts are otherwise
+identical.
+
 `npm test` also runs `src/i18n/locales.test.ts`, which fails if `en.ts` and
 `uk.ts` drift apart — either a missing key or a `{param}` that exists on only one
 side. That is the enforcement behind golden rule 2.
@@ -537,6 +541,21 @@ builds the same renderer into `dist-web/` for Capacitor, rooted at
 — it did, silently narrowed the suite to a directory with no tests, and reported
 "no test files" rather than failing. If you add a root Vite config, check
 `npm test` still collects 4 files.
+
+## Review checklist
+
+- Run `npm run typecheck`, `npm test`, `npm run build`, and `npm run build:web`
+  for changes that can affect the renderer, shared code, or engine exports.
+- Inspect responsive behavior when changing CSS or JSX. Layout must use classes,
+  not inline styles; computed meter widths and colors are the normal inline
+  style exceptions.
+- Add or update a pure engine test for every gameplay rule change. Test both
+  success and failure paths, including save-compatible optional fields.
+- Check that state mutations go through the owning engine helper. In particular,
+  reputation changes use `applyKarma`, cargo changes update sourcing, and UI
+  actions persist through the store's autosave path.
+- Review locale parity and use stable message ids for every new user-facing
+  string.
 
 ## Environment gotchas
 

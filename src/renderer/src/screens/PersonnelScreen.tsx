@@ -19,6 +19,7 @@ import {
   robotsForSale,
   robotsPowered,
   shipRobots,
+  traderDiscount,
   ROBOT_FUEL_PER_DAY,
   type Skills,
   type CrewRole
@@ -29,7 +30,7 @@ import { fmt } from '../util/format'
 function SkillRow({ m }: { m: Skills }): React.JSX.Element {
   const { t } = useI18n()
   return (
-    <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-dim)', flexWrap: 'wrap' }}>
+    <div className="skill-tags">
       <span>{t('skill.pilot')} {m.pilot}</span>
       <span>{t('skill.fighter')} {m.fighter}</span>
       <span>{t('skill.trader')} {m.trader}</span>
@@ -238,6 +239,9 @@ export function PersonnelScreen(): React.JSX.Element {
           ) : (
             forSale.map((id) => {
               const r = ROBOTS[id]
+              // The dealer charges what the best negotiator aboard talks it down
+              // to — quote that, and gate affordability on the same figure.
+              const price = Math.round(r.price * (1 - traderDiscount(game)))
               return (
                 <div key={id} className="kv" style={{ alignItems: 'flex-start' }}>
                   <span className="k">
@@ -247,11 +251,11 @@ export function PersonnelScreen(): React.JSX.Element {
                     <SkillRow m={r.skills} />
                   </span>
                   <span className="v" style={{ textAlign: 'right' }}>
-                    <div>{fmt(r.price)} {t('common.cr')}</div>
+                    <div>{fmt(price)} {t('common.cr')}</div>
                     <button
                       className="btn btn-sm btn-primary"
                       style={{ marginTop: 6 }}
-                      disabled={freeQuarters(game.ship) <= 0 || game.credits < r.price}
+                      disabled={freeQuarters(game.ship) <= 0 || game.credits < price}
                       onClick={() => buyRobot(id)}
                     >
                       {t('common.buy')}

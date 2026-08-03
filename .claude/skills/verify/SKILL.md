@@ -6,6 +6,8 @@ description: Run the full Space Trader verification suite (typecheck, engine tes
 # Verify Space Trader
 
 Run these from the repository root, in order. Stop and fix on the first failure.
+On Windows PowerShell, use `npm.cmd` in the commands below when the execution
+policy blocks `npm.ps1` (for example, `npm.cmd test`).
 
 Steps 1–3 are always required. Step 4 covers the **web/Android** bundle and is
 required for any change under `src/renderer/` or `src/shared/`, since one
@@ -39,6 +41,9 @@ the runner adopting the root `vite.config.ts`, which is rooted at `src/renderer`
 and holds no tests. Without it the suite reports "no test files" — an exit code
 that looks like a config slip, not a red suite.
 
+The current baseline is 4 test files and 184 tests; a different count is not
+automatically a failure, but investigate unexpected collection changes.
+
 ## 3. Production build (always)
 
 ```bash
@@ -57,6 +62,10 @@ npm run build:web
 Builds the same renderer into `dist-web/` — the bundle the APK packages. The
 desktop build passing does **not** imply this one does: it uses a different Vite
 config, a different root and different aliases.
+
+For renderer, shared, or platform changes, also inspect generated behavior on
+both hosts when available. A green bundle only proves that the code bundled;
+it does not prove that a phone's responsive layout or native storage works.
 
 ## 5. GUI smoke test (only where a desktop/display is available)
 

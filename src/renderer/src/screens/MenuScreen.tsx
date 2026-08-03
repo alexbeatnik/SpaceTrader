@@ -59,7 +59,7 @@ export function MenuScreen(): React.JSX.Element {
             💾 {t('saves.loadGame')}
           </button>
         )}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+        <div className="row-between" style={{ marginTop: 4 }}>
           <span className="field-label">{t('menu.language')}</span>
           <LocaleToggle />
         </div>

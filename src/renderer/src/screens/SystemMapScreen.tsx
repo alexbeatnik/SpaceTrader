@@ -8,6 +8,8 @@ import {
   systemBodies,
   transitDaysTo,
   STATIONS,
+  SHIP_TYPES,
+  type GameState,
   type SolarSystem,
   type StarClass,
   type SystemBody
@@ -214,7 +216,7 @@ export function SystemMapScreen(): React.JSX.Element {
               <div className="screen-sub" style={{ margin: '14px 0 6px' }}>
                 {t('systemMap.services')}
               </div>
-              <BodyServices sys={sys} body={selected} />
+              <BodyServices game={game} sys={sys} body={selected} />
 
               {selected.id !== hereIndex && (
                 <button
@@ -273,7 +275,7 @@ export function SystemMapScreen(): React.JSX.Element {
 }
 
 /** What a place in the system actually offers a captain who lands on it. */
-function BodyServices({ sys, body }: { sys: SolarSystem; body: SystemBody }): React.JSX.Element {
+function BodyServices({ game, sys, body }: { game: GameState; sys: SolarSystem; body: SystemBody }): React.JSX.Element {
   const { t } = useI18n()
   const lines: string[] = []
   const mine = bodyMineSite(sys, body)
@@ -301,6 +303,13 @@ function BodyServices({ sys, body }: { sys: SolarSystem; body: SystemBody }): Re
 
   const station = body.kind === 'station' ? STATIONS[body.station ?? 'science'] : null
 
+  // Quote the discount the current hull would actually feel: per-unit prices are
+  // rounded, so a cheap hull may pay the planetary rate even at a discounted
+  // station. Judged on the real figures, as the shipyard screen does, not the
+  // nominal multiplier.
+  const baseRepair = SHIP_TYPES[game.ship.type].repairCostPerUnit
+  const stationRepair = station ? Math.max(1, Math.round(baseRepair * station.repairCostMul)) : 0
+
   return (
     <div>
       {lines.map((line) => (
@@ -322,9 +331,9 @@ function BodyServices({ sys, body }: { sys: SolarSystem; body: SystemBody }): Re
           <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
             {t('station.hullUpgrades', { max: station.maxHullUpgrades })}
           </div>
-          {station.repairCostMul < 1 && (
+          {station && stationRepair < baseRepair && (
             <div className="muted" style={{ fontSize: 12 }}>
-              {t('station.repairDiscount', { percent: Math.round(station.repairCostMul * 100) })}
+              {t('station.repairDiscount', { percent: Math.round((stationRepair / baseRepair) * 100) })}
             </div>
           )}
         </div>

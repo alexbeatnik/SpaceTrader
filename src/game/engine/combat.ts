@@ -560,7 +560,7 @@ export function tradeSell(
 
   const have = state.ship.cargo[good]
   if (have <= 0) return { ok: false, error: 'error.nothingToSell' }
-  if (amount <= 0) return { ok: false, error: 'error.cannotBuy' }
+  if (amount <= 0) return { ok: false, error: 'error.nothingToSell' }
 
   const qty = Math.min(amount, have)
   const revenue = qty * unit

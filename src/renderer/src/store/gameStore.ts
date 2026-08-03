@@ -721,14 +721,16 @@ export const useGameStore = create<GameStore>((set, get) => {
         }
         set({
           game: clone(g),
-          incident: res.incident ? clone(res.incident) : null,
+          // A pending incident must survive the tick that found none, or the
+          // next extraction clears it before the player ever sees it.
+          incident: res.incident ? clone(res.incident) : get().incident,
           toast: {
             id: ++toastCounter,
             type: 'info',
             text:
               res.resource === 'fuel'
-                ? renderMessage('log.minedFuel')
-                : renderMessage('log.mined', { good: res.resource! })
+                ? renderMessage('log.minedFuel', { amount: res.amount ?? 0 })
+                : renderMessage('log.mined', { good: res.resource!, amount: res.amount ?? 0 })
           }
         })
         void get().saveGame()

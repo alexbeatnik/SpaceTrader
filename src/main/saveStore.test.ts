@@ -203,6 +203,21 @@ describe('adopting the folder from the previous app name', () => {
     expect(await whoIsInSlot()).toBe('new voyage')
   })
 
+  it('adopts each slot on its own, keeping new ones and filling empty ones', async () => {
+    // A partial state used to strand everything: one slot written under the new
+    // name made the whole adoption bail, so the rest of the old commanders never
+    // came across. Each slot is now judged separately.
+    await saves.write('auto', envelope('new voyage', 100))
+    await writeFile(join(oldDir, 'slot-auto.json'), envelope('old auto', 100), 'utf-8')
+    await writeFile(join(oldDir, 'slot-3.json'), envelope('old three', 100), 'utf-8')
+
+    await saves.adoptSavesFrom(oldDir)
+
+    expect(await whoIsInSlot()).toBe('new voyage')
+    const slots = await saves.list()
+    expect(slots.find((s) => s.slot === '3')?.meta?.commanderName).toBe('old three')
+  })
+
   it('carries a pre-slots savegame.json over for the legacy migration to pick up', async () => {
     await writeFile(
       join(oldDir, 'savegame.json'),

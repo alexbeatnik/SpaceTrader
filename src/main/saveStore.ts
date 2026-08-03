@@ -177,27 +177,29 @@ export function createSaveStore(getDir: () => string): SaveStore {
      * anyone who rolls back to an older build still finds their commander where
      * they left them, and a copy that fails halfway cannot destroy the only
      * surviving save.
+     *
+     * Each slot is adopted on its own: one that already exists under the new
+     * name wins outright (this must never land on top of a voyage started since
+     * the rename), and one file that fails to copy must not strand the rest —
+     * an all-or-nothing loop left whatever a partial failure skipped invisible
+     * to the game for good.
      */
     async adoptSavesFrom(oldDir) {
       try {
         if (oldDir === getDir() || !existsSync(oldDir)) return
-        // Anything already written under the new name wins outright: this must
-        // never land on top of a voyage started since the rename.
-        if (SAVE_SLOT_IDS.some((slot) => existsSync(slotFile(slot)))) return
-        if (existsSync(legacyFile())) return
+        await ensureDir()
 
-        const legacySource = join(oldDir, 'savegame.json')
-        const sources = SAVE_SLOT_IDS.map(
-          (slot) => [join(oldDir, `slot-${slot}.json`), slotFile(slot)] as const
-        )
+        for (const slot of SAVE_SLOT_IDS) {
+          const from = join(oldDir, `slot-${slot}.json`)
+          if (!existsSync(from) || existsSync(slotFile(slot))) continue
+          await copyFile(from, slotFile(slot)).catch(() => {})
+        }
+
         // A pre-slots save left in the old folder comes across as-is;
         // migrateLegacySave promotes it to the autosave slot right after.
-        if (existsSync(legacySource)) sources.push([legacySource, legacyFile()] as const)
-        if (!sources.some(([from]) => existsSync(from))) return
-
-        await ensureDir()
-        for (const [from, to] of sources) {
-          if (existsSync(from)) await copyFile(from, to)
+        const legacySource = join(oldDir, 'savegame.json')
+        if (existsSync(legacySource) && !existsSync(legacyFile())) {
+          await copyFile(legacySource, legacyFile()).catch(() => {})
         }
       } catch {
         // Saves that will not copy are not a reason to fail startup — the old

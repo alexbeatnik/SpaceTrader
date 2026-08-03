@@ -6,6 +6,7 @@ import {
   canTurnIn,
   questSupply,
   freeCargoBays,
+  marketBuyPrice,
   deliverableUnits,
   escortShipProblem,
   boardQuestProblem,
@@ -93,14 +94,16 @@ export function QuestsScreen(): React.JSX.Element {
                   need !== null &&
                   missing > 0 &&
                   !atTarget &&
-                  here.buyPrice[need.good] > 0 &&
+                  // marketBuyPrice is 0 both when the good is not sold and when
+                  // a contract embargoes it, so it covers both refusals at once.
+                  marketBuyPrice(game, need.good) > 0 &&
                   here.qty[need.good] > 0 &&
                   freeCargoBays(game.ship) > 0
                 return (
                   <div className="panel panel-pad" key={q.id}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="row" style={{ gap: 12 }}>
                       <span style={{ fontSize: 26 }}>{ICON[q.type]}</span>
-                      <div style={{ flex: 1 }}>
+                      <div className="col-fill">
                         <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
                         <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
                         <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
@@ -123,13 +126,13 @@ export function QuestsScreen(): React.JSX.Element {
                           <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>⚠ {t('quest.sourceElsewhere')}</div>
                         )}
                       </div>
-                      <div style={{ textAlign: 'right' }}>
+                      <div className="quest-card-actions">
                         <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                        <div className="row-end" style={{ gap: 6, marginTop: 6 }}>
                           {q.type === 'bounty' ? (
                             <div className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>{t('quest.viaCombat')}</div>
                           ) : q.type === 'escort' ? (
-                            <button className="btn btn-sm btn-primary" disabled={escortProblem !== null || q.giverSystem !== game.currentSystem} onClick={() => startEscort(q.id)}>
+                            <button className="btn btn-sm btn-primary" disabled={escortProblem !== null || q.giverSystem !== game.currentSystem || !atCapital(game)} onClick={() => startEscort(q.id)}>
                               🛡 {t('quest.beginEscort')}
                             </button>
                           ) : (
@@ -162,9 +165,9 @@ export function QuestsScreen(): React.JSX.Element {
             const problem = boardQuestProblem(game, q)
             return (
               <div className="panel panel-pad" key={q.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="row" style={{ gap: 12 }}>
                   <span style={{ fontSize: 24 }}>{ICON[q.type]}</span>
-                  <div style={{ flex: 1 }}>
+                  <div className="col-fill">
                     <div style={{ fontWeight: 600 }}>
                       {questTypeLabel(q)}
                       {need && (
@@ -190,7 +193,7 @@ export function QuestsScreen(): React.JSX.Element {
                       </div>
                     )}
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div className="quest-card-actions">
                     <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
                     <button
                       className="btn btn-sm btn-primary"
@@ -216,9 +219,9 @@ export function QuestsScreen(): React.JSX.Element {
           <div className="grid" style={{ gap: 12 }}>
             {completed.map((q, i) => (
               <div className="panel panel-pad" key={`${q.id}-${i}`} style={{ opacity: 0.55 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="row" style={{ gap: 12 }}>
                   <span style={{ fontSize: 22 }}>✅</span>
-                  <div style={{ flex: 1 }}>
+                  <div className="col-fill">
                     <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
                     <div className="muted" style={{ fontSize: 13 }}>{questDescription(q, game)}</div>
                   </div>

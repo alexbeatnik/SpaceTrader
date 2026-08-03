@@ -42,17 +42,22 @@ export async function initPlatform(): Promise<void> {
 
   await sweepScratchFiles()
 
+  // The game runs full-screen: its own HUD is the only chrome the player should
+  // see, so the status bar (clock, battery, signal) is hidden. A swipe down from
+  // the top edge brings it back transiently — sticky immersive — which is how
+  // Android still lets the player reach notifications without leaving the run.
+  // Re-hidden on resume, because some devices show the bar again when the app
+  // comes back from the background.
+  let hideStatusBar: () => Promise<void> = async () => {}
   if (platform.kind === 'android') {
-    // The HUD runs right up to the status bar, so a default light bar puts dark
-    // icons on the game's near-black chrome. `Style.Dark` means light content,
-    // which is the pairing that actually matches.
-    const { StatusBar, Style } = await import('@capacitor/status-bar')
-    await StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
-    await StatusBar.setBackgroundColor({ color: '#05060f' }).catch(() => {})
+    const { StatusBar } = await import('@capacitor/status-bar')
+    hideStatusBar = () => StatusBar.hide().catch(() => {})
+    await hideStatusBar()
   }
 
   const { App } = await import('@capacitor/app')
   await App.addListener('appStateChange', ({ isActive }) => {
-    if (!isActive) void platform.saves.flush()
+    if (isActive) void hideStatusBar()
+    else void platform.saves.flush()
   })
 }
