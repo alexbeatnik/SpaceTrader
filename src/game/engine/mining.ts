@@ -56,14 +56,14 @@ export function mineOnce(state: GameState, rng: Rng): MineResult {
     const cap = maxFuel(state.ship)
     amount = Math.min(yieldPerDay, cap - state.ship.fuel)
     state.ship.fuel += amount
-    pushLog(state, 'log.minedFuel')
+    pushLog(state, 'log.minedFuel', { amount })
   } else {
     amount = Math.min(yieldPerDay, freeCargoBays(state.ship))
     state.ship.cargo[site.resource] += amount
     // Mining at the capital is local sourcing; mining at another body in the
     // system is cargo hauled in from elsewhere and may fulfil a port contract.
     if (atCapital(state)) noteLocalSourcing(state, site.resource, amount)
-    pushLog(state, 'log.mined', { good: site.resource })
+    pushLog(state, 'log.mined', { good: site.resource, amount })
     // Asteroid fields occasionally yield a rare gem.
     if (
       site.kind === 'asteroidField' &&

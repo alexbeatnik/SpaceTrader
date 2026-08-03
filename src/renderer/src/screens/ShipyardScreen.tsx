@@ -17,6 +17,7 @@ import {
   maxHull,
   maxFuel,
   shipValue,
+  traderDiscount,
   fuelPricePerParsec,
   hullUpgradePrice,
   HULL_UPGRADE_AMOUNT,
@@ -58,6 +59,11 @@ export function ShipyardScreen(): React.JSX.Element {
   const fuelMissing = fuelCap - ship.fuel
   const hullMissing = maxHull(ship) - ship.hull
   const fuelUnit = fuelPricePerParsec(game)
+
+  // The yard charges what the best negotiator aboard talks it down to — quote
+  // that figure, or the button shows one price and the account loses another.
+  // (Repairs, fuel and pods are services, not goods: no discount applies.)
+  const discounted = (price: number): number => Math.round(price * (1 - traderDiscount(game)))
 
   return (
     <div>
@@ -179,7 +185,7 @@ export function ShipyardScreen(): React.JSX.Element {
                 disabled={ship.weapons.length >= type.weaponSlots}
                 onClick={() => s.buyWeapon(id)}
               >
-                {fmt(WEAPONS[id].price)}
+                {fmt(discounted(WEAPONS[id].price))}
               </button>
             </div>
           ))}
@@ -193,7 +199,7 @@ export function ShipyardScreen(): React.JSX.Element {
                 disabled={ship.shields.length >= type.shieldSlots}
                 onClick={() => s.buyShield(id)}
               >
-                {fmt(SHIELDS[id].price)}
+                {fmt(discounted(SHIELDS[id].price))}
               </button>
             </div>
           ))}
@@ -210,7 +216,7 @@ export function ShipyardScreen(): React.JSX.Element {
                 }
                 onClick={() => s.buyGadget(id)}
               >
-                {fmt(GADGETS[id].price)}
+                {fmt(discounted(GADGETS[id].price))}
               </button>
             </div>
           ))}
@@ -288,7 +294,7 @@ export function ShipyardScreen(): React.JSX.Element {
           <tbody>
             {hulls.map((id: ShipTypeId) => {
               const st = SHIP_TYPES[id]
-              const net = st.price - shipValue(ship)
+              const net = discounted(st.price) - shipValue(ship)
               const isCurrent = id === ship.type
               return (
                 <tr key={id} className="row-hover">

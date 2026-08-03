@@ -6,6 +6,7 @@ import {
   canTurnIn,
   questSupply,
   freeCargoBays,
+  marketBuyPrice,
   deliverableUnits,
   escortShipProblem,
   boardQuestProblem,
@@ -93,7 +94,9 @@ export function QuestsScreen(): React.JSX.Element {
                   need !== null &&
                   missing > 0 &&
                   !atTarget &&
-                  here.buyPrice[need.good] > 0 &&
+                  // marketBuyPrice is 0 both when the good is not sold and when
+                  // a contract embargoes it, so it covers both refusals at once.
+                  marketBuyPrice(game, need.good) > 0 &&
                   here.qty[need.good] > 0 &&
                   freeCargoBays(game.ship) > 0
                 return (
@@ -129,7 +132,7 @@ export function QuestsScreen(): React.JSX.Element {
                           {q.type === 'bounty' ? (
                             <div className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>{t('quest.viaCombat')}</div>
                           ) : q.type === 'escort' ? (
-                            <button className="btn btn-sm btn-primary" disabled={escortProblem !== null || q.giverSystem !== game.currentSystem} onClick={() => startEscort(q.id)}>
+                            <button className="btn btn-sm btn-primary" disabled={escortProblem !== null || q.giverSystem !== game.currentSystem || !atCapital(game)} onClick={() => startEscort(q.id)}>
                               🛡 {t('quest.beginEscort')}
                             </button>
                           ) : (

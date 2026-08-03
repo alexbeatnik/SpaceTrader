@@ -5,6 +5,8 @@ import {
   currentSystem,
   systemDistance,
   maxRange,
+  marketBuyPrice,
+  traderDiscount,
   POLITICS,
   GOOD_IDS,
   TECH_LEVEL_IDS,
@@ -329,9 +331,17 @@ export function ChartScreen(): React.JSX.Element {
                           (id) => selected.buyPrice[id] > 0 || selected.sellPrice[id] > 0
                         ).map((id) => {
                           const buyP = selected.buyPrice[id]
+                          // The Trader discount applies at every market, so the
+                          // figure a captain pays there is below the listed one.
+                          const buyCharged =
+                            buyP > 0 ? Math.round(buyP * (1 - traderDiscount(game))) : 0
                           const sellP = selected.sellPrice[id]
-                          const hereBuy = here.buyPrice[id]
-                          // Profit per unit: buy at the current system, sell here.
+                          // What the current system actually charges for the good —
+                          // the Trader discount included, and 0 while a contract
+                          // embargoes it — not the bare listed figure.
+                          const hereBuy = marketBuyPrice(game, id)
+                          // Profit per unit: buy at the current system, sell at the
+                          // selected one.
                           const margin =
                             selected.id !== here.id && sellP > 0 && hereBuy > 0
                               ? sellP - hereBuy
@@ -339,7 +349,7 @@ export function ChartScreen(): React.JSX.Element {
                           return (
                             <tr key={id}>
                               <td>{goodName(id)}</td>
-                              <td className="num">{buyP > 0 ? fmt(buyP) : '—'}</td>
+                              <td className="num">{buyCharged > 0 ? fmt(buyCharged) : '—'}</td>
                               <td className="num">{sellP > 0 ? fmt(sellP) : '—'}</td>
                               <td
                                 className={`num ${

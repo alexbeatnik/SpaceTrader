@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
 import {
@@ -22,8 +22,19 @@ export function BankScreen(): React.JSX.Element {
   const { t } = useI18n()
 
   const available = Math.max(0, maxLoan(game) - game.debt)
+  const affordablePay = Math.min(game.debt, game.credits)
   const [loanAmt, setLoanAmt] = useState(available)
-  const [payAmt, setPayAmt] = useState(Math.min(game.debt, game.credits))
+  const [payAmt, setPayAmt] = useState(affordablePay)
+
+  // The amounts are seeded once at mount; re-sync them when the figures they
+  // track change (a taken loan shrinks what is left, a repayment the debt), or
+  // the field keeps quoting a number from before the action.
+  useEffect(() => {
+    setLoanAmt(available)
+  }, [available])
+  useEffect(() => {
+    setPayAmt(affordablePay)
+  }, [affordablePay])
 
   const fine = fineToClear(game)
   const wanted = notoriety(game)
@@ -137,7 +148,7 @@ export function BankScreen(): React.JSX.Element {
               {t('record.wantedBank', { debt: fmt(game.debt) })}
             </div>
           )}
-          {wanted === 0 && (
+          {wanted === 0 && !wantedByBank(game) && (
             <div className="screen-sub" style={{ marginTop: 10 }}>{t('record.clean')}</div>
           )}
 

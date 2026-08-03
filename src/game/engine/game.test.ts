@@ -1742,6 +1742,16 @@ describe('trader trading', () => {
     expect(tradeBuy(g, enc, 'water', 1).ok).toBe(false)
     expect(tradeSell(g, enc, 'water', 1).ok).toBe(false)
   })
+
+  it('refuses a zero-amount sell with a sell error, not a buy one', () => {
+    const g = newGame({ commanderName: 'Test', seed: 64 })
+    g.ship.cargo.furs = 2
+    const enc = testEncounter('trader')
+    enc.trade = { sells: {}, buys: { furs: 200 } }
+    const res = tradeSell(g, enc, 'furs', 0)
+    expect(res.ok).toBe(false)
+    expect(res.error).toBe('error.nothingToSell')
+  })
 })
 
 describe('quest generation', () => {
@@ -1821,6 +1831,18 @@ describe('mining', () => {
     const g = newGame({ commanderName: 'Test', seed: 83 })
     g.systems[g.currentSystem].mineSite = null
     expect(mineOnce(g, new Rng(1)).ok).toBe(false)
+  })
+
+  it('logs the amount actually extracted, not a fixed one', () => {
+    // An industrial hull pulls INDUSTRIAL_MINING_YIELD units a day; the log
+    // line the UI quotes must carry that figure rather than a hard-coded 1.
+    const g = newGame({ commanderName: 'Test', seed: 83 })
+    g.ship.type = 'ant' // industrial
+    g.systems[g.currentSystem].mineSite = { kind: 'iceField', resource: 'water', richness: 5 }
+    const res = mineOnce(g, new Rng(1))
+    expect(res.ok).toBe(true)
+    const entry = g.log.find((l) => l.key === 'log.mined')
+    expect(entry?.params?.amount).toBe(INDUSTRIAL_MINING_YIELD)
   })
 })
 

@@ -22,6 +22,12 @@ const { autoUpdater } = electronUpdater
 
 let status: UpdateStatus = { state: 'idle' }
 let target: BrowserWindow | null = null
+/**
+ * Listeners and the first check are registered once per process. `createWindow`
+ * runs again on macOS `activate` after all windows close, and re-attaching the
+ * handlers there would publish every update event N times and race N checks.
+ */
+let initialized = false
 
 function publish(next: UpdateStatus): void {
   status = next
@@ -38,6 +44,9 @@ export function setupUpdater(window: BrowserWindow): void {
     registerIpc()
     return
   }
+
+  if (initialized) return
+  initialized = true
 
   autoUpdater.autoDownload = true
   // Swap the installed build on quit rather than yanking the player out of a run.
