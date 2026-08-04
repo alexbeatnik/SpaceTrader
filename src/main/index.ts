@@ -41,7 +41,7 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => mainWindow.show())
 
-  setupUpdater(mainWindow)
+  setupUpdater(mainWindow, () => saves.flush())
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -78,15 +78,37 @@ ipcMain.handle('save:delete', async (_e, slot: unknown) => {
 
 ipcMain.handle('save:list', (): Promise<SaveSlotInfo[]> => saves.list())
 
-app.whenReady().then(async () => {
-  await saves.adoptSavesFrom(previousSaveDir())
-  await saves.migrateLegacySave()
-  await saves.sweepScratchFiles()
-  createWindow()
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+/**
+ * One copy of the game at a time.
+ *
+ * Two of them are never harmless: both autosave into the same seven files in
+ * userData with no lock between the processes, so whichever writes last wins and
+ * the other player's voyage is gone. On Windows a second copy also keeps the
+ * installed exe open, and that is exactly what makes a self-update fail — the
+ * updater closes the instance that asked for it, the installer finds the other
+ * one still holding the program folder, and reports that the application is
+ * running. Launching again now raises the window that already exists.
+ */
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const [existing] = BrowserWindow.getAllWindows()
+    if (!existing) return
+    if (existing.isMinimized()) existing.restore()
+    existing.focus()
   })
-})
+
+  app.whenReady().then(async () => {
+    await saves.adoptSavesFrom(previousSaveDir())
+    await saves.migrateLegacySave()
+    await saves.sweepScratchFiles()
+    createWindow()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+}
 
 /**
  * The player's last action is exactly the one they would notice missing, and
@@ -98,7 +120,11 @@ app.on('before-quit', (event) => {
   if (flushing || !saves.hasPending()) return
   event.preventDefault()
   flushing = true
-  void saves.flush().then(() => app.quit())
+  // `finally`, not `then`: this is the only quit left in flight, so a flush that
+  // rejects would leave the app running forever with its window gone — and a
+  // process that never exits is one that keeps holding its own program folder,
+  // which is what a Windows update fails on.
+  void saves.flush().finally(() => app.quit())
 })
 
 app.on('window-all-closed', () => {

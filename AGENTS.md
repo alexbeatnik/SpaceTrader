@@ -199,9 +199,30 @@ things are load-bearing and easy to break:
 - **`allowScripts` in package.json** approves Electron's and esbuild's install
   scripts. npm 11 skips unapproved install scripts, and without them CI never
   downloads the Electron binary.
+- **The `.blockmap` goes up with the installer.** electron-updater fetches
+  `<installer>.blockmap` for the installed version and the new one to download
+  only the changed blocks. Releases 0.1.0–0.1.8 shipped without it, so every
+  update quietly re-downloaded all 80 MB.
 
 `setupUpdater` no-ops when `!app.isPackaged` (electron-updater throws rather
 than skipping), so a dev run reports `unsupported` instead of failing.
+
+**Applying an update installs silently** — `quitAndInstall(true, true)`. The
+interactive alternative opens the assisted NSIS wizard, whose first page is
+`build/installer.nsh`'s welcome page telling the player to close a game the
+updater has just closed for them; players read that as the update refusing to
+run because the app is open, and the old version stays installed until somebody
+clicks through the rest of the wizard. `--updated` also skips that page now, so
+a setup.exe run by hand mid-update behaves the same. Two things make silent
+installing safe, and both are load-bearing:
+
+- **Saves are drained before the installer is spawned.** `quitAndInstall` starts
+  setup.exe and only *then* asks the app to quit, so `update:install` awaits the
+  save queue first.
+- **Only one copy of the game may run** (`requestSingleInstanceLock`). A second
+  instance holds the program folder open, which is what NSIS reports as the
+  application still running — and it would be autosaving over the first one's
+  slots regardless.
 
 ### Save slots
 
