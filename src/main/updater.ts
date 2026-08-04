@@ -22,6 +22,8 @@ const { autoUpdater } = electronUpdater
 
 let status: UpdateStatus = { state: 'idle' }
 let target: BrowserWindow | null = null
+/** Drains anything still on its way to disk before the app is torn down. */
+let drain: () => Promise<void> = () => Promise.resolve()
 /**
  * Listeners and the first check are registered once per process. `createWindow`
  * runs again on macOS `activate` after all windows close, and re-attaching the
@@ -34,8 +36,9 @@ function publish(next: UpdateStatus): void {
   if (target && !target.isDestroyed()) target.webContents.send('update:status', next)
 }
 
-export function setupUpdater(window: BrowserWindow): void {
+export function setupUpdater(window: BrowserWindow, flush: () => Promise<void>): void {
   target = window
+  drain = flush
 
   // A dev run has no installer to replace, and electron-updater throws rather
   // than no-ops if asked to check.
@@ -103,11 +106,22 @@ function registerIpc(): void {
     await check()
     return status
   })
-  ipcMain.handle('update:install', () => {
+  ipcMain.handle('update:install', async () => {
     if (status.state !== 'ready') return false
-    // isSilent false so the player sees the installer do its work; the app is
-    // closed and relaunched on the new version.
-    autoUpdater.quitAndInstall(false, true)
+
+    // quitAndInstall spawns setup.exe first and only then asks the app to quit,
+    // so a save still on its way to disk would be racing the process that is
+    // about to kill this one. Drain the queue while we are still in control.
+    await drain()
+
+    // isSilent true. The alternative runs the full NSIS wizard: it opens on the
+    // welcome page - which asks the player to close a game the updater has just
+    // closed for them - and then waits for clicks while the old version is
+    // still installed, which is how an update that should be invisible ended up
+    // reported as "it says the application is open". Silent needs no clicks, and
+    // the installer replaces the running copy by itself; the second argument
+    // relaunches the game on the new version when it is done.
+    autoUpdater.quitAndInstall(true, true)
     return true
   })
 }

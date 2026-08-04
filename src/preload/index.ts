@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { SaveSlotId, SaveSlotInfo } from '../shared/saves'
-import type { UpdateStatus } from '../main/updater'
+// From shared, not from main: every other consumer of this type already reads it
+// there, and the one import pointing at main is what would quietly drag the
+// updater's module graph back across a bundle boundary the day it stops being a
+// type-only import.
+import type { UpdateStatus } from '../shared/updates'
 
 const api = {
   saveGame: (slot: SaveSlotId, data: string): Promise<boolean> =>

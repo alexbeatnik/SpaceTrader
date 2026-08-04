@@ -204,7 +204,13 @@ jobs:
           $portable = "release/SpaceTrader-$version-portable.exe"
           $latest = "release/latest.yml"
           $apk = "release/SpaceTrader-$version-debug.apk"
-          foreach ($f in @($setup, $portable, $latest, $apk)) {
+          # The updater asks for "<installer>.blockmap" on both the installed
+          # version and the new one so it can download only the parts that
+          # changed. A release without it still updates - it just falls back to
+          # pulling all 80-odd MB again, every time, for a build that usually
+          # differs by a few hundred KB.
+          $blockmap = "$setup.blockmap"
+          foreach ($f in @($setup, $blockmap, $portable, $latest, $apk)) {
             if (-not (Test-Path $f)) {
               Write-Error "Expected artifact not found: $f"
               exit 1
@@ -217,6 +223,6 @@ jobs:
             Write-Error "latest.yml points at '$expected' but the installer is '$(Split-Path $setup -Leaf)' - the updater would 404."
             exit 1
           }
-          gh release create "${{ needs.check.outputs.tag }}" $setup $portable $latest $apk `
+          gh release create "${{ needs.check.outputs.tag }}" $setup $blockmap $portable $latest $apk `
             --title "${{ needs.check.outputs.tag }}" `
             --generate-notes
