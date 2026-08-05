@@ -13,6 +13,9 @@ const api = {
   deleteSave: (slot: SaveSlotId): Promise<boolean> => ipcRenderer.invoke('save:delete', slot),
   listSaves: (): Promise<SaveSlotInfo[]> => ipcRenderer.invoke('save:list'),
 
+  /** Hold the display awake while a voyage is on screen. */
+  setKeepAwake: (on: boolean): Promise<boolean> => ipcRenderer.invoke('power:keepAwake', on),
+
   // --- Self-update ---
   updateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:status'),
   checkForUpdate: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:check'),

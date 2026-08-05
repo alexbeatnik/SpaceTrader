@@ -126,6 +126,60 @@ function subscribeBackButton(handler: () => void): () => void {
   }
 }
 
+/**
+ * Keeping the screen lit, via the standard Screen Wake Lock API.
+ *
+ * Two things about the sentinel drive the shape of this. It is only grantable
+ * to a *visible* page, and the system takes it back the moment the page is
+ * hidden — so a player who checks a message and comes back would return to a
+ * screen that dims again, unless the lock is re-acquired on the way in. And the
+ * request can simply be refused (battery saver is the usual reason), which is
+ * not a failure worth surfacing: the game is entirely playable with a screen
+ * that dims, so a refusal is swallowed and the setting is left as an intent
+ * that will be honoured the next time it can be.
+ */
+let wakeLock: WakeLockSentinel | null = null
+let wakeWanted = false
+let wakeWired = false
+
+async function acquireWakeLock(): Promise<void> {
+  if (!wakeWanted || wakeLock) return
+  if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) return
+  try {
+    const sentinel = await navigator.wakeLock.request('screen')
+    // Between the await and here the player may have quit to the menu; holding
+    // a lock nobody asked for any more is exactly the battery bug this avoids.
+    if (!wakeWanted) {
+      void sentinel.release().catch(() => {})
+      return
+    }
+    wakeLock = sentinel
+    sentinel.addEventListener('release', () => {
+      if (wakeLock === sentinel) wakeLock = null
+    })
+  } catch {
+    // Refused by the platform. `wakeWanted` stays true so returning to the
+    // foreground tries again.
+  }
+}
+
+function setKeepAwake(on: boolean): void {
+  wakeWanted = on
+  if (!on) {
+    const held = wakeLock
+    wakeLock = null
+    void held?.release().catch(() => {})
+    return
+  }
+  if (!wakeWired && typeof document !== 'undefined') {
+    wakeWired = true
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') void acquireWakeLock()
+    })
+  }
+  void acquireWakeLock()
+}
+
 export function createCapacitorPlatform(): Platform {
   // The same ordering guarantees the desktop relies on. The store fires
   // autosaves without awaiting them here too, and every call is an async hop
@@ -209,6 +263,11 @@ export function createCapacitorPlatform(): Platform {
 
     exitApp: isAndroid
       ? () => void import('@capacitor/app').then(({ App }) => App.exitApp())
-      : () => {}
+      : () => {},
+
+    // Not gated on `isAndroid`: the API is a web standard, so a browser tab
+    // running `npm run dev:web` exercises this same path — which is the point
+    // of dev-web serving the real storage code too.
+    keepAwake: setKeepAwake
   }
 }

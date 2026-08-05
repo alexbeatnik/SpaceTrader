@@ -60,4 +60,18 @@ export interface Platform {
    * or tab belongs to the user, so this does nothing.
    */
   exitApp(): void
+  /**
+   * Hold the display awake while a voyage is on screen, and let it sleep again
+   * when there is none.
+   *
+   * This game is played in long stretches with nothing to touch: a jump runs
+   * ten to thirty seconds on its own, a mining run loops for as long as the
+   * player leaves it, and reading a market table is entirely motionless. All of
+   * that reads as "idle" to the system, so the screen dims and locks mid-run.
+   *
+   * Held only while a game is in progress — the menu is a place you leave the
+   * app sitting, and keeping a phone lit there would be a battery bug rather
+   * than a feature.
+   */
+  keepAwake(on: boolean): void
 }

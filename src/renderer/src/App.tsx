@@ -3,6 +3,7 @@ import { atCapital, hasShipyard } from '@game/index'
 import { useGameStore, type Screen } from './store/gameStore'
 import { useI18n } from './hooks/useI18n'
 import { useBackButton } from './hooks/useBackButton'
+import { useKeepAwake } from './hooks/useKeepAwake'
 import { Hud } from './components/Hud'
 import { Nav } from './components/Nav'
 import { Toast } from './components/Toast'
@@ -59,6 +60,14 @@ export function App(): React.JSX.Element {
       : game && rawScreen === 'shipyard' && !hasShipyard(game)
         ? 'system'
         : rawScreen
+
+  // A jump runs half a minute on its own and a mining run loops indefinitely,
+  // neither of them touching the screen — so the display is held awake while
+  // the voyage is on screen. Keyed off exactly what the branch below renders,
+  // not off `game`: quitting to the menu deliberately keeps the state loaded so
+  // Continue works, so a game-is-loaded test holds the screen lit on the menu.
+  const inVoyage = game !== null && screen !== 'menu'
+  useKeepAwake(inVoyage)
 
   if (!game || screen === 'menu') {
     return (
