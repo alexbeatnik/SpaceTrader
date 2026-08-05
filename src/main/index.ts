@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, powerSaveBlocker } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { isSaveSlotId, type SaveSlotInfo } from '../shared/saves'
@@ -79,6 +79,37 @@ ipcMain.handle('save:delete', async (_e, slot: unknown) => {
 ipcMain.handle('save:list', (): Promise<SaveSlotInfo[]> => saves.list())
 
 /**
+ * Keep the display awake while a voyage is on screen.
+ *
+ * `powerSaveBlocker` rather than the renderer's `navigator.wakeLock`: the web
+ * API is grantable only to a visible page and is revoked whenever the page is
+ * hidden, which on the desktop includes minimising the window — and a jump or a
+ * mining run left going in a minimised window is precisely when the player
+ * expects the machine to stay up. This is also the documented Electron route.
+ *
+ * `prevent-display-sleep`, not `prevent-app-suspension`: the game has no reason
+ * to stop a machine suspending when the player has walked away from it, only to
+ * stop the screen blanking while they are watching it.
+ */
+let keepAwakeId: number | null = null
+
+const setKeepAwake = (on: boolean): void => {
+  if (on && keepAwakeId === null) {
+    keepAwakeId = powerSaveBlocker.start('prevent-display-sleep')
+  } else if (!on && keepAwakeId !== null) {
+    // Guarded: stopping an id the blocker no longer knows about throws, and a
+    // quit racing a release must not take the app down on its way out.
+    if (powerSaveBlocker.isStarted(keepAwakeId)) powerSaveBlocker.stop(keepAwakeId)
+    keepAwakeId = null
+  }
+}
+
+ipcMain.handle('power:keepAwake', (_e, on: unknown) => {
+  setKeepAwake(on === true)
+  return keepAwakeId !== null
+})
+
+/**
  * One copy of the game at a time.
  *
  * Two of them are never harmless: both autosave into the same seven files in
@@ -128,5 +159,8 @@ app.on('before-quit', (event) => {
 })
 
 app.on('window-all-closed', () => {
+  // On macOS the app outlives its window, and a blocker left running there
+  // would hold the display awake for an app with nothing on screen.
+  setKeepAwake(false)
   if (process.platform !== 'darwin') app.quit()
 })

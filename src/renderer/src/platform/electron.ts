@@ -28,6 +28,11 @@ export function createElectronPlatform(): Platform {
     // A desktop window has no back gesture, and closing it is the title bar's
     // job — not something a game screen decides.
     onBackButton: () => () => {},
-    exitApp: () => {}
+    exitApp: () => {},
+    // Fire-and-forget: the renderer has nothing to do with the answer, and the
+    // blocker's own bookkeeping lives in main. Swallowed rather than merely
+    // `void`ed — a screen that dims is not worth an unhandled rejection, and
+    // this is called from an effect cleanup where nothing can act on a failure.
+    keepAwake: (on) => void api.setKeepAwake(on).catch(() => {})
   }
 }

@@ -1056,69 +1056,8 @@ tr:last-child td { border-bottom: none; }
   .panel { overflow-x: auto; }
   table { min-width: 640px; }
 
-  /* --- Tables you act on, restacked as one card per row --------------------
-     The market has eight columns and the shipyard ten; neither can be made to
-     fit 411px, and scrolling sideways to reach Buy means the thing the screen
-     exists for is the thing you cannot see. So the row stops being a row: the
-     subject becomes a heading, each cell becomes a labelled line beneath it,
-     and the buttons span the card. One render path still feeds both shapes —
-     the labels are the same strings as the table header, carried on
-     data-label. Read-only tables elsewhere keep the scrolling fallback above;
-     nothing is hidden there but a number. */
-  .stacked-table { min-width: 0; }
-  .stacked-table thead { display: none; }
-  .stacked-table,
-  .stacked-table tbody,
-  .stacked-table tr,
-  .stacked-table td { display: block; }
-
-  /* Stats one per line made a card tall enough that only two rows fit on
-     screen, trading sideways scrolling for just as much vertical. Paired up
-     they read just as clearly in half the height. */
-  .stacked-table tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 18px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  .stacked-table tr:last-child { border-bottom: none; }
-  .stacked-table td.stacked-title,
-  .stacked-table td.stacked-actions { grid-column: 1 / -1; }
-
-  .stacked-table td {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 3px 0;
-    border-bottom: none;
-    text-align: right;
-  }
-  .stacked-table td::before {
-    content: attr(data-label);
-    color: var(--text-faint);
-    font-size: 10.5px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    text-align: left;
-  }
-  /* The subject heads the card and the buttons close it; neither is a labelled
-     field, and an empty ::before would still take up a gap. */
-  .stacked-table td:not([data-label])::before { display: none; }
-  .stacked-table td.stacked-title {
-    font-size: 15px;
-    font-weight: 600;
-    text-align: left;
-    padding-bottom: 8px;
-  }
-  .stacked-table td.stacked-actions { padding-top: 10px; }
-  /* Covers both shapes: a row of buttons, and a lone one sitting bare in the
-     cell as the shipyard's does. */
-  .stacked-actions-row { width: 100%; }
-  .stacked-actions-row .btn { flex: 1; }
-  .stacked-table td.stacked-actions > .btn { width: 100%; }
+  /* The tables you act on are restacked as cards — see the shared block below
+     the landscape rules, which serves this layout and narrow landscape both. */
 }
 
 /* =========================================================================
@@ -1260,11 +1199,93 @@ tr:last-child td { border-bottom: none; }
      shipyard's ten columns plus a Buy button came to just over what a
      landscape phone has, leaving the button a few pixels past the edge. That
      is the same unreachable-action trap the portrait cards exist to avoid, so
-     these two tighten up rather than overflow. */
+     these two tighten up rather than overflow. Below ~560px there is no longer
+     width for them at all, and the block after this one restacks them instead. */
   .stacked-table th,
   .stacked-table td { padding: 6px 5px; font-size: 12px; }
   .stacked-table th { font-size: 9.5px; }
   .stacked-table .btn-sm { padding: 4px 8px; font-size: 11px; }
+}
+
+/* =========================================================================
+   Tables you act on, restacked as one card per row
+
+   The market has eight columns and the shipyard ten; neither can be made to
+   fit 411px, and scrolling sideways to reach Buy means the thing the screen
+   exists for is the thing you cannot see. So the row stops being a row: the
+   subject becomes a heading, each cell becomes a labelled line beneath it, and
+   the buttons span the card. One render path still feeds both shapes — the
+   labels are the same strings as the table header, carried on data-label.
+   Read-only tables elsewhere keep the scrolling fallback; nothing is hidden
+   there but a number.
+
+   Two layouts need this, which is why it is no longer inside the portrait
+   block it started in. The second is a *small* screen on its side: the rail
+   takes a fixed 172px, so a 512px-wide device leaves a 340px column — and the
+   640px table in it put Buy at x=774, more than a full screen width past the
+   edge, with 36 buttons out there in total. A landscape phone is 850px wide
+   and never hit this; the tightened columns above were enough for it. The
+   cutoff sits at 560px so those phones keep the table they have today.
+
+   Placed after the landscape block deliberately: where both apply, the card
+   rules must be the ones that win.
+   ========================================================================= */
+@media (orientation: portrait) and (max-width: 860px),
+  (orientation: landscape) and (max-width: 560px) {
+  .stacked-table { min-width: 0; }
+  .stacked-table thead { display: none; }
+  .stacked-table,
+  .stacked-table tbody,
+  .stacked-table tr,
+  .stacked-table td { display: block; }
+
+  /* Stats one per line made a card tall enough that only two rows fit on
+     screen, trading sideways scrolling for just as much vertical. Paired up
+     they read just as clearly in half the height. */
+  .stacked-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 18px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .stacked-table tr:last-child { border-bottom: none; }
+  .stacked-table td.stacked-title,
+  .stacked-table td.stacked-actions { grid-column: 1 / -1; }
+
+  .stacked-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    border-bottom: none;
+    text-align: right;
+  }
+  .stacked-table td::before {
+    content: attr(data-label);
+    color: var(--text-faint);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    text-align: left;
+  }
+  /* The subject heads the card and the buttons close it; neither is a labelled
+     field, and an empty ::before would still take up a gap. */
+  .stacked-table td:not([data-label])::before { display: none; }
+  .stacked-table td.stacked-title {
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+    padding-bottom: 8px;
+  }
+  .stacked-table td.stacked-actions { padding-top: 10px; }
+  /* Covers both shapes: a row of buttons, and a lone one sitting bare in the
+     cell as the shipyard's does. */
+  .stacked-actions-row { width: 100%; }
+  .stacked-actions-row .btn { flex: 1; }
+  .stacked-table td.stacked-actions > .btn { width: 100%; }
 }
 
 /* =========================================================================
@@ -1285,4 +1306,179 @@ tr:last-child td { border-bottom: none; }
   .menu-title { font-size: 34px; letter-spacing: 1px; }
   .menu-tagline { margin-bottom: 14px; font-size: 13px; }
   .menu-card { padding: 16px 18px; gap: 10px; }
+}
+
+/* =========================================================================
+   Small handhelds, upright: portrait where height is scarce too
+
+   The portrait block far above assumes a phone's proportions — ~411x891, where
+   the tab strip and a wrapped HUD are a tenth of the screen each and the rest
+   is still a page of content. A small device breaks that assumption without
+   changing orientation: 342x512 is the same layout with 57% of the height, and
+   there the HUD alone wrapped onto *three* rows and took 159px — 31% of the
+   screen — before a single line of the game was drawn.
+
+   Keyed on height rather than width because height is what ran out. Nothing
+   previously supported matches: a portrait phone is 640px tall at the very
+   least, and the desktop window cannot be portrait at all (its minimum is
+   1024x680, so width always exceeds height).
+
+   Worth knowing when reading the sizes below: Android's WebView multiplies
+   every font by the system font scale, which is a user accessibility setting
+   and is deliberately left alone. The device this was measured on runs 1.3x,
+   so a `10px` label here is drawn at 13px. The rules give text room to be
+   bigger than it says rather than pinning it down.
+   ========================================================================= */
+@media (orientation: portrait) and (max-height: 620px) {
+  /*
+   * The same trade the landscape block makes, for the same reason: six stats
+   * wrapping cost three rows of a screen that has room for about twelve. One
+   * row that scrolls sideways is 47px instead of 159px, and it hands the 112px
+   * saved to the content — which is the game.
+   */
+  .hud {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 5px;
+    padding: 4px 10px;
+    padding-top: calc(4px + env(safe-area-inset-top));
+  }
+  .hud::-webkit-scrollbar { display: none; }
+  /* Decoration goes first: the brand alone was 166px of a 342px row. */
+  .hud-brand { display: none; }
+  /* Without this the stats compress into each other instead of overflowing,
+     which is what makes the row scrollable in the first place. */
+  .hud-stat,
+  .lang-toggle { flex-shrink: 0; }
+  .hud-stat { min-width: 0; padding: 2px 8px; }
+  .hud-stat .label { font-size: 9px; letter-spacing: 0.5px; }
+  .hud-stat .value { font-size: 12px; }
+
+  /* The tab strip keeps its 44px tap targets from the `pointer: coarse` block
+     — those are a floor, not a preference. Only the padding around them gives. */
+  .nav {
+    gap: 2px;
+    padding: 4px 6px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+  }
+  .nav button { min-width: 56px; padding: 4px 6px; font-size: 9.5px; }
+  .nav .nav-icon { font-size: 17px; }
+
+  .content { padding: 10px 12px; }
+  .screen-title { font-size: 16px; margin-bottom: 2px; }
+  .screen-sub { font-size: 12px; margin-bottom: 10px; }
+  .panel-pad { padding: 12px 14px; }
+  .grid { gap: 10px; }
+
+  .modal { max-height: 92vh; padding: 14px 16px; }
+  .modal h2 { font-size: 17px; margin-bottom: 10px; }
+
+  /*
+   * Combat, compacted — and this is the rule that had to move rather than be
+   * written. It lived in the landscape block, so a *portrait* screen this short
+   * never got it: two full-size ship cards plus a 200px log pushed Attack, Flee
+   * and Submit past the bottom of a 440px modal, and the log grows with every
+   * shot fired. The player went hunting for "flee" mid-fight, which is the one
+   * failure the whole responsive layout exists to prevent. Sticky actions mean
+   * that however long the fight runs, the decision stays on screen and the log
+   * scrolls beneath it.
+   */
+  .ship-visual { padding: 8px 10px; gap: 10px; }
+  /* Width and height are SVG presentation attributes, which CSS outranks. */
+  .ship-visual svg { width: 44px; height: 44px; }
+  .ship-emoji { font-size: 28px; }
+  .side-label { font-size: 10px; margin-bottom: 0; }
+  .combat-log { max-height: 96px; padding: 8px 10px; font-size: 12px; }
+  .combat-actions {
+    position: sticky;
+    bottom: 0;
+    margin-top: 10px;
+    padding: 10px 0 2px;
+    background: var(--bg-panel-2);
+  }
+
+  /* Same reasoning for the escort log, and the mining rock is decoration that
+     was costing a fifth of the overlay. */
+  .escort-log { max-height: 104px; margin-top: 8px; }
+  .warp-core { gap: 10px; }
+  .mining-rock { font-size: 64px; }
+}
+
+/* =========================================================================
+   Very narrow: a content column below what a phone gives
+
+   342px upright is 69px narrower than the phone the portrait block was measured
+   against, and things that merely looked tight at 411px break here. The same
+   rules serve the small screen on its side, where a fixed 172px rail leaves an
+   even narrower column than portrait has — 340px against 316px.
+
+   Both arms are scoped to miss every mainstream handset: 350px upright keeps
+   360, 375, 390 and 411 exactly as they are today, and 560px on its side keeps
+   the 640px-and-wider landscape phones on the table layout they have.
+   ========================================================================= */
+@media (orientation: portrait) and (max-width: 350px),
+  (orientation: landscape) and (max-width: 560px) {
+  /*
+   * `1fr` is `minmax(auto, 1fr)`, so a track refuses to shrink below the widest
+   * word inside it — and a label like "Вантажні відсіки" is wider than half of
+   * 272px. Every card in the shipyard therefore pushed its own row 15–34px past
+   * the panel. `minmax(0, …)` lets the track shrink to the space there actually
+   * is.
+   */
+  .stacked-table tr {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 12px;
+    padding: 10px 12px;
+  }
+  /*
+   * Which leaves the cell to give somewhere, and the label is the half that
+   * should: `min-width: 0` lets it fall below its own longest word and wrap
+   * onto a second line, so the value stays on the first line at the right edge
+   * where it lines up with every other value in the card. Letting the *cell*
+   * wrap instead was the first attempt and read badly — the value dropped to a
+   * line of its own, left-aligned under a label it no longer looked attached
+   * to. `break-word` is the backstop for a label that is one long word with
+   * nowhere to break.
+   */
+  .stacked-table td::before {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  /*
+   * The save row is a flex line of description plus buttons, and the buttons do
+   * not shrink — so at this width they sat at x=378 on a 342px screen while the
+   * description was crushed to 9px. Both halves get their own line: you can
+   * read which voyage a slot holds, and Delete is on screen rather than past
+   * the edge of it. The one genuinely unreachable action left on this device.
+   */
+  .save-slot { flex-wrap: wrap; gap: 8px; }
+  .save-slot-main { flex-basis: 100%; }
+  .save-slot-actions { width: 100%; justify-content: flex-end; }
+
+  /*
+   * A label squeezed between an icon and a button has very little left at this
+   * width — the mine site's was 82px — and a single long word simply hung out
+   * of it. Breaking engages only when the word genuinely does not fit, so this
+   * costs nothing on the rows that already have room.
+   */
+  .col-fill { overflow-wrap: break-word; }
+
+  /*
+   * One column, not two. Upright this is already the case; on its side the
+   * landscape block keeps `.grid-3` paired, which at 512px wide means 151px
+   * panels — and the shipyard's equipment rows are a name beside a price
+   * button, which does not fit in that and put the button 37px past the panel.
+   * The stacked tables above are the same argument: below this width there is
+   * room for one column of anything, and no more.
+   */
+  .grid-2,
+  .grid-3,
+  .grid-split { grid-template-columns: 1fr; }
+
+  /* Read-only tables still scroll sideways rather than restack — nothing is
+     hidden in them but a number — but 640px was over two screenfuls at this
+     width. Still wide enough to keep the columns legible. */
+  table { min-width: 520px; }
 }
