@@ -1708,6 +1708,22 @@ describe('standing and hired hunters', () => {
     expect(g.record.policeRecord).toBe(0)
     expect(g.log.some((entry) => entry.key === 'log.standingChanged')).toBe(true)
   })
+
+  it('a sentence served over a bank debt leaves a defender their name', () => {
+    const g = newGame({ commanderName: 'Test', seed: 108 })
+    // Hunters chase an unpaid loan whatever the record says, so a decorated
+    // captain can end up in a cell without ever breaking a law.
+    g.record.policeRecord = 8
+    g.debt = BANK_BOUNTY_DEBT
+    g.credits = 20000
+    expect(standing(g)).toBe('defender')
+
+    const served = serveSentence(g)
+
+    expect(served.days).toBe(sentenceDays(g)) // no notoriety to lengthen it
+    expect(g.record.policeRecord).toBe(8)
+    expect(standing(g)).toBe('defender')
+  })
 })
 
 describe('trader trading', () => {

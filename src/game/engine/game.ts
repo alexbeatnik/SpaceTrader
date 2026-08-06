@@ -56,6 +56,7 @@ import {
 // The local-sourcing ledger lives in its own module (`crew.ts` needs it too and
 // cannot import this one), but stays part of this module's public surface.
 export {
+  emptyGoods,
   noteLocalSourcing,
   clearLocalSourcing,
   releaseLocalSourcing,

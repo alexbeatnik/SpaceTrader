@@ -161,8 +161,10 @@ export function serveSentence(state: GameState): Sentence {
   }
   state.credits -= fine
   for (let i = 0; i < days; i++) advanceDay(state)
-  // Time served wipes the slate.
-  applyKarma(state, -state.record.policeRecord)
+  // Time served wipes the slate — but only a criminal one. A hunter collecting
+  // on a bank loan hauls in captains with a clean or celebrated record too, and
+  // a debt is no reason to strip a defender of the name they earned.
+  if (state.record.policeRecord < 0) applyKarma(state, -state.record.policeRecord)
   pushLog(state, 'log.servedSentence', { days, fine })
   return { days, fine, confiscated }
 }
