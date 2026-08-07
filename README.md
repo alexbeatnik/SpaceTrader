@@ -39,7 +39,11 @@ Core systems implemented:
   actually true of it. A drought on an agrarian world under a dictatorship reads
   nothing like one on a hi-tech democracy: the harvest is a write-off, the
   Governor orders every commune to pull together, and the ministry starts buying
-  water in bulk from anyone who can haul it in. Refreshed on every arrival.
+  water in bulk from anyone who can haul it in. Ninety stories draw on the crisis
+  the planet is living through, the government that runs it, the trade it lives
+  off and whatever oddity it was born with — safari charters and broken poaching
+  rings on a world thick with wildlife, a third dome sealed on schedule on one
+  where nothing lives and nothing ever did. Refreshed on every arrival.
 - **Dynamic market** — prices driven by tech level, **planet economy type**
   (agrarian, mining, industrial, energy, resort, hi-tech — e.g. food is cheap on
   agrarian worlds, machines dear), government preferences, special resources,
@@ -97,13 +101,24 @@ Core systems implemented:
 - **Surrender terms** — pirates size up your hold and name the cargo they came
   for; give it up and they strip the hold and let you fly on. Bounty hunters want
   *you*: standing down means days in a cell and a fine — but you come out with a
-  **clean record**.
+  **clean record**. The cell clears a criminal record, never an earned one, so a
+  decorated captain collected over an unpaid loan pays in days and credits and
+  walks out still a defender.
+- **Meeting a trader, and turning on one** — a hauler crossing your path is not
+  a fight. There is nobody to run from, so there is no *Flee*: you deal at its
+  **marketplace** or you wave it off and fly on. Open fire and that changes in
+  one shot — the freighter puts a distress call out on the open channel with your
+  registry on it, the stall closes, walking away is no longer on the table, and
+  the hauler stays in the fight between your manoeuvres. **Piracy is the one
+  crime a clean name will not cover**: however the galaxy filed you before, the
+  warrant goes out and hunters start looking.
 - **Standing & bounty hunters** — the galaxy files you somewhere between
-  **Outlaw** and **Champion of justice**. Smuggling runs blacken the record;
-  relief missions, pirate bounties and clean inspections redeem it. Go notorious
-  — *or* leave a bank loan unpaid — and hunters are hired to collect, better
-  armed the bigger the payday. Buy the record clean with a **large fine** at the
-  bank (the bank calls its own collectors off only when the debt is paid).
+  **Outlaw** and **Champion of justice**. Smuggling runs and shots fired at
+  civilian haulers blacken the record; relief missions, pirate bounties and clean
+  inspections redeem it. Go notorious — *or* leave a bank loan unpaid — and
+  hunters are hired to collect, better armed the bigger the payday. Buy the
+  record clean with a **large fine** at the bank (the bank calls its own
+  collectors off only when the debt is paid).
 - **Crew, stations & incidents** — you start alone in a **Flea**, the only hull
   certified for single-handed flight; everything bigger needs a real crew, up to
   **10 hands on a capital ship**. Four stations must be manned — **helm, guns,
@@ -297,8 +312,10 @@ npm run dist       # package a distributable (electron-builder)
 
 Before opening a pull request, run `npm run typecheck`, `npm test`, `npm run
 build`, and `npm run build:web`. The test suite includes engine, save-format,
-write-queue, and locale-parity tests. On Windows PowerShell, use `npm.cmd`
-instead if execution policy blocks `npm.ps1`, for example `npm.cmd test`.
+write-queue, and locale tests — the last covering both dictionaries key for key
+and proving every news story the engine can run has prose on both sides. On
+Windows PowerShell, use `npm.cmd` instead if execution policy blocks `npm.ps1`,
+for example `npm.cmd test`.
 
 Requires Node.js 18+.
 

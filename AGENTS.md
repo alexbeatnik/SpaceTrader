@@ -455,6 +455,14 @@ in crisis always leads with the crisis. Ids only: a template's copy lives at
 `news.<id>.headline` / `news.<id>.body` in both locales. The set is regenerated
 in `settleArrival` and stored on `SolarSystem.news`.
 
+Adding a story is a template plus two dictionary entries per locale, and
+`NEWS_IDS` exists so the locale suite can prove the second half was done — a
+template with no prose reaches the player as a raw key, which locale *parity*
+cannot catch because both dictionaries would be missing it equally. When adding
+one, check what the planet it targets already runs: a trait with a single story
+(or none, as `richFauna` and `lifeless` had) reads as generic filler on every
+visit.
+
 ### Standing (karma) and hired hunters
 
 `reputation.ts` owns the whole karma model. `record.policeRecord` is the single
@@ -511,6 +519,24 @@ narrate shields absorbing, shields collapsing, and a crippled hull as distinct
 messages. Pirates and hunters also push a demand line (`enc.demand`) that the
 combat modal uses to label the surrender button.
 
+### Traders: a meeting until you make it a fight
+
+A trader encounter is not an engagement. `isPeacefulTrader(enc)` is true until
+the player fires, and while it is, `flee` is **refused by `resolveRound` before
+any round is spent** and hidden by the modal — there is nobody to escape from,
+and `ignore` ("Leave") is how you part. The first `attack` flips
+`enc.provoked`, and that flag (not the current action) is what keeps the hauler
+shooting back on exchanges the player spends manoeuvring. It also closes the
+trade panel and takes `ignore` away: the shot cannot be walked back.
+
+That first shot is piracy, so it goes through `reportPiracy` in `reputation.ts`
+rather than a bare `applyKarma`. It costs `PIRACY_KARMA`, or enough to land the
+player at `-WANTED_THRESHOLD`, whichever is worse — the only karma hit in the
+game that **guarantees** the player ends up wanted, because a decorated record
+is no defence against gunning down a civilian hauler. Charged once per
+encounter, before the to-hit roll: whether the shot lands changes nothing about
+what the distress call says.
+
 ### Exotic (resource-gated) goods
 
 Goods whose `TradeGood.producedByResource` is set are bought only on the matching
@@ -555,13 +581,25 @@ Always run `npm run typecheck` and `npm test` before considering a change done.
 `noUnusedLocals`/`noUnusedParameters`, so keep imports tidy.
 
 **There are four build configs and they are not interchangeable.**
-`electron.vite.config.ts` builds the desktop into `out/`; `vite.config.ts`
+`electron.vite.config.ts` builds the desktop into `out/`; `vite.config.mts`
 builds the same renderer into `dist-web/` for Capacitor, rooted at
 `src/renderer` with `base: './'`; `capacitor.config.ts` is the native shell;
-`vitest.config.ts` exists **only** to stop the runner adopting `vite.config.ts`
+`vitest.config.mts` exists **only** to stop the runner adopting `vite.config.mts`
 — it did, silently narrowed the suite to a directory with no tests, and reported
 "no test files" rather than failing. If you add a root Vite config, check
 `npm test` still collects 4 files.
+
+**The two `.mts` extensions are deliberate.** `package.json` carries no
+`"type": "module"` and must not get one — Electron's main and preload are
+CommonJS by design — so a `.ts` Vite config is loaded through Vite's deprecated
+CJS Node API and every run prints the warning. The explicit ESM extension takes
+that path out without touching the package type, and is what Vite 6+ will
+require anyway. Renaming either back means updating three other places that name
+the file: the `include` list in `tsconfig.node.json` (a stale name there is
+dropped in silence, and the config simply stops being type-checked) and the
+`paths:` filters in `.github/workflows/android.yml` and `release.yml` (a stale
+name there means a change to the config no longer triggers the build it
+configures).
 
 ## Review checklist
 

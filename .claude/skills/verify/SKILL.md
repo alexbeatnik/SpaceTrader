@@ -36,12 +36,14 @@ planet economies, exotic resource goods, crew, equipment & hull upgrades, quests
 plus the save format, the shared write queue and locale parity.
 When you add or change engine behavior, add/extend a test here.
 
-**Check the run collected 4 test files.** `vitest.config.ts` exists only to stop
-the runner adopting the root `vite.config.ts`, which is rooted at `src/renderer`
+**Check the run collected 4 test files.** `vitest.config.mts` exists only to stop
+the runner adopting the root `vite.config.mts`, which is rooted at `src/renderer`
 and holds no tests. Without it the suite reports "no test files" — an exit code
-that looks like a config slip, not a red suite.
+that looks like a config slip, not a red suite. The `.mts` extension keeps the
+config off Vite's deprecated CJS Node API; a clean run has no warning above the
+first test line.
 
-The current baseline is 4 test files and 184 tests; a different count is not
+The current baseline is 4 test files and 196 tests; a different count is not
 automatically a failure, but investigate unexpected collection changes.
 
 ## 3. Production build (always)

@@ -143,7 +143,7 @@ export function PersonnelScreen(): React.JSX.Element {
               {game.ship.crew.map((id) => {
                 const m = MERCENARIES[id]
                 return (
-                  <div key={id} className="kv" style={{ alignItems: 'flex-start' }}>
+                  <div key={id} className="kv kv-card">
                     <span className="k">
                       <div style={{ color: 'var(--text)', fontWeight: 600 }}>
                         {mercName(id)}{' '}
@@ -151,7 +151,7 @@ export function PersonnelScreen(): React.JSX.Element {
                       </div>
                       <SkillRow m={m.skills} />
                     </span>
-                    <span className="v" style={{ textAlign: 'right' }}>
+                    <span className="v quest-card-actions">
                       <div>{fmt(m.wage)} {t('common.cr')}/{t('common.day').toLowerCase()}</div>
                       <button className="btn btn-sm btn-danger" style={{ marginTop: 6 }} onClick={() => fire(id)}>
                         {t('crew.fire')}
@@ -163,7 +163,7 @@ export function PersonnelScreen(): React.JSX.Element {
               {robots.map((id, index) => {
                 const r = ROBOTS[id]
                 return (
-                  <div key={`${id}-${index}`} className="kv" style={{ alignItems: 'flex-start' }}>
+                  <div key={`${id}-${index}`} className="kv kv-card">
                     <span className="k">
                       <div style={{ color: 'var(--text)', fontWeight: 600 }}>
                         🤖 {t(`robot.${id}`)}{' '}
@@ -172,7 +172,7 @@ export function PersonnelScreen(): React.JSX.Element {
                       </div>
                       <SkillRow m={r.skills} />
                     </span>
-                    <span className="v" style={{ textAlign: 'right' }}>
+                    <span className="v quest-card-actions">
                       <div className="muted">{t('crew.noWage')}</div>
                       <button
                         className="btn btn-sm btn-danger"
@@ -201,14 +201,14 @@ export function PersonnelScreen(): React.JSX.Element {
             roster.map((id) => {
               const m = MERCENARIES[id]
               return (
-                <div key={id} className="kv" style={{ alignItems: 'flex-start' }}>
+                <div key={id} className="kv kv-card">
                   <span className="k">
                     <div style={{ color: 'var(--text)', fontWeight: 600 }}>
                       {mercName(id)} <span className="badge">{t(`profession.${m.profession}`)}</span>
                     </div>
                     <SkillRow m={m.skills} />
                   </span>
-                  <span className="v" style={{ textAlign: 'right' }}>
+                  <span className="v quest-card-actions">
                     <div>{fmt(m.wage)} {t('common.cr')}/{t('common.day').toLowerCase()}</div>
                     <button
                       className="btn btn-sm btn-primary"
@@ -243,14 +243,14 @@ export function PersonnelScreen(): React.JSX.Element {
               // to — quote that, and gate affordability on the same figure.
               const price = Math.round(r.price * (1 - traderDiscount(game)))
               return (
-                <div key={id} className="kv" style={{ alignItems: 'flex-start' }}>
+                <div key={id} className="kv kv-card">
                   <span className="k">
                     <div style={{ color: 'var(--text)', fontWeight: 600 }}>
                       {t(`robot.${id}`)} <span className="badge">{t(`profession.${r.profession}`)}</span>
                     </div>
                     <SkillRow m={r.skills} />
                   </span>
-                  <span className="v" style={{ textAlign: 'right' }}>
+                  <span className="v quest-card-actions">
                     <div>{fmt(price)} {t('common.cr')}</div>
                     <button
                       className="btn btn-sm btn-primary"

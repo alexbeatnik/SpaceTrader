@@ -219,15 +219,7 @@ export function ChartScreen(): React.JSX.Element {
               )}
 
               {selectedQuests.length > 0 && (
-                <div
-                  style={{
-                    marginBottom: 12,
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    background: 'rgba(255,192,74,0.08)',
-                    border: '1px solid rgba(255,192,74,0.3)'
-                  }}
-                >
+                <div className="chart-quest-note">
                   <div className="badge warn" style={{ marginBottom: 8 }}>
                     📋 {t('chart.questHere')}
                   </div>

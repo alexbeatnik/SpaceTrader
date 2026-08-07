@@ -51,12 +51,13 @@ import {
   blackHoleEvent,
   ensureBodies,
   pushLog,
+  clearLocalSourcing,
+  emptyGoods,
   shipValue,
   systemDistance,
   transitDaysTo,
   Rng,
   SHIP_TYPES,
-  GOOD_IDS,
   type GameState,
   type Encounter,
   type GameEvent,
@@ -915,12 +916,19 @@ function handleDestruction(g: GameState): void {
   // that was actually lost, not on the Flea handed over as a replacement.
   const payout = g.insurance ? shipValue(g.ship) : 0
   const flea = SHIP_TYPES.flea
+  // The hold goes down with the ship, so the books that shadow it go too: the
+  // price paid for the lost cargo, and its local-sourcing record. Every other
+  // path that empties the hold (seizure, plunder, an electrical fire) clears
+  // all three together, and a run lost short of port never reaches the arrival
+  // that would have cleared the ledger.
+  g.buyingPrice = emptyGoods()
+  clearLocalSourcing(g)
   g.ship = {
     type: 'flea',
     hull: flea.hullStrength,
     hullUpgrades: 0,
     fuel: flea.fuelTanks,
-    cargo: emptyCargo(),
+    cargo: emptyGoods(),
     weapons: [],
     shields: [],
     shieldPoints: [],
@@ -936,10 +944,4 @@ function handleDestruction(g: GameState): void {
     pushLog(g, 'log.insurancePaid', { amount: payout })
   }
   pushLog(g, 'encounter.escapePod')
-}
-
-function emptyCargo(): GameState['ship']['cargo'] {
-  const rec = {} as GameState['ship']['cargo']
-  for (const g of GOOD_IDS) rec[g] = 0
-  return rec
 }

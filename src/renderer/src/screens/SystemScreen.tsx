@@ -31,16 +31,11 @@ import { bodyDisplayName } from '../util/bodyText'
 
 function StrengthBar({ value }: { value: number }): React.JSX.Element {
   return (
-    <div className="row" style={{ gap: 2 }}>
+    <div className="strength-bar">
       {Array.from({ length: 7 }).map((_, i) => (
         <span
           key={i}
-          style={{
-            width: 10,
-            height: 8,
-            borderRadius: 2,
-            background: i < value ? 'var(--accent)' : 'rgba(255,255,255,0.08)'
-          }}
+          style={{ background: i < value ? 'var(--accent)' : 'rgba(255,255,255,0.08)' }}
         />
       ))}
     </div>
@@ -76,9 +71,9 @@ export function SystemScreen(): React.JSX.Element {
 
       {!docked && (
         <div className="panel panel-pad" style={{ marginTop: 12 }}>
-          <div className="row-wrap" style={{ gap: 14 }}>
+          <div className="icon-card">
             <span style={{ fontSize: 26 }}>{here?.kind === 'station' ? '🛰️' : '🪨'}</span>
-            <div className="col-fill" style={{ minWidth: 200 }}>
+            <div className="icon-card-text">
               <div style={{ fontWeight: 600 }}>
                 {here?.kind === 'station'
                   ? stationName(here.station ?? 'science')
@@ -166,7 +161,7 @@ export function SystemScreen(): React.JSX.Element {
               {docked ? t('body.capital') : `#${currentBodyIndex(game)}`}
             </span>
           </div>
-          <div className="row-wrap" style={{ marginTop: 16, gap: 10 }}>
+          <div className="button-row">
             <button
               className="btn btn-primary"
               disabled={!docked}
@@ -198,7 +193,7 @@ export function SystemScreen(): React.JSX.Element {
 
       {mine && (
         <div className="panel panel-pad" style={{ marginTop: 16 }}>
-          <div className="row" style={{ gap: 14 }}>
+          <div className="icon-card">
             <span style={{ fontSize: 30 }}>
               {mine.kind === 'asteroidField' ? '☄️' : mine.kind === 'gasGiant' ? '🪐' : '🧊'}
             </span>
