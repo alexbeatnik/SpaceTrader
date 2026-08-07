@@ -16,7 +16,7 @@ on:
       - 'src/**'
       - 'android/**'
       - 'capacitor.config.ts'
-      - 'vite.config.ts'
+      - 'vite.config.mts'
       - 'package.json'
       - '.github/workflows/android.yml'
   pull_request:

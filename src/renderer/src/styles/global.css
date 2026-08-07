@@ -371,6 +371,36 @@ tr:last-child td { border-bottom: none; }
 .escort-warp-core  { max-width: 620px; width: 90%; }
 /* Skill-tag row inside crew cards. */
 .skill-tags  { display: flex; gap: 10px; font-size: 12px; color: var(--text-dim); flex-wrap: wrap; }
+/* Pushes a trailing control to the far end of a flex row (combat's Continue). */
+.push-end  { margin-left: auto; }
+/* A .kv row carrying a card rather than a label/value pair: a name and its
+   skill tags on one side, a wage or price and its button on the other. Top
+   aligned, because the two columns are different heights and centring them
+   floats the button away from the name it belongs to. */
+.kv-card  { align-items: flex-start; }
+/* Icon beside a block of text: the body you are parked at, a mine site. The
+   text column keeps a floor so it does not collapse to one word per line next
+   to the glyph — released below, where 200px is most of the screen. */
+.icon-card  { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.icon-card-text  { flex: 1; min-width: 200px; }
+/* A row of buttons closing a panel. */
+.button-row  { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+/* Government strength read-out: seven segments, lit or unlit. Only the fill
+   colour is per-segment and stays inline; the box is the same every time. */
+.strength-bar  { display: flex; align-items: center; gap: 2px; }
+.strength-bar span  { width: 10px; height: 8px; border-radius: 2px; }
+/* Loan and repayment amounts run to five figures, so these two entries are
+   wider than the stepper's default 64px. */
+.stepper input.stepper-wide  { width: 120px; }
+
+@media (max-width: 560px) {
+  /* Narrow enough that a 200px floor is the whole panel: let the text wrap
+     under the glyph instead of forcing the row wider than the screen. */
+  .icon-card-text { min-width: 0; }
+  .icon-card { gap: 10px; }
+  /* The entry and its button no longer fit side by side at full width. */
+  .stepper input.stepper-wide { width: 90px; }
+}
 
 /* --- Stat rows / meters --- */
 .meter {
@@ -703,6 +733,14 @@ tr:last-child td { border-bottom: none; }
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   overflow: hidden;
+}
+/* "A contract is due here" callout on the star-chart destination dossier. */
+.chart-quest-note {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 192, 74, 0.08);
+  border: 1px solid rgba(255, 192, 74, 0.3);
 }
 /* Compact price/profit table in the star-chart detail panel. */
 .chart-price-wrap { overflow-x: auto; }

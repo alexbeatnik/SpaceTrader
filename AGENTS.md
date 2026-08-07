@@ -581,13 +581,25 @@ Always run `npm run typecheck` and `npm test` before considering a change done.
 `noUnusedLocals`/`noUnusedParameters`, so keep imports tidy.
 
 **There are four build configs and they are not interchangeable.**
-`electron.vite.config.ts` builds the desktop into `out/`; `vite.config.ts`
+`electron.vite.config.ts` builds the desktop into `out/`; `vite.config.mts`
 builds the same renderer into `dist-web/` for Capacitor, rooted at
 `src/renderer` with `base: './'`; `capacitor.config.ts` is the native shell;
-`vitest.config.ts` exists **only** to stop the runner adopting `vite.config.ts`
+`vitest.config.mts` exists **only** to stop the runner adopting `vite.config.mts`
 — it did, silently narrowed the suite to a directory with no tests, and reported
 "no test files" rather than failing. If you add a root Vite config, check
 `npm test` still collects 4 files.
+
+**The two `.mts` extensions are deliberate.** `package.json` carries no
+`"type": "module"` and must not get one — Electron's main and preload are
+CommonJS by design — so a `.ts` Vite config is loaded through Vite's deprecated
+CJS Node API and every run prints the warning. The explicit ESM extension takes
+that path out without touching the package type, and is what Vite 6+ will
+require anyway. Renaming either back means updating three other places that name
+the file: the `include` list in `tsconfig.node.json` (a stale name there is
+dropped in silence, and the config simply stops being type-checked) and the
+`paths:` filters in `.github/workflows/android.yml` and `release.yml` (a stale
+name there means a change to the config no longer triggers the build it
+configures).
 
 ## Review checklist
 

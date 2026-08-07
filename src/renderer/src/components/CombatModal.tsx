@@ -398,7 +398,7 @@ export function CombatModal(): React.JSX.Element | null {
           )}
 
           {terminal && (
-            <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={dismiss}>
+            <button className="btn btn-primary push-end" onClick={dismiss}>
               {t('encounter.action.continue')}
             </button>
           )}

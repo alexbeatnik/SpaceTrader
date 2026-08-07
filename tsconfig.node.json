@@ -23,8 +23,8 @@
   },
   "include": [
     "electron.vite.config.ts",
-    "vite.config.ts",
-    "vitest.config.ts",
+    "vite.config.mts",
+    "vitest.config.mts",
     "capacitor.config.ts",
     "src/main/**/*",
     "src/preload/**/*",
