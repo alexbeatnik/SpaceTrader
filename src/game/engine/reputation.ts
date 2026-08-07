@@ -92,6 +92,20 @@ export function wantedByLaw(state: GameState): boolean {
   return notoriety(state) >= WANTED_THRESHOLD
 }
 
+/** Karma lost for opening fire on a civilian hauler. */
+export const PIRACY_KARMA = 3
+
+/**
+ * The player has fired on a trader: piracy, and the freighter's distress call
+ * names the ship that did it. Unlike an ordinary karma hit this always leaves
+ * the player wanted — a spotless record buys the benefit of the doubt over
+ * contraband in the hold, not over shooting at a hauler in open space, and a
+ * defender who turns on one has stopped being a defender.
+ */
+export function reportPiracy(state: GameState): void {
+  applyKarma(state, -Math.max(PIRACY_KARMA, state.record.policeRecord + WANTED_THRESHOLD))
+}
+
 /** True while the bank has hired collectors over an unpaid loan. */
 export function wantedByBank(state: GameState): boolean {
   return state.debt >= BANK_BOUNTY_DEBT

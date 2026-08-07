@@ -666,7 +666,8 @@ export const en = {
     trader: {
       appear: 'You meet a trader flying a {ship}.',
       caravan: 'A trader caravan of {count} ships crosses your path.',
-      ignore: 'The trader goes on its way.'
+      ignore: 'The trader goes on its way.',
+      distress: 'The hauler broadcasts a distress call on the open channel — your registry, your heading, and the word piracy. There is no talking your way out of this one.'
     },
     fleetNext: 'Another ship closes in — {remaining} still in the fight!',
     lootDropped: 'You scooped {qty} units of loot from the wreck.',
@@ -760,6 +761,8 @@ export const en = {
       surrender: 'Surrender',
       ignore: 'Ignore',
       leave: 'Leave',
+      leaveHint: 'Nothing has happened here. You go your way, they go theirs.',
+      attackTraderHint: 'Firing on a hauler is piracy. The distress call goes out on the first shot and the law will be looking for you.',
       continue: 'Continue',
       plunder: 'Plunder'
     },
@@ -1214,6 +1217,130 @@ export const en = {
     waterExport: {
       headline: 'Spring consortium signs an export deal',
       body: 'The first long-term contract will send bottled water to three dry worlds. Local bottlers are expanding before the next launch window.'
+    },
+    workerRecruiters: {
+      headline: 'Recruiters comb the outer settlements',
+      body: 'Agents are offering passage and a signing bonus to anyone who can hold a tool. The berths are being filled by ships that ask no questions.'
+    },
+    droughtWellRiot: {
+      headline: 'Crowd storms the western well',
+      body: 'Militia cleared the pumping station after a night of it. Ration cards are being reissued, and this time they will be checked at gunpoint.'
+    },
+    plagueVolunteers: {
+      headline: 'Volunteer medics land from three systems',
+      body: 'Off-world crews walked into the wards without being asked. The port has waived its fees for anything with medicine aboard.'
+    },
+    warCeasefireTalks: {
+      headline: 'Envoys meet under a flag of truce',
+      body: 'The guns have been quiet for two days. Nobody is unloading a hold until they see whether it holds.'
+    },
+    coldFuelQueues: {
+      headline: 'Fuel queues stretch around the depot',
+      body: 'The cold has doubled demand and the tankers are late. Anything that burns is being sold by the litre at the gate.'
+    },
+    boredomTalentShow: {
+      headline: 'Talent contest grips a planet with nothing else on',
+      body: 'Eleven weeks, four hundred acts, and viewing figures the broadcasters cannot quite believe. First prize is passage off-world.'
+    },
+    boredomRacing: {
+      headline: 'Canyon racing season opens',
+      body: 'Half the planet has turned out to watch modified skiffs take the gorge at full burn. The other half is betting on it.'
+    },
+    democracyScandal: {
+      headline: 'Minister resigns over the docking contracts',
+      body: 'The tender went to a company nobody had heard of and everybody now has. The inquiry opens next week; the ships are already berthed.'
+    },
+    communeBrigade: {
+      headline: 'Volunteer brigade sent to the northern works',
+      body: 'Ten thousand citizens have pledged a season of labour. The posters went up before the volunteers did.'
+    },
+    anarchyNoLaw: {
+      headline: 'Third harbourmaster this year steps down',
+      body: 'There is no law here, only arrangements. The berths still get allocated, one way or another.'
+    },
+    theocracyPilgrimage: {
+      headline: 'Pilgrim season fills the orbital lanes',
+      body: 'Tens of thousands are coming for the procession. Every berth, bunk and bowl of soup on the planet is spoken for.'
+    },
+    militaryDraft: {
+      headline: 'Draft notices posted district by district',
+      body: 'Two years, no appeal, and the recruiters are working the spaceport as well as the streets. Crews are advised to keep their papers close.'
+    },
+    cyberneticGlitch: {
+      headline: 'Implant fault leaves thousands offline',
+      body: 'A bad patch dropped a whole district out of the net for six hours. The Assembly calls it an incident; the district calls it silence.'
+    },
+    miningCollapse: {
+      headline: 'Gallery collapse halts the deep workings',
+      body: 'Rescue crews are still cutting through. Output has stopped; the price of ore has not.'
+    },
+    industrialSmog: {
+      headline: 'Smog alert closes the works for a day',
+      body: 'An inversion layer has trapped a week of output over the city. Filters and medicine are selling as fast as they can be landed.'
+    },
+    resortOffSeason: {
+      headline: 'The season closes and the hotels empty',
+      body: 'Rates have collapsed, the beaches are deserted, and the staff are looking for a berth to anywhere that is hiring.'
+    },
+    agriMarketDay: {
+      headline: 'Market day brings the whole belt to town',
+      body: 'Every co-operative is selling off the tailgate. What does not go today goes to the silo tomorrow, at half the price.'
+    },
+    refineryTankerQueue: {
+      headline: 'Tankers stack up over the cracking plant',
+      body: 'The queue for a loading slot is four days deep. Fuel is cheap on the ground and dear everywhere else.'
+    },
+    desertSolarFarm: {
+      headline: 'Solar array switches on across the flats',
+      body: 'A thousand square kilometres of mirrors, and power to spare for the first time in a generation. The dust remains a problem.'
+    },
+    warlikeArmourers: {
+      headline: 'Armourers open the season with a duel',
+      body: 'The clans settle their disputes in the ring and their business afterwards. Smiths are taking orders from every captain who lands.'
+    },
+    faunaSafari: {
+      headline: 'Safari charters booked out for the season',
+      body: 'The herds are moving through the southern range and the galaxy has come to watch. Wardens are hiring ships to keep pace with them.'
+    },
+    faunaPoachers: {
+      headline: 'Poaching ring broken at the eastern preserve',
+      body: 'Six ships impounded, holds full of things that should still be breathing. Customs is opening every departure this week.'
+    },
+    lifelessDome: {
+      headline: 'Third dome sealed on schedule',
+      body: 'Nothing lives out there and nothing ever did. Everything under the glass — the soil, the air, the water in the pipes — came off a ship.'
+    },
+    richSoilFair: {
+      headline: 'Growers fair draws buyers from four systems',
+      body: 'The soil here does the work a laboratory does anywhere else. Contracts are signed on a handshake and a taste.'
+    },
+    poorSoilHydroponics: {
+      headline: 'Hydroponics towers pass their first harvest',
+      body: 'Nothing takes root in the ground here, so the farms were built upwards. The trays are producing; the nutrient feed is imported.'
+    },
+    mineralPoorImports: {
+      headline: 'Foundries idle waiting on ore',
+      body: 'There is nothing worth digging for under this crust. Every furnace on the planet runs on what the freighters bring in.'
+    },
+    portFeeRise: {
+      headline: 'Port authority raises the berthing fee',
+      body: 'Effective this rotation, and the notice went up the same morning. The captains committee has lodged a protest nobody will read.'
+    },
+    salvageAuction: {
+      headline: 'Salvage auction clears the impound yard',
+      body: 'Three hulls, a scorched cargo pod, and whatever was still bolted to them. Bidding opens at whatever the yard is owed.'
+    },
+    beaconOffline: {
+      headline: 'Navigation beacon down at the jump point',
+      body: 'Engineers are working on it. Until it is back, approaches are being flown on instruments and nerve.'
+    },
+    insuranceRates: {
+      headline: 'Underwriters raise premiums on this run',
+      body: 'Losses in the approach lanes have been heavy this quarter. The brokers have priced it in, as brokers do.'
+    },
+    harbourFestival: {
+      headline: 'Harbour festival closes the main lock',
+      body: 'Lanterns on the gantries, a procession down the loading ramp, and no cargo moving until the morning after.'
     }
   }
 } as const

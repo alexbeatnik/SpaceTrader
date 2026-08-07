@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { en } from './locales/en'
 import { uk } from './locales/uk'
+import { NEWS_IDS } from '../game/engine/news'
 
 /** Every leaf key path in a locale dictionary, e.g. "encounter.tractor.held". */
 function keyPaths(dict: unknown, prefix = ''): string[] {
@@ -46,5 +47,26 @@ describe('locale dictionaries', () => {
       if (params(enValue).join(',') !== params(ukValue).join(',')) mismatched.push(key)
     }
     expect(mismatched).toEqual([])
+  })
+
+  it('carry a headline and a body for every news story the engine can run', () => {
+    // A template whose id has no prose reaches the player as a raw key like
+    // "news.faunaSafari.headline". Parity between the two dictionaries cannot
+    // catch it — both would be missing it — so the story list is the check.
+    const enStrings = leafStrings(en)
+    const ukStrings = leafStrings(uk)
+    const missing: string[] = []
+    for (const id of NEWS_IDS) {
+      for (const part of ['headline', 'body']) {
+        const key = `news.${id}.${part}`
+        if (!enStrings.has(key)) missing.push(`en:${key}`)
+        if (!ukStrings.has(key)) missing.push(`uk:${key}`)
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
+  it('run no story twice under two ids', () => {
+    expect(new Set(NEWS_IDS).size).toBe(NEWS_IDS.length)
   })
 })

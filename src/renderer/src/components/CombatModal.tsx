@@ -13,6 +13,7 @@ import {
   opponentHitChance,
   POINT_BLANK_RANGE,
   MAX_ENGAGEMENT_RANGE,
+  isPeacefulTrader,
   GOOD_IDS,
   type GoodId,
   type EncounterKind
@@ -52,7 +53,11 @@ export function CombatModal(): React.JSX.Element | null {
   const opp = enc.opponent
   const ship = game.ship
   const terminal = enc.status !== 'ongoing'
-  const canTrade = enc.kind === 'trader' && !terminal && !!enc.trade
+  // Nobody haggles with the ship that just shot at them: the moment the player
+  // opens fire the stall closes, and the parting options swap over — no more
+  // waving the hauler off, and a run to make instead.
+  const peacefulTrader = isPeacefulTrader(enc)
+  const canTrade = enc.kind === 'trader' && !terminal && !!enc.trade && peacefulTrader
 
   const maxTradeBuy = (id: GoodId): number => {
     const offer = enc.trade?.sells[id]
@@ -307,7 +312,11 @@ export function CombatModal(): React.JSX.Element | null {
         <div className="combat-actions">
           {!terminal && (
             <>
-              <button className="btn btn-danger" onClick={() => combatAction('attack')}>
+              <button
+                className="btn btn-danger"
+                title={peacefulTrader ? t('encounter.action.attackTraderHint') : undefined}
+                onClick={() => combatAction('attack')}
+              >
                 ⚔ {t('encounter.action.attack')}
               </button>
               <button
@@ -329,15 +338,17 @@ export function CombatModal(): React.JSX.Element | null {
                   ⏭ {t('encounter.action.endTurn')}
                 </button>
               )}
-              <button
-                className="btn"
-                title={enc.tractorLocked ? t('encounter.tractor.held') : undefined}
-                onClick={() => combatAction('flee')}
-              >
-                {enc.tractorLocked
-                  ? `🧲 ${t('encounter.action.breakFree')}`
-                  : `💨 ${t('encounter.action.flee')}`}
-              </button>
+              {!peacefulTrader && (
+                <button
+                  className="btn"
+                  title={enc.tractorLocked ? t('encounter.tractor.held') : undefined}
+                  onClick={() => combatAction('flee')}
+                >
+                  {enc.tractorLocked
+                    ? `🧲 ${t('encounter.action.breakFree')}`
+                    : `💨 ${t('encounter.action.flee')}`}
+                </button>
+              )}
               {enc.kind === 'police' && (
                 <button className="btn" onClick={() => combatAction('submit')}>
                   {t('encounter.action.submit')}
@@ -368,8 +379,12 @@ export function CombatModal(): React.JSX.Element | null {
                   )}
                 </button>
               )}
-              {enc.kind === 'trader' && (
-                <button className="btn" onClick={() => combatAction('ignore')}>
+              {peacefulTrader && (
+                <button
+                  className="btn"
+                  title={t('encounter.action.leaveHint')}
+                  onClick={() => combatAction('ignore')}
+                >
                   👋 {t('encounter.action.leave')}
                 </button>
               )}

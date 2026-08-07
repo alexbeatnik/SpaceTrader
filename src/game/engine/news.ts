@@ -161,6 +161,55 @@ const TEMPLATES: NewsTemplate[] = [
     crisis: true,
     when: (s) => s.status === 'lackOfWorkers'
   },
+  {
+    id: 'workerRecruiters',
+    weight: 3,
+    tone: 'neutral',
+    crisis: true,
+    when: (s) => s.status === 'lackOfWorkers'
+  },
+  {
+    id: 'droughtWellRiot',
+    weight: 2,
+    tone: 'bad',
+    crisis: true,
+    when: (s) => s.status === 'drought'
+  },
+  {
+    id: 'plagueVolunteers',
+    weight: 2,
+    tone: 'good',
+    crisis: true,
+    when: (s) => s.status === 'plague'
+  },
+  {
+    id: 'warCeasefireTalks',
+    weight: 3,
+    tone: 'neutral',
+    crisis: true,
+    when: (s) => s.status === 'war'
+  },
+  {
+    id: 'coldFuelQueues',
+    weight: 3,
+    tone: 'bad',
+    crisis: true,
+    when: (s) => s.status === 'cold'
+  },
+  {
+    id: 'boredomTalentShow',
+    weight: 3,
+    tone: 'neutral',
+    crisis: true,
+    when: (s) => s.status === 'boredom'
+  },
+  {
+    id: 'boredomRacing',
+    weight: 3,
+    tone: 'neutral',
+    crisis: true,
+    when: (s) => s.status === 'boredom'
+  },
 
   // --- Who is in charge, and how it feels ------------------------------------
   {
@@ -241,6 +290,42 @@ const TEMPLATES: NewsTemplate[] = [
     tone: 'good',
     when: (s) => s.politics === 'pacifist'
   },
+  {
+    id: 'democracyScandal',
+    weight: 3,
+    tone: 'bad',
+    when: (s) => s.politics === 'democracy' || s.politics === 'confederacy'
+  },
+  {
+    id: 'communeBrigade',
+    weight: 3,
+    tone: 'neutral',
+    when: (s) => s.politics === 'communist' || s.politics === 'socialist'
+  },
+  {
+    id: 'anarchyNoLaw',
+    weight: 3,
+    tone: 'neutral',
+    when: (s) => s.politics === 'anarchy'
+  },
+  {
+    id: 'theocracyPilgrimage',
+    weight: 3,
+    tone: 'good',
+    when: (s) => s.politics === 'theocracy'
+  },
+  {
+    id: 'militaryDraft',
+    weight: 3,
+    tone: 'bad',
+    when: (s) => s.politics === 'military' || s.politics === 'fascist' || s.politics === 'dictatorship'
+  },
+  {
+    id: 'cyberneticGlitch',
+    weight: 3,
+    tone: 'bad',
+    when: (s) => s.politics === 'cybernetic'
+  },
 
   // --- What the planet lives off ---------------------------------------------
   {
@@ -308,6 +393,36 @@ const TEMPLATES: NewsTemplate[] = [
     weight: 3,
     tone: 'good',
     when: (s) => s.economyType === 'hiTech'
+  },
+  {
+    id: 'miningCollapse',
+    weight: 3,
+    tone: 'bad',
+    when: (s) => s.economyType === 'mining'
+  },
+  {
+    id: 'industrialSmog',
+    weight: 3,
+    tone: 'bad',
+    when: (s) => s.economyType === 'industrial'
+  },
+  {
+    id: 'resortOffSeason',
+    weight: 2,
+    tone: 'neutral',
+    when: (s) => s.economyType === 'resort'
+  },
+  {
+    id: 'agriMarketDay',
+    weight: 3,
+    tone: 'neutral',
+    when: (s) => s.economyType === 'agricultural'
+  },
+  {
+    id: 'refineryTankerQueue',
+    weight: 3,
+    tone: 'neutral',
+    when: (s) => s.economyType === 'refinery'
   },
 
   // --- Local oddities ---------------------------------------------------------
@@ -383,6 +498,56 @@ const TEMPLATES: NewsTemplate[] = [
     tone: 'bad',
     when: (s) => s.specialResource === 'desert'
   },
+  {
+    id: 'desertSolarFarm',
+    weight: 3,
+    tone: 'good',
+    when: (s) => s.specialResource === 'desert'
+  },
+  {
+    id: 'warlikeArmourers',
+    weight: 3,
+    tone: 'neutral',
+    when: (s) => s.specialResource === 'warlike'
+  },
+  // Worlds whose oddity had no story of its own until now: they were falling
+  // back on the generic pool and reading like anywhere else.
+  {
+    id: 'faunaSafari',
+    weight: 4,
+    tone: 'good',
+    when: (s) => s.specialResource === 'richFauna'
+  },
+  {
+    id: 'faunaPoachers',
+    weight: 3,
+    tone: 'bad',
+    when: (s) => s.specialResource === 'richFauna'
+  },
+  {
+    id: 'lifelessDome',
+    weight: 4,
+    tone: 'neutral',
+    when: (s) => s.specialResource === 'lifeless'
+  },
+  {
+    id: 'richSoilFair',
+    weight: 4,
+    tone: 'good',
+    when: (s) => s.specialResource === 'richSoil'
+  },
+  {
+    id: 'poorSoilHydroponics',
+    weight: 4,
+    tone: 'neutral',
+    when: (s) => s.specialResource === 'poorSoil'
+  },
+  {
+    id: 'mineralPoorImports',
+    weight: 4,
+    tone: 'bad',
+    when: (s) => s.specialResource === 'mineralPoor'
+  },
 
   // --- Anywhere ---------------------------------------------------------------
   {
@@ -410,8 +575,20 @@ const TEMPLATES: NewsTemplate[] = [
     when: (s) => (s.bodies ?? []).some((b) => b.kind === 'station')
   },
   { id: 'dockStrike', weight: 2, tone: 'bad', when: () => true },
-  { id: 'quietWeek', weight: 2, tone: 'neutral', when: (s) => s.status === 'uneventful' }
+  { id: 'portFeeRise', weight: 2, tone: 'bad', when: () => true },
+  { id: 'salvageAuction', weight: 2, tone: 'neutral', when: () => true },
+  { id: 'beaconOffline', weight: 2, tone: 'bad', when: () => true },
+  { id: 'insuranceRates', weight: 2, tone: 'neutral', when: () => true },
+  { id: 'quietWeek', weight: 2, tone: 'neutral', when: (s) => s.status === 'uneventful' },
+  { id: 'harbourFestival', weight: 2, tone: 'good', when: (s) => s.status === 'uneventful' }
 ]
+
+/**
+ * Every story the feed can run. Exported so the locale suite can prove each one
+ * has prose on both sides — a template whose id is missing from a dictionary
+ * shows up in the bulletin as a raw key, and nothing else would catch it.
+ */
+export const NEWS_IDS: readonly string[] = TEMPLATES.map((t) => t.id)
 
 /** Fewest and most stories a planet's feed carries at once. */
 export const NEWS_MIN = 2

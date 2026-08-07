@@ -69,6 +69,7 @@ import {
   setTarget,
   playerHitChance,
   opponentHitChance,
+  isPeacefulTrader,
   POINT_BLANK_RANGE,
   MAX_ENGAGEMENT_RANGE,
   RANGE_MANOEUVRE_STEP
@@ -84,7 +85,10 @@ import {
   serveSentence,
   standing,
   wantedByBank,
+  wantedByLaw,
   BANK_BOUNTY_DEBT,
+  PIRACY_KARMA,
+  WANTED_THRESHOLD,
   QUEST_KARMA
 } from './reputation'
 import {
@@ -1767,6 +1771,97 @@ describe('trader trading', () => {
     const res = tradeSell(g, enc, 'furs', 0)
     expect(res.ok).toBe(false)
     expect(res.error).toBe('error.nothingToSell')
+  })
+})
+
+describe('firing on a trader is piracy', () => {
+  it('will not let the player run from a hauler nobody is fighting', () => {
+    const g = newGame({ commanderName: 'Test', seed: 65 })
+    const enc = testEncounter('trader')
+    expect(isPeacefulTrader(enc)).toBe(true)
+
+    resolveRound(g, enc, 'flee', new Rng(1))
+
+    // Refused outright: no round burned, no parting shot, still a meeting.
+    expect(enc.status).toBe('ongoing')
+    expect(enc.round).toBe(0)
+    expect(enc.messages).toEqual([])
+  })
+
+  it('the first shot puts a warrant out and opens the escape route', () => {
+    const g = newGame({ commanderName: 'Test', seed: 66 })
+    expect(wantedByLaw(g)).toBe(false)
+    const enc = testEncounter('trader')
+
+    resolveRound(g, enc, 'attack', new Rng(2))
+
+    expect(enc.provoked).toBe(true)
+    expect(isPeacefulTrader(enc)).toBe(false)
+    expect(g.record.policeRecord).toBe(-PIRACY_KARMA)
+    expect(wantedByLaw(g)).toBe(true)
+    expect(hunterChance(g)).toBeGreaterThan(0)
+    expect(enc.messages.some((m) => m.key === 'encounter.trader.distress')).toBe(true)
+
+    // Now there is a fight to run from — and no strolling away from it.
+    resolveRound(g, enc, 'ignore', new Rng(3))
+    expect(enc.status).toBe('ongoing')
+    resolveRound(g, enc, 'flee', new Rng(3))
+    expect(['ongoing', 'playerFled']).toContain(enc.status)
+    expect(enc.round).toBeGreaterThan(1)
+  })
+
+  it('charges the crime once, however many volleys follow', () => {
+    const g = newGame({ commanderName: 'Test', seed: 67 })
+    const enc = testEncounter('trader', { hull: 100000 }) // outlives the barrage
+    const rng = new Rng(4)
+    for (let i = 0; i < 5; i++) resolveRound(g, enc, 'attack', rng)
+
+    expect(g.record.policeRecord).toBe(-PIRACY_KARMA)
+    expect(enc.messages.filter((m) => m.key === 'encounter.trader.distress').length).toBe(1)
+  })
+
+  it('a defender who turns pirate is wanted like anyone else', () => {
+    const g = newGame({ commanderName: 'Test', seed: 68 })
+    g.record.policeRecord = 8
+    expect(standing(g)).toBe('defender')
+    const enc = testEncounter('trader')
+
+    resolveRound(g, enc, 'attack', new Rng(5))
+
+    // A spotless name is no shield here: the drop always lands past the warrant.
+    expect(wantedByLaw(g)).toBe(true)
+    expect(g.record.policeRecord).toBe(-WANTED_THRESHOLD)
+  })
+
+  it('a provoked hauler keeps firing between manoeuvres', () => {
+    const g = newGame({ commanderName: 'Test', seed: 69 })
+    g.ship.hull = 5000 // survive long enough to be shot at repeatedly
+    const enc = testEncounter('trader', { hull: 100000, weaponPower: 40, fighter: 20 })
+    const rng = new Rng(6)
+    resolveRound(g, enc, 'attack', rng)
+    const hullAfterFirstExchange = g.ship.hull
+
+    // Nothing but helm work from here: an unprovoked trader would hold fire, but
+    // this one has been shot at and is in the fight until it ends.
+    for (let i = 0; i < 6 && enc.status === 'ongoing'; i++) {
+      resolveRound(g, enc, i % 2 === 0 ? 'openRange' : 'closeIn', rng)
+    }
+    expect(g.ship.hull).toBeLessThan(hullAfterFirstExchange)
+  })
+
+  it('leaves a trader alone until fired on', () => {
+    const g = newGame({ commanderName: 'Test', seed: 70 })
+    const enc = testEncounter('trader', { weaponPower: 40, fighter: 20 })
+    const hullBefore = g.ship.hull
+
+    resolveRound(g, enc, 'closeIn', new Rng(7))
+    resolveRound(g, enc, 'openRange', new Rng(8))
+
+    expect(g.ship.hull).toBe(hullBefore)
+    expect(g.record.policeRecord).toBe(0)
+
+    resolveRound(g, enc, 'ignore', new Rng(9))
+    expect(enc.status).toBe('ignored')
   })
 })
 

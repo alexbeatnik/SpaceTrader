@@ -22,6 +22,7 @@ import {
   hunterChance,
   hunterEmployer,
   notoriety,
+  reportPiracy,
   serveSentence,
   standing,
   wantedByBank
@@ -138,6 +139,13 @@ export interface Encounter {
   tractorLocked?: boolean
   /** A demand on the table: hand over the cargo, or stand down for arrest. */
   demand?: 'cargo' | 'arrest'
+  /**
+   * Traders only: the player has opened fire, so this is a fight now. Until it
+   * is set the hauler is a ship the player merely met — there is nothing to run
+   * from, and the way past is to wave it off. Once set it is never cleared: the
+   * shot cannot be taken back, and the trader keeps shooting between manoeuvres.
+   */
+  provoked?: boolean
   /** Bounty hunters only: who is paying for the player's head. */
   hiredBy?: 'law' | 'bank'
   /** Set when this pirate is a bounty target from an active quest. */
@@ -160,6 +168,16 @@ export type CombatAction =
   | 'surrender'
   | 'ignore'
   | 'plunder'
+
+/**
+ * A hauler the player has not fired on. It is not an engagement: there is no
+ * one to escape from, so `flee` is neither offered nor accepted — the way past
+ * is `ignore`, which is how every other peaceful parting works. Fire once and
+ * this stops being true for the rest of the encounter.
+ */
+export function isPeacefulTrader(enc: Encounter): boolean {
+  return enc.kind === 'trader' && !enc.provoked
+}
 
 // --- Encounter generation ----------------------------------------------------
 /**
@@ -739,6 +757,12 @@ export function resolveRound(
   rng: Rng
 ): void {
   if (enc.status !== 'ongoing') return
+  // Two actions the encounter simply does not offer, refused before anything is
+  // spent on them: running from a hauler nobody is fighting, and strolling away
+  // from one the player has just shot at. The UI hides each in turn, and this is
+  // what makes that a rule rather than a missing button.
+  if (action === 'flee' && isPeacefulTrader(enc)) return
+  if (action === 'ignore' && enc.kind === 'trader' && enc.provoked) return
   enc.round++
   const skills = effectiveSkills(state)
   const opp = enc.opponent
@@ -915,6 +939,15 @@ export function resolveRound(
 
   // --- Attack ---
   if (action === 'attack') {
+    // Firing on a hauler is piracy, and it is the first shot that does it —
+    // whether it lands, and whether the trader survives, changes nothing about
+    // what the distress call says. Recorded before the roll for exactly that
+    // reason, and only once: a second volley is the same crime, not a new one.
+    if (isPeacefulTrader(enc) && playerWeapon > 0) {
+      enc.provoked = true
+      reportPiracy(state)
+      msg('encounter.trader.distress')
+    }
     if (playerWeapon <= 0) {
       msg('encounter.noWeapons')
     } else if (rng.chance(playerHitChance(state, enc))) {
@@ -982,12 +1015,15 @@ export function resolveRound(
   }
 
   // --- Opponent's turn (attacks back unless a trader who won't provoke) ---
+  // A trader that has been fired on stays in the fight: keyed on `provoked`
+  // rather than on this action, or the hauler would politely hold fire on any
+  // exchange the player spent closing the range instead of shooting.
   const oppWillFight =
     enc.kind === 'pirate' ||
     enc.kind === 'police' ||
     enc.kind === 'bountyHunter' ||
     enc.kind === 'alien' ||
-    (enc.kind === 'trader' && action === 'attack')
+    (enc.kind === 'trader' && enc.provoked === true)
 
   if (oppWillFight && opp.weaponPower > 0) {
     // A ship held in a tractor beam is a far easier target.
