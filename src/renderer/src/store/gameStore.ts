@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import {
   newGame,
+  abandonShip,
   buyGood,
   sellGood,
   dumpGood,
   refuel,
   refuelFull,
+  takeEmergencyFuel,
   repair,
   repairFull,
   buyHullUpgrade,
@@ -28,6 +30,7 @@ import {
   cancelInsurance,
   payFine,
   warp,
+  warpRoute,
   resolveRound,
   setTarget,
   plunder,
@@ -50,14 +53,9 @@ import {
   enterUnstableWormhole,
   blackHoleEvent,
   ensureBodies,
-  pushLog,
-  clearLocalSourcing,
-  emptyGoods,
-  shipValue,
   systemDistance,
   transitDaysTo,
   Rng,
-  SHIP_TYPES,
   type GameState,
   type Encounter,
   type GameEvent,
@@ -187,6 +185,8 @@ interface GameStore {
   // shipyard
   refuel: (parsecs: number) => void
   refuelFull: () => void
+  /** Take the port's advance of fuel when the ship cannot otherwise leave. */
+  emergencyFuel: () => void
   setAutoRefuel: (enabled: boolean) => void
   repair: (units: number) => void
   repairFull: () => void
@@ -281,6 +281,11 @@ function ensureBoard(game: GameState): void {
   // Legacy saves predate robots and the electrician trade.
   if (!game.ship.robots) game.ship.robots = []
   if (game.skills.electrician === undefined) game.skills.electrician = game.skills.engineer
+  // Builds up to 0.2.1 could autosave a ship already lost to a singularity or
+  // a failed convoy run. Combat reads a zero hull as destroyed the moment the
+  // other side takes its turn, hit or miss, so such a save limps home on one
+  // point rather than dying to the first ship it meets.
+  if (game.ship.hull <= 0) game.ship.hull = 1
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
@@ -343,7 +348,13 @@ export const useGameStore = create<GameStore>((set, get) => {
       screen: 'systemMap',
       travel: { ...anim, toId, interceptPoints }
     })
-    void get().saveGame()
+    // A leg that ended over a singularity's horizon is not checkpointed here:
+    // the engine has already left the hull at zero, and writing that made
+    // "Continue" hand back a wreck. `finishTravel` saves once the pod has put
+    // the commander in a new ship, and leaves the autosave alone if there was
+    // no pod — so it stays the checkpoint from before the jump.
+    const lost = !!result.blackHole && !result.blackHole.survived
+    if (!lost) void get().saveGame()
   }
 
   return {
@@ -483,7 +494,25 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     quitToMenu: () => {
       pendingWarp = null
-      set({ screen: 'menu', encounter: null, event: null, questOffer: null, questReward: null, mining: null, escort: null, incident: null, travel: null, gameOverCause: null })
+      // A finished run does not follow the player back to the menu. Left set,
+      // `gameOver` made the back gesture swallow every press there — it reads
+      // as "a decision is on screen" — so a lost ship meant the app could no
+      // longer be left by the way Android leaves apps. The wreck goes with it.
+      const over = get().gameOver
+      set({
+        screen: 'menu',
+        encounter: null,
+        event: null,
+        questOffer: null,
+        questReward: null,
+        mining: null,
+        escort: null,
+        incident: null,
+        travel: null,
+        gameOver: false,
+        gameOverCause: null,
+        ...(over ? { game: null } : {})
+      })
     },
 
     buy: (good, amount) => withGame((g) => applyResult(g, buyGood(g, good, amount))),
@@ -492,6 +521,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     refuel: (parsecs) => withGame((g) => applyResult(g, refuel(g, parsecs))),
     refuelFull: () => withGame((g) => applyResult(g, refuelFull(g))),
+    emergencyFuel: () => withGame((g) => applyResult(g, takeEmergencyFuel(g))),
     setAutoRefuel: (enabled) =>
       withGame((g) => {
         g.autoRefuel = enabled
@@ -526,7 +556,9 @@ export const useGameStore = create<GameStore>((set, get) => {
         // Capture origin details before the jump mutates the game state.
         const fromSys = g.systems[g.currentSystem]
         const toSys = g.systems[targetId]
-        const viaWormhole = fromSys.wormholeTo === targetId
+        // Asked of the engine, before the jump spends anything: a wormhole pair
+        // within drive range is flown on the drive when the toll cannot be paid.
+        const viaWormhole = warpRoute(g, targetId) === 'wormhole'
         const distance = systemDistance(fromSys, toSys)
         const fromName = fromSys.nameId
         const shipType = g.ship.type
@@ -637,7 +669,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (!blackHole.survived) {
           const survives = g.ship.escapePod
           const story = blackHoleEvent(blackHole, survives)
-          handleDestruction(g)
+          abandonShip(g)
           set({
             travel: null,
             game: clone(g),
@@ -750,9 +782,9 @@ export const useGameStore = create<GameStore>((set, get) => {
 
         if (enc.status === 'playerDestroyed') {
           // Whether the player survives depends on owning a pod *before*
-          // handleDestruction swaps in a fresh (pod-less) Flea.
+          // abandonShip swaps in a fresh (pod-less) Flea.
           const survives = g.ship.escapePod
-          handleDestruction(g)
+          abandonShip(g)
           if (!survives) {
             set({ game: clone(g), encounter: clone(enc), gameOver: true })
             return
@@ -883,7 +915,10 @@ export const useGameStore = create<GameStore>((set, get) => {
           return
         }
         set({ game: clone(g), escort: clone(res.run), screen: 'systemMap' })
-        void get().saveGame()
+        // A run the escort did not survive is settled in `finishEscort`, which
+        // saves only if a pod got the commander out. Saving it here wrote the
+        // zero-hull wreck over the very checkpoint that comment promises to keep.
+        if (!res.run.destroyed) void get().saveGame()
       }),
 
     finishEscort: () => {
@@ -895,7 +930,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         // Losing the ship on contract is resolved exactly as in combat — and,
         // as there, the checkpoint before the run ended is left standing.
         const survives = g.ship.escapePod
-        handleDestruction(g)
+        abandonShip(g)
         set({ game: clone(g), gameOver: !survives })
         if (survives) void get().saveGame()
         return
@@ -908,40 +943,3 @@ export const useGameStore = create<GameStore>((set, get) => {
     dismissQuestReward: () => set({ questReward: null })
   }
 })
-
-/** Handle ship destruction with an escape pod: drop into a Flea. */
-function handleDestruction(g: GameState): void {
-  if (!g.ship.escapePod) return
-  // Value the wreck *before* it is replaced: insurance must pay out on the ship
-  // that was actually lost, not on the Flea handed over as a replacement.
-  const payout = g.insurance ? shipValue(g.ship) : 0
-  const flea = SHIP_TYPES.flea
-  // The hold goes down with the ship, so the books that shadow it go too: the
-  // price paid for the lost cargo, and its local-sourcing record. Every other
-  // path that empties the hold (seizure, plunder, an electrical fire) clears
-  // all three together, and a run lost short of port never reaches the arrival
-  // that would have cleared the ledger.
-  g.buyingPrice = emptyGoods()
-  clearLocalSourcing(g)
-  g.ship = {
-    type: 'flea',
-    hull: flea.hullStrength,
-    hullUpgrades: 0,
-    fuel: flea.fuelTanks,
-    cargo: emptyGoods(),
-    weapons: [],
-    shields: [],
-    shieldPoints: [],
-    gadgets: [],
-    crew: [],
-    robots: [],
-    escapePod: false
-  }
-  if (payout > 0) {
-    g.credits += payout
-    g.insurance = false
-    g.noClaim = 0
-    pushLog(g, 'log.insurancePaid', { amount: payout })
-  }
-  pushLog(g, 'encounter.escapePod')
-}

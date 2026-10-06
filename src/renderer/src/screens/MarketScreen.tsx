@@ -165,6 +165,9 @@ export function MarketScreen(): React.JSX.Element {
           unitPrice={
             dialog.mode === 'buy' ? unitBuyPrice(dialog.good) : sys.sellPrice[dialog.good]
           }
+          // Selling opens on the whole lot — a hold is usually emptied, not
+          // sold a crate at a time. Buying still opens on one: that one spends.
+          initial={dialog.mode === 'sell' ? game.ship.cargo[dialog.good] : 1}
           confirmLabel={dialog.mode === 'buy' ? t('common.buy') : t('common.sell')}
           onConfirm={(amount) => {
             if (dialog.mode === 'buy') buy(dialog.good, amount)

@@ -11,7 +11,7 @@ import type {
 } from './types'
 import { Rng, randomSeed } from './rng'
 import { generateGalaxy, distance } from './galaxy'
-import { refreshMarket } from './market'
+import { refreshMarket, MAX_TRADER_DISCOUNT } from './market'
 import { SHIP_TYPES, SHIP_TYPE_IDS } from '../data/ships'
 import { GOOD_IDS } from '../data/goods'
 import {
@@ -186,6 +186,46 @@ export function maxFuel(ship: Ship): number {
 }
 
 /**
+ * Whether a ship with `range` parsecs of tank could ever get out of the system
+ * it is docked in: another star within a full tank, or a wormhole of either
+ * kind to fall into.
+ *
+ * The chart is not evenly settled. About one system in ten sits further from
+ * its nearest neighbour than the shortest-legged hulls can fly, and a couple
+ * per galaxy are out of reach of everything — which is fine, until something
+ * leaves the player in one aboard a ship that cannot make the crossing back.
+ * Every way of changing a ship's range, or of arriving without choosing where,
+ * asks this first.
+ */
+export function canLeaveSystem(state: GameState, range: number, systemId = state.currentSystem): boolean {
+  const here = state.systems[systemId]
+  if (!here) return false
+  if (here.wormholeTo !== null || here.unstableWormhole) return true
+  // Rounded exactly as `systemDistance` rounds it, which is what a jump costs.
+  return state.systems.some((s) => s.id !== here.id && Math.round(distance(here, s)) <= range)
+}
+
+/** Parsecs a fresh hull of this type flies on a full tank, perks included. */
+export function hullRange(type: ShipTypeId): number {
+  const hull = SHIP_TYPES[type]
+  return hull.fuelTanks + (hull.shipClass === 'explorer' ? EXPLORER_RANGE_BONUS : 0)
+}
+
+/**
+ * Why the yard here should not sell this hull, or null if it may. Exported so
+ * the shipyard can grey the row out with the reason, rather than take the
+ * player's money for a ship that will never leave the lot.
+ */
+export function shipPurchaseProblem(state: GameState, target: ShipTypeId): string | null {
+  if (!canLeaveSystem(state, hullRange(target))) return 'error.rangeTooShort'
+  // Nor one with fewer cabins than there are passengers already aboard.
+  if (SHIP_TYPES[target].crewQuarters - 1 < passengersAboard(state)) {
+    return 'error.passengersNeedBerths'
+  }
+  return null
+}
+
+/**
  * Fuel price per parsec at the current system: the ship's base cost scaled by
  * the local economy (e.g. cheap on refinery worlds, dear on resort worlds).
  */
@@ -203,6 +243,25 @@ export function crewWages(state: GameState): number {
 /** Free berths, counting the commander's own and any robots aboard. */
 export function freeQuarters(ship: Ship): number {
   return SHIP_TYPES[ship.type].crewQuarters - 1 - ship.crew.length - (ship.robots?.length ?? 0)
+}
+
+/** VIPs aboard under an active passenger contract. Each one has a cabin. */
+export function passengersAboard(state: GameState): number {
+  return state.quests.filter((q) => q.status === 'active' && q.type === 'passenger').length
+}
+
+/**
+ * Berths nobody is in: `freeQuarters`, less the cabins passengers are using.
+ *
+ * A passenger contract was only ever *checked* against a spare berth, never
+ * given one: with a single bunk free a ship could sign five VIPs, then hire a
+ * mercenary into the same bunk. Everything that fills a berth — a hand, a
+ * robot, another passenger — asks this, so a cabin promised stays promised.
+ * Can read negative on a save from before the rule; nothing new fits until
+ * somebody disembarks.
+ */
+export function freeBerths(state: GameState): number {
+  return freeQuarters(state.ship) - passengersAboard(state)
 }
 
 export function maxHull(ship: Ship): number {
@@ -327,7 +386,7 @@ export interface ActionResult {
 
 /** Fraction knocked off a listed price by the best negotiator aboard (0–0.1). */
 export function traderDiscount(state: GameState): number {
-  return Math.min(0.1, effectiveSkills(state).trader * 0.01)
+  return Math.min(MAX_TRADER_DISCOUNT, effectiveSkills(state).trader * 0.01)
 }
 
 /**
@@ -343,7 +402,18 @@ export function marketBuyPrice(state: GameState, good: GoodId): number {
   return Math.max(1, Math.round(listed * (1 - traderDiscount(state))))
 }
 
+/**
+ * A count the player typed, as the whole number of units it can stand for.
+ * Cargo, fuel and credits are all integers, and nothing in the engine may trust
+ * a caller to have rounded: the bank's amount field passed its text straight
+ * through, so a loan of 100.5 left half a credit on the books for good.
+ */
+export function wholeAmount(amount: number): number {
+  return Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0
+}
+
 export function buyGood(state: GameState, good: GoodId, amount: number): ActionResult {
+  amount = wholeAmount(amount)
   if (!atCapital(state)) return fail('error.noMarketHere')
   const sys = currentSystem(state)
   const price = sys.buyPrice[good]
@@ -377,6 +447,7 @@ export function buyGood(state: GameState, good: GoodId, amount: number): ActionR
 }
 
 export function sellGood(state: GameState, good: GoodId, amount: number): ActionResult {
+  amount = wholeAmount(amount)
   if (amount <= 0) return fail('error.nothingToSell')
   if (!atCapital(state)) return fail('error.noMarketHere')
   const sys = currentSystem(state)
@@ -398,6 +469,7 @@ export function sellGood(state: GameState, good: GoodId, amount: number): Action
 
 /** Dump cargo into space (may incur a fine if noticed). */
 export function dumpGood(state: GameState, good: GoodId, amount: number): ActionResult {
+  amount = wholeAmount(amount)
   if (amount <= 0) return fail('error.nothingToDump')
   const have = state.ship.cargo[good]
   if (have <= 0) return fail('error.nothingToDump')
@@ -412,7 +484,7 @@ export function dumpGood(state: GameState, good: GoodId, amount: number): Action
 export function refuel(state: GameState, parsecs: number): ActionResult {
   if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const unit = fuelPricePerParsec(state)
-  const needed = Math.min(parsecs, maxFuel(state.ship) - state.ship.fuel)
+  const needed = Math.min(wholeAmount(parsecs), maxFuel(state.ship) - state.ship.fuel)
   if (needed <= 0) return fail('error.tankFull')
   const affordable = Math.floor(state.credits / unit)
   const buy = Math.min(needed, affordable)
@@ -426,6 +498,64 @@ export function refuelFull(state: GameState): ActionResult {
   return refuel(state, maxFuel(state.ship))
 }
 
+/** What the port charges, over its pump price, for fuel advanced on account. */
+export const EMERGENCY_FUEL_MARKUP = 2
+
+/** Fuel a port will advance a ship that cannot pay for it. */
+export interface EmergencyFuelOffer {
+  /** Parsecs put in the tank: exactly enough to reach the nearest star. */
+  parsecs: number
+  /** What it costs, markup included. */
+  cost: number
+}
+
+/**
+ * What the yard here would advance a stranded ship, or null when the ship is
+ * not stranded.
+ *
+ * Stranded means: docked somewhere that sells fuel, with a tank that will not
+ * reach even the nearest star, and without the credits to buy the difference.
+ * There was no way out of that — no fuel without money, no money without a
+ * jump, and no loan once the bank's limit was reached — and no game over
+ * either: the voyage simply stopped, and two careers in five ended there.
+ *
+ * So the port authority, which would rather not have a derelict on its pad,
+ * puts in just enough to clear the system and adds the bill to the commander's
+ * account. It is deliberately a bad deal and a small one: double the pump
+ * price, the nearest star and not a parsec further.
+ */
+export function emergencyFuelOffer(state: GameState): EmergencyFuelOffer | null {
+  if (!hasShipyard(state)) return null
+  const here = currentSystem(state)
+  let nearest = Infinity
+  for (const s of state.systems) {
+    if (s.id !== here.id) nearest = Math.min(nearest, Math.round(distance(here, s)))
+  }
+  // Nothing within a full tank: fuel is not what is missing (see `canLeaveSystem`).
+  if (nearest > maxFuel(state.ship)) return null
+  const parsecs = nearest - state.ship.fuel
+  if (parsecs <= 0) return null
+  const pump = parsecs * fuelPricePerParsec(state)
+  if (state.credits >= pump) return null
+  return { parsecs, cost: pump * EMERGENCY_FUEL_MARKUP }
+}
+
+/**
+ * Take the port's advance: fuel now, the bill on account. Whatever is in the
+ * purse goes towards it first and the rest becomes debt — past the bank's loan
+ * limit if need be, since the alternative is a ship that never moves again.
+ */
+export function takeEmergencyFuel(state: GameState): ActionResult {
+  const offer = emergencyFuelOffer(state)
+  if (!offer) return fail('error.notStranded')
+  const paid = Math.min(state.credits, offer.cost)
+  state.credits -= paid
+  state.debt += offer.cost - paid
+  state.ship.fuel += offer.parsecs
+  pushLog(state, 'log.emergencyFuel', { parsecs: offer.parsecs, cost: offer.cost })
+  return okInfo('info.emergencyFuel', { parsecs: offer.parsecs, cost: offer.cost })
+}
+
 /** What one point of hull costs to patch where the ship is docked. */
 export function repairPricePerUnit(state: GameState): number {
   const base = SHIP_TYPES[state.ship.type].repairCostPerUnit
@@ -435,7 +565,7 @@ export function repairPricePerUnit(state: GameState): number {
 export function repair(state: GameState, units: number): ActionResult {
   if (!hasShipyard(state)) return fail('error.noShipyardHere')
   const unit = repairPricePerUnit(state)
-  const needed = Math.min(units, maxHull(state.ship) - state.ship.hull)
+  const needed = Math.min(wholeAmount(units), maxHull(state.ship) - state.ship.hull)
   if (needed <= 0) return fail('error.hullFull')
   const affordable = Math.floor(state.credits / unit)
   const fix = Math.min(needed, affordable)
@@ -567,6 +697,10 @@ export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
   if (!SHIP_TYPES[target] || !shipsForSale(state).includes(target)) return fail('error.notSold')
   if (target === state.ship.type) return fail('error.sameShip')
   if (usedCargoBays(state.ship) > 0) return fail('error.cargoNotEmpty')
+  // A hull that cannot reach the nearest star from this yard is a purchase
+  // with no way out: the trade-in is gone, and the new ship sits here forever.
+  const problem = shipPurchaseProblem(state, target)
+  if (problem) return fail(problem)
 
   const price = traderPrice(state, SHIP_TYPES[target].price)
   const tradeIn = shipValue(state.ship)
@@ -576,7 +710,8 @@ export function buyShip(state: GameState, target: ShipTypeId): ActionResult {
   const keepPod = state.ship.escapePod
   // The crew comes across with you, as far as the new hull has berths for
   // them — being dumped back to a solo watch on a bigger ship would be absurd.
-  const berths = SHIP_TYPES[target].crewQuarters - 1
+  // Passengers keep their cabins, so the crew gets what is left after them.
+  const berths = SHIP_TYPES[target].crewQuarters - 1 - passengersAboard(state)
   const crew = state.ship.crew.slice(0, berths)
   const robots = (state.ship.robots ?? []).slice(0, Math.max(0, berths - crew.length))
   const leftBehind =
@@ -630,7 +765,15 @@ export function sellGadget(state: GameState, index: number): ActionResult {
   if (bays > 0 && usedCargoBays(state.ship) > totalCargoBays(state.ship) - bays) {
     return fail('error.cargoNotEmpty')
   }
+  // Nor is a tank extension unbolted in a system only the extension can leave.
+  const without = state.ship.gadgets.filter((_, i) => i !== index)
+  const rangeAfter = maxFuel({ ...state.ship, gadgets: without })
+  if (rangeAfter < maxFuel(state.ship) && !canLeaveSystem(state, rangeAfter)) {
+    return fail('error.rangeTooShort')
+  }
   state.ship.gadgets.splice(index, 1)
+  // Fuel the smaller tank cannot hold is vented with the module that held it.
+  state.ship.fuel = Math.min(state.ship.fuel, maxFuel(state.ship))
   state.credits += Math.round(GADGETS[id].price * 0.75)
   return okInfo('info.equipmentSold')
 }
@@ -641,7 +784,7 @@ export function hireMercenary(state: GameState, id: string): ActionResult {
   const sys = currentSystem(state)
   const roster = sys.mercenaryIds ?? []
   if (!roster.includes(id) || !MERCENARIES[id]) return fail('error.mercNotHere')
-  if (freeQuarters(state.ship) <= 0) return fail('error.noQuarters')
+  if (freeBerths(state) <= 0) return fail('error.noQuarters')
   if (state.ship.crew.includes(id)) return fail('error.alreadyHired')
   state.ship.crew.push(id)
   sys.mercenaryIds = roster.filter((m) => m !== id)
@@ -679,7 +822,7 @@ export function buyRobot(state: GameState, id: string): ActionResult {
   const robot = ROBOTS[id]
   if (!robot) return fail('error.robotNotHere')
   if (!robotsForSale(state).includes(id)) return fail('error.robotNotHere')
-  if (freeQuarters(state.ship) <= 0) return fail('error.noQuarters')
+  if (freeBerths(state) <= 0) return fail('error.noQuarters')
   const price = traderPrice(state, robot.price)
   if (state.credits < price) return fail('error.notEnoughCredits')
   state.credits -= price
@@ -708,7 +851,7 @@ export function maxLoan(state: GameState): number {
 export function getLoan(state: GameState, amount: number): ActionResult {
   if (!atCapital(state)) return fail('error.noBankHere')
   const available = maxLoan(state) - state.debt
-  const take = Math.min(amount, available)
+  const take = Math.min(wholeAmount(amount), available)
   if (take <= 0) return fail('error.noLoanAvailable')
   state.debt += take
   state.credits += take
@@ -717,7 +860,7 @@ export function getLoan(state: GameState, amount: number): ActionResult {
 
 export function payDebt(state: GameState, amount: number): ActionResult {
   if (!atCapital(state)) return fail('error.noBankHere')
-  const pay = Math.min(amount, state.debt, state.credits)
+  const pay = Math.min(wholeAmount(amount), state.debt, state.credits)
   if (pay <= 0) return fail('error.nothingToPay')
   state.debt -= pay
   state.credits -= pay
@@ -805,6 +948,62 @@ export function advanceDay(state: GameState, rng?: Rng): CrewIncident | null {
   const incident = rollCrewIncident(state, rng)
   if (incident) pushLog(state, incident.bodyKey, incident.params)
   return incident
+}
+
+// --- Losing the ship ---------------------------------------------------------
+/**
+ * The ship is gone and the escape pod has fired: the commander comes out of it
+ * in a bare Flea, the insurer pays out on the hull that was lost, and everything
+ * that went down with it is written off. Returns false, changing nothing, when
+ * there was no pod — that is the end of the run, and the caller's to announce.
+ *
+ * One function for every way to lose a ship (gunfire, a convoy run, a
+ * singularity), so the three cannot settle it three different ways.
+ */
+export function abandonShip(state: GameState): boolean {
+  if (!state.ship.escapePod) return false
+  // Value the wreck *before* it is replaced: insurance must pay out on the ship
+  // that was actually lost, not on the Flea handed over as a replacement.
+  const payout = state.insurance ? shipValue(state.ship) : 0
+  const flea = SHIP_TYPES.flea
+  // The hold goes down with the ship, so the books that shadow it go too: the
+  // price paid for the lost cargo, and its local-sourcing record. Every other
+  // path that empties the hold (seizure, plunder, an electrical fire) clears
+  // all three together, and a run lost short of port never reaches the arrival
+  // that would have cleared the ledger.
+  state.buyingPrice = emptyGoods()
+  state.sourcedHere = emptyGoods()
+  // A pod seats one. Anyone travelling under contract is taken off by the
+  // rescue tender and the contract lapses unpaid — there is no cabin left to
+  // carry them in, and no berth in the replacement to offer them.
+  for (const q of state.quests.filter((x) => x.status === 'active' && x.type === 'passenger')) {
+    pushLog(state, 'quest.passengerLost', { passenger: q.passengerName ?? '' })
+  }
+  state.quests = state.quests.filter((x) => !(x.status === 'active' && x.type === 'passenger'))
+  state.ship = {
+    type: 'flea',
+    hull: flea.hullStrength,
+    hullUpgrades: 0,
+    fuel: flea.fuelTanks,
+    cargo: emptyGoods(),
+    weapons: [],
+    shields: [],
+    shieldPoints: [],
+    gadgets: [],
+    crew: [],
+    robots: [],
+    escapePod: false
+  }
+  // The policy covered the hull that was lost, and ends with the claim: the
+  // replacement has no pod, and the bank insures nothing without one.
+  if (state.insurance) {
+    state.insurance = false
+    state.noClaim = 0
+    state.credits += payout
+    pushLog(state, 'log.insurancePaid', { amount: payout })
+  }
+  pushLog(state, 'encounter.escapePod')
+  return true
 }
 
 // --- Result helpers ----------------------------------------------------------

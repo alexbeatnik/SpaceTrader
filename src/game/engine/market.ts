@@ -5,6 +5,14 @@ import { POLITICS } from '../data/politics'
 import { economyOf } from '../data/economies'
 
 /**
+ * The most a negotiator can talk a listed price down by. Lives here rather than
+ * beside `traderDiscount` because the market has to price against it — a planet
+ * must never buy a good back for more than its best customer paid — and this
+ * module sits below `game.ts`, which imports it.
+ */
+export const MAX_TRADER_DISCOUNT = 0.1
+
+/**
  * Baseline "encyclopaedia" price for a good in a system, ignoring random
  * fluctuation. Returns 0 when the good cannot be traded there at all.
  */
@@ -116,7 +124,15 @@ function sellablePrice(
 
   // Sellers typically get slightly under buy price, plus fluctuation.
   const fluct = rng.variance(good.variance)
-  return Math.max(1, Math.round(reference * 0.92) + fluct)
+  const price = Math.max(1, Math.round(reference * 0.92) + fluct)
+  // Where the planet also sells the good, it never pays more than it charges.
+  // The fluctuation is a flat ± and the margin only 8%, so on a cheap good a
+  // lucky roll put the sell price above the buy price — and well above what a
+  // good negotiator actually paid — and the whole stock could be bought and
+  // sold straight back across the same counter at a profit. Capped at the
+  // lowest price any trader can talk the shelf down to.
+  if (buy <= 0) return price
+  return Math.max(1, Math.min(price, Math.round(buy * (1 - MAX_TRADER_DISCOUNT))))
 }
 
 /** Convenience: list of goods currently buyable in a system. */

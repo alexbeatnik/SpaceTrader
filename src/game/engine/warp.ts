@@ -4,7 +4,17 @@ import { SHIP_TYPES } from '../data/ships'
 import { SHIELDS } from '../data/equipment'
 import { refreshMarket } from './market'
 import { fuelCost, systemDistance } from './travel'
-import { pushLog, refuelFull, advanceDay, clearLocalSourcing, effectiveSkills, maxHull } from './game'
+import {
+  pushLog,
+  refuelFull,
+  advanceDay,
+  clearLocalSourcing,
+  effectiveSkills,
+  maxHull,
+  maxFuel,
+  canLeaveSystem,
+  EMERGENCY_FUEL_MARKUP
+} from './game'
 import { rollEncounter, createBountyEncounter, type Encounter } from './combat'
 import { maybeTriggerEvent, type GameEvent } from './events'
 import { questsReadyToTurnIn, generateQuestOffer, generateQuestBoard, hasActiveBounty } from './quests'
@@ -200,6 +210,12 @@ function flyTo(state: GameState, targetId: number, distance: number, rng: Rng): 
   // Deep space keeps one hazard nobody can shoot back at.
   const blackHole = rng.chance(blackHoleChance(distance)) ? resolveBlackHole(state, rng) : null
 
+  // A ship that went over the horizon meets nobody else on this leg. The hull
+  // is already at zero, so anyone left in the queue would be fought by a wreck:
+  // the first reply destroyed it on a miss, spent the escape pod there, and the
+  // singularity then finished off the replacement Flea on arrival.
+  if (blackHole && !blackHole.survived) encounters.length = 0
+
   // If no encounter (or a benign one), finalise arrival immediately.
   settleArrival(state, rng)
 
@@ -227,6 +243,45 @@ function flyTo(state: GameState, targetId: number, distance: number, rng: Rng): 
 }
 
 /**
+ * How the ship would get to `targetId` right now: down the surveyed wormhole,
+ * on its own drive, or not at all.
+ *
+ * A wormhole pair is not always far apart — the pairing is random — and the
+ * far end used to be reachable *only* through the hole: a captain parked ten
+ * parsecs away with a full tank and no money for the toll was told the jump
+ * could not be made. The hole is taken when the toll can be paid; otherwise
+ * the drive, if the tank reaches. One function, so the engine, the chart and
+ * the travel overlay all agree on which it is.
+ */
+export function warpRoute(state: GameState, targetId: number): 'wormhole' | 'drive' | null {
+  const here = state.systems[state.currentSystem]
+  if (!here || !state.systems[targetId] || targetId === state.currentSystem) return null
+  if (here.wormholeTo === targetId) {
+    if (state.credits >= wormholeTax(state) || tollOnAccount(state)) return 'wormhole'
+  }
+  return fuelCost(state, targetId) <= state.ship.fuel ? 'drive' : null
+}
+
+/**
+ * True when the gate here will pass the ship on account: the surveyed wormhole
+ * is the only way out of the system — no star within a full tank, no unmapped
+ * hole to fall into — and the toll cannot be paid.
+ *
+ * The same dead end as an empty tank and an empty purse (see
+ * `emergencyFuelOffer`), reached by the other road: a hull whose drive cannot
+ * leave a system is allowed there *because* the wormhole is a way out, which
+ * stops being true the moment the commander cannot afford it. So the gate lets
+ * the ship through and bills it, at the same markup the port charges for fuel.
+ */
+export function tollOnAccount(state: GameState): boolean {
+  const here = state.systems[state.currentSystem]
+  if (!here || here.wormholeTo === null || here.unstableWormhole) return false
+  if (state.credits >= wormholeTax(state)) return false
+  const range = maxFuel(state.ship)
+  return !state.systems.some((s) => s.id !== here.id && systemDistance(here, s) <= range)
+}
+
+/**
  * Warp to a target system. Returns the encounters met en route (or none).
  * The player is moved to the destination; encounters are considered "en route"
  * but are surfaced to the UI for resolution after the jump.
@@ -236,17 +291,30 @@ export function warp(state: GameState, targetId: number): WarpResult {
   const target = state.systems[targetId]
   if (!target || targetId === state.currentSystem) return { ok: false, error: 'error.invalidTarget' }
 
-  const viaWormhole = here.wormholeTo === targetId
+  const route = warpRoute(state, targetId)
+  if (route === null) {
+    return {
+      ok: false,
+      error: here.wormholeTo === targetId ? 'error.cannotAffordWormhole' : 'error.notEnoughFuel'
+    }
+  }
+  const viaWormhole = route === 'wormhole'
   const cost = fuelCost(state, targetId)
-
-  if (!viaWormhole && cost > state.ship.fuel) return { ok: false, error: 'error.notEnoughFuel' }
 
   const rng = new Rng((state.seed ^ (state.day * 2654435761)) >>> 0)
 
   if (viaWormhole) {
     const tax = wormholeTax(state)
-    if (state.credits < tax) return { ok: false, error: 'error.cannotAffordWormhole' }
-    state.credits -= tax
+    if (state.credits >= tax) {
+      state.credits -= tax
+    } else {
+      // Passed through on account: the purse first, the rest to the debt at
+      // the port's markup. Only reachable when `tollOnAccount` said so.
+      const owed = (tax - state.credits) * EMERGENCY_FUEL_MARKUP
+      state.credits = 0
+      state.debt += owed
+      pushLog(state, 'log.tollOnAccount', { amount: owed })
+    }
     pushLog(state, 'log.wormhole', { system: target.nameId, tax })
   } else {
     state.ship.fuel -= cost
@@ -266,7 +334,14 @@ export function warp(state: GameState, targetId: number): WarpResult {
 export function enterUnstableWormhole(state: GameState): WarpResult {
   const here = state.systems[state.currentSystem]
   if (!here?.unstableWormhole) return { ok: false, error: 'error.noWormholeHere' }
-  const elsewhere = state.systems.filter((s) => s.id !== here.id)
+  // Anywhere — but not somewhere this ship could never fly out of again. A few
+  // systems per galaxy lie beyond every drive ever built, and many more beyond a
+  // short-legged hull's; being spat out into one was a voyage that could only
+  // end at the menu. The hole stays unaimable: it just has a floor.
+  const range = maxFuel(state.ship)
+  const elsewhere = state.systems.filter(
+    (s) => s.id !== here.id && canLeaveSystem(state, range, s.id)
+  )
   if (elsewhere.length === 0) return { ok: false, error: 'error.invalidTarget' }
 
   const rng = new Rng((state.seed ^ (state.day * 40503) ^ (here.id * 2654435761)) >>> 0)

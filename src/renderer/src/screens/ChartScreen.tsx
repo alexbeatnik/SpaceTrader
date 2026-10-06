@@ -13,6 +13,8 @@ import {
   GALAXY_WIDTH,
   GALAXY_HEIGHT,
   wormholeTax,
+  warpRoute,
+  tollOnAccount,
   questSupplyMissing
 } from '@game/index'
 import {
@@ -63,12 +65,14 @@ export function ChartScreen(): React.JSX.Element {
   const selected = selectedId !== null ? game.systems[selectedId] : null
   const selectedQuests = selected ? activeQuests.filter((q) => q.targetSystem === selected.id) : []
   const selDist = selected ? systemDistance(here, selected) : 0
-  const viaWormhole = selected ? here.wormholeTo === selected.id : false
-  const canWarp = selected
-    ? viaWormhole
-      ? game.credits >= wormholeTax(game)
-      : selDist <= game.ship.fuel
-    : false
+  // Which way the engine would actually take the ship — the same answer the
+  // jump itself is made on, so the button and the bill cannot disagree with it.
+  const route = selected ? warpRoute(game, selected.id) : null
+  const linked = selected ? here.wormholeTo === selected.id : false
+  const viaWormhole = route === 'wormhole'
+  // The toll cannot be paid and nothing else leads out: passed through on debt.
+  const onAccount = linked && viaWormhole && tollOnAccount(game)
+  const canWarp = route !== null
 
   return (
     <div>
@@ -274,12 +278,21 @@ export function ChartScreen(): React.JSX.Element {
 
               {selected.id !== here.id && (
                 <>
-                  {viaWormhole && (
+                  {/* The toll is quoted whenever the hole leads there, paid or
+                      not — in red when it cannot be, which is the whole reason
+                      the fuel line below it is showing instead. */}
+                  {linked && (
                     <div className="kv">
                       <span className="k">{t('chart.wormholeTax')}</span>
-                      <span className="v">{fmt(wormholeTax(game))} {t('common.cr')}</span>
+                      <span className={`v ${viaWormhole && !onAccount ? '' : 'neg'}`}>
+                        {fmt(wormholeTax(game))} {t('common.cr')}
+                      </span>
                     </div>
                   )}
+                  {/* The gate's own way out of a dead end, spelt out before the
+                      jump is made: it is a debt, and should not arrive as one
+                      the commander did not know they were taking on. */}
+                  {onAccount && <div className="rescue-hint">{t('chart.tollOnAccount')}</div>}
                   {!viaWormhole && (
                     <div className="kv">
                       <span className="k">{t('chart.fuelNeeded')}</span>
@@ -299,8 +312,14 @@ export function ChartScreen(): React.JSX.Element {
                   >
                     ⚡ {t('chart.warp')}
                   </button>
+                  {/* Say which of the two it is: a wormhole needs no fuel at all,
+                      so "out of range" was the wrong answer to a short purse. */}
                   {!canWarp && (
-                    <div className="screen-sub" style={{ marginTop: 8 }}>{t('chart.outOfRange')}</div>
+                    <div className="screen-sub neg" style={{ marginTop: 8 }}>
+                      {linked
+                        ? t('error.cannotAffordWormhole')
+                        : t('chart.fuelShort', { missing: selDist - game.ship.fuel })}
+                    </div>
                   )}
                 </>
               )}

@@ -49,6 +49,9 @@ import {
   blackHoleChance,
   blackHoleEscapeChance,
   blackHoleEvent,
+  warpRoute,
+  wormholeTax,
+  tollOnAccount,
   BLACK_HOLE_CHANCE_MAX
 } from './warp'
 import { travelToBody, bodyTravelProblem } from './system'
@@ -63,6 +66,13 @@ import {
   tractorChance,
   fleeChance,
   spawnPirates,
+  spawnEncounter,
+  alienChance,
+  ALIEN_CHANCE,
+  ALIEN_NOTICE_WORTH,
+  ALIEN_FULL_WORTH,
+  PIRATE_BULK_RISK,
+  PIRATE_VALUE_RISK,
   pirateCargoChance,
   pirateCargoValue,
   rollEncounter,
@@ -121,10 +131,29 @@ import {
   questDemand,
   activeQuests,
   boardQuestProblem,
-  isContractEmbargoed
+  isContractEmbargoed,
+  questsReadyToTurnIn
 } from './quests'
 import { runEscort, escortLegs, ESCORT_KILL_BONUS } from './escort'
-import { escortShipProblem, canEscort, buyRobot, freeQuarters } from './game'
+import {
+  escortShipProblem,
+  canEscort,
+  buyRobot,
+  freeQuarters,
+  abandonShip,
+  canLeaveSystem,
+  hullRange,
+  shipPurchaseProblem,
+  sellGadget,
+  payDebt,
+  shipValue,
+  freeBerths,
+  passengersAboard,
+  emergencyFuelOffer,
+  takeEmergencyFuel,
+  EMERGENCY_FUEL_MARKUP
+} from './game'
+import { ROBOTS } from '../data/robots'
 import {
   assignRoles,
   berthsUsed,
@@ -1384,6 +1413,23 @@ describe('tractor beams and escape', () => {
 
     expect(smallFleeingBig).toBeGreaterThan(bigFleeingSmall)
   })
+
+  it('a parting shot that kills the ship is not also logged as an escape', () => {
+    // Same-size hulls so no tractor beam complicates the run; a gunner good
+    // enough that the parting shot lands most of the time.
+    let died = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      const g = newGame({ commanderName: 'Test', seed: 94 })
+      g.ship.hull = 1
+      const enc = testEncounter('pirate', { shipType: 'flea', weaponPower: 50, fighter: 13 })
+      resolveRound(g, enc, 'flee', new Rng(seed))
+      if (g.ship.hull > 0) continue
+      died++
+      expect(enc.status).toBe('playerDestroyed')
+      expect(enc.messages.some((m) => m.key === 'encounter.fledSuccess')).toBe(false)
+    }
+    expect(died).toBeGreaterThan(10)
+  })
 })
 
 describe('combat log detail', () => {
@@ -1771,6 +1817,24 @@ describe('trader trading', () => {
     const res = tradeSell(g, enc, 'furs', 0)
     expect(res.ok).toBe(false)
     expect(res.error).toBe('error.nothingToSell')
+  })
+
+  it('a trader never buys back what is on its own stall', () => {
+    // The two lists are priced independently, so a good on both could be
+    // bought at the low end and handed straight back at the high one.
+    const g = newGame({ commanderName: 'Test', seed: 65 })
+    let stalls = 0
+    for (let seed = 1; seed <= 400; seed++) {
+      const enc = spawnEncounter('trader', g, new Rng(seed))
+      if (!enc.trade) continue // a caravan passes without dealing
+      stalls++
+      for (const id of GOOD_IDS) {
+        if (enc.trade.sells[id]) expect(enc.trade.buys[id]).toBeUndefined()
+      }
+      // And it still wants something: the wishlist is not emptied by the rule.
+      expect(Object.keys(enc.trade.buys).length).toBeGreaterThanOrEqual(2)
+    }
+    expect(stalls).toBeGreaterThan(100)
   })
 })
 
@@ -2189,6 +2253,36 @@ describe('quoted market price', () => {
     const before = g.credits
     buyGood(g, 'water', 3)
     expect(before - g.credits).toBe(quoted * 3)
+  })
+
+  it('never lets a planet buy a good back for more than it charges', () => {
+    // The best negotiator there is, at every market in a spread of galaxies:
+    // buying the whole shelf and selling it straight back must not pay.
+    let checked = 0
+    for (let seed = 1; seed <= 25; seed++) {
+      const g = newGame({ commanderName: 'T', seed })
+      g.skills.trader = 10
+      for (const sys of g.systems) {
+        g.currentSystem = sys.id
+        for (const id of GOOD_IDS) {
+          if (sys.buyPrice[id] <= 0 || sys.sellPrice[id] <= 0) continue
+          checked++
+          expect(sys.sellPrice[id]).toBeLessThanOrEqual(marketBuyPrice(g, id))
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(1000)
+  })
+
+  it('still buys goods a planet cannot make at their full local value', () => {
+    // The cap only bites where the planet sells the good itself. A world below
+    // a good's production tech has no shelf price to be capped against.
+    const g = newGame({ commanderName: 'T', seed: 11 })
+    const importer = g.systems.find(
+      (s) => s.buyPrice.robots === 0 && s.sellPrice.robots > 0
+    )
+    expect(importer).toBeDefined()
+    expect(importer!.sellPrice.robots).toBeGreaterThan(TRADE_GOODS.robots.minPrice / 2)
   })
 })
 
@@ -2725,11 +2819,573 @@ describe('black holes', () => {
     expect(killed).toBe(1)
   })
 
+  it('a ship lost to one meets nobody else on that leg', () => {
+    // A hold full of robots draws pirates on most legs, so a fatal leg that
+    // still carried its encounters would show up well inside this many deaths.
+    let killed = 0
+    for (let seed = 1; seed < 6000 && killed < 12; seed++) {
+      const g = newGame({ commanderName: 'Test', seed })
+      g.ship.fuel = 999
+      g.skills.pilot = 1
+      g.ship.cargo.robots = 10
+      const target = g.systems.find((s) => s.id !== g.currentSystem)!.id
+      const res = warp(g, target)
+      if (!res.blackHole || res.blackHole.survived) continue
+      killed++
+      expect(res.encounters).toEqual([])
+    }
+    expect(killed).toBe(12)
+  })
+
   it('reads back as an event the UI can show either way', () => {
     const survived = blackHoleEvent({ survived: true, damage: 12, daysLost: 2, escapeChance: 0.5 })
     expect(survived.bodyKey).toBe('event.blackHole.bodySurvived')
     expect(survived.params?.chance).toBe(50)
     const lost = blackHoleEvent({ survived: false, damage: 40, daysLost: 3, escapeChance: 0.2 })
     expect(lost.bodyKey).toBe('event.blackHole.bodyLost')
+  })
+})
+
+// Everything below was found by the whole-game bot in `playthrough.test.ts`,
+// then pinned here so each rule has a test that names it.
+describe('systems a ship could never leave', () => {
+  /**
+   * Strand the current system: everything else is moved out of reach, bar one
+   * neighbour placed exactly `gap` parsecs away, and the wormholes are closed.
+   */
+  function isolate(g: ReturnType<typeof newGame>, gap: number): void {
+    const here = g.systems[g.currentSystem]
+    g.systems.forEach((s, i) => {
+      s.x = 100000 + i * 1000
+      s.y = 100000
+    })
+    here.x = 0
+    here.y = 0
+    here.wormholeTo = null
+    here.unstableWormhole = false
+    const neighbour = g.systems.find((s) => s.id !== here.id)!
+    neighbour.x = gap
+    neighbour.y = 0
+  }
+
+  it('the yard will not sell a hull whose tank cannot reach the nearest star', () => {
+    const g = newGame({ commanderName: 'Test', seed: 7 })
+    g.credits = 1000000
+    g.systems[g.currentSystem].techLevel = 7
+    isolate(g, 15)
+
+    // A Gnat flies 14 parsecs: one short, for ever.
+    expect(hullRange('gnat')).toBe(14)
+    expect(canLeaveSystem(g, 14)).toBe(false)
+    expect(shipPurchaseProblem(g, 'gnat')).toBe('error.rangeTooShort')
+    const refused = buyShip(g, 'gnat')
+    expect(refused.error).toBe('error.rangeTooShort')
+    expect(g.ship.type).toBe('flea')
+    expect(g.credits).toBe(1000000)
+
+    // A Firefly flies 17 and may be bought.
+    expect(shipPurchaseProblem(g, 'firefly')).toBeNull()
+    expect(buyShip(g, 'firefly').ok).toBe(true)
+  })
+
+  it('a wormhole of either kind counts as a way out', () => {
+    const g = newGame({ commanderName: 'Test', seed: 7 })
+    isolate(g, 500)
+    expect(canLeaveSystem(g, 20)).toBe(false)
+    g.systems[g.currentSystem].unstableWormhole = true
+    expect(canLeaveSystem(g, 20)).toBe(true)
+    g.systems[g.currentSystem].unstableWormhole = false
+    g.systems[g.currentSystem].wormholeTo = g.systems.find((s) => s.id !== g.currentSystem)!.id
+    expect(canLeaveSystem(g, 20)).toBe(true)
+  })
+
+  it('a tank extension is not unbolted where only it can get the ship out', () => {
+    const g = newGame({ commanderName: 'Test', seed: 8 })
+    g.ship.gadgets = ['fuelCompactor']
+    g.ship.fuel = maxFuel(g.ship) // 23: the compactor's three on top of twenty
+    isolate(g, 22)
+    expect(sellGadget(g, 0).error).toBe('error.rangeTooShort')
+    expect(g.ship.gadgets).toEqual(['fuelCompactor'])
+
+    // With a star inside the plain tank's reach it comes off — and the fuel the
+    // smaller tank cannot hold goes with it, rather than reading 23/20.
+    isolate(g, 12)
+    expect(sellGadget(g, 0).ok).toBe(true)
+    expect(g.ship.fuel).toBe(maxFuel(g.ship))
+  })
+
+  it('an unmapped wormhole never spits a ship out where it cannot fly on', () => {
+    // The shortest tank in the catalogue, through every hole in forty galaxies.
+    let falls = 0
+    for (let seed = 1; seed <= 40; seed++) {
+      const base = newGame({ commanderName: 'Test', seed })
+      for (const hole of base.systems.filter((s) => s.unstableWormhole)) {
+        const g = newGame({ commanderName: 'Test', seed })
+        g.ship.type = 'goliath'
+        g.currentSystem = hole.id
+        g.day = 1 + hole.id // the far end is drawn off the day
+        const res = enterUnstableWormhole(g)
+        expect(res.ok).toBe(true)
+        falls++
+        expect(canLeaveSystem(g, maxFuel(g.ship))).toBe(true)
+      }
+    }
+    expect(falls).toBeGreaterThan(300)
+  })
+
+  it('no contract is posted to, and no convoy run to, a system the ship could not return from', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = newGame({ commanderName: 'Test', seed })
+      g.ship.type = 'goliath'
+      for (const q of generateQuestBoard(g, new Rng(seed))) {
+        if (q.targetSystem === g.currentSystem) continue // a fetch comes back here
+        expect(canLeaveSystem(g, maxFuel(g.ship), q.targetSystem)).toBe(true)
+      }
+    }
+
+    // And a convoy signed for in one hull is refused in a shorter-legged one.
+    const g = newGame({ commanderName: 'Test', seed: 300 })
+    g.ship.type = 'mosquito'
+    g.ship.weapons = ['pulse', 'pulse']
+    g.ship.shields = ['energy']
+    g.ship.shieldPoints = [100]
+    const target = g.systems.find((s) => s.id !== g.currentSystem)!
+    const q: Quest = {
+      id: 'far',
+      type: 'escort',
+      giverSystem: g.currentSystem,
+      targetSystem: target.id,
+      reward: 5000,
+      status: 'offered'
+    }
+    acceptQuest(g, q)
+    // Maroon the destination: nothing within any tank, and no wormhole.
+    target.x = -50000
+    target.y = -50000
+    target.wormholeTo = null
+    target.unstableWormhole = false
+    const res = runEscort(g, q.id, new Rng(1))
+    expect(res.error).toBe('error.escortTooFar')
+    expect(g.currentSystem).toBe(q.giverSystem)
+  })
+})
+
+describe('a wormhole pair within drive range', () => {
+  function pair(gap: number): ReturnType<typeof newGame> {
+    const g = newGame({ commanderName: 'Test', seed: 21 })
+    const here = g.systems[g.currentSystem]
+    const far = g.systems.find((s) => s.id !== here.id)!
+    far.x = here.x + gap
+    far.y = here.y
+    here.wormholeTo = far.id
+    far.wormholeTo = here.id
+    return g
+  }
+
+  it('is flown on the drive when the toll cannot be paid', () => {
+    const g = pair(10)
+    const far = g.systems[g.currentSystem].wormholeTo!
+    g.credits = 0
+    expect(warpRoute(g, far)).toBe('drive')
+    expect(warp(g, far).ok).toBe(true)
+    expect(g.currentSystem).toBe(far)
+    expect(g.log.some((l) => l.key === 'log.wormhole')).toBe(false)
+  })
+
+  it('goes through the hole, for the toll, when it can be paid', () => {
+    const g = pair(10)
+    const far = g.systems[g.currentSystem].wormholeTo!
+    g.credits = 5000
+    expect(warpRoute(g, far)).toBe('wormhole')
+    expect(warp(g, far).ok).toBe(true)
+    expect(g.currentSystem).toBe(far)
+    expect(g.log.some((l) => l.key === 'log.wormhole')).toBe(true)
+  })
+
+  it('is refused only when neither the purse nor the tank will do', () => {
+    const g = pair(200)
+    const far = g.systems[g.currentSystem].wormholeTo!
+    g.credits = 0
+    expect(warpRoute(g, far)).toBeNull()
+    expect(warp(g, far).error).toBe('error.cannotAffordWormhole')
+    expect(wormholeTax(g)).toBeGreaterThan(0)
+  })
+})
+
+describe('rules the combat screen used to keep for the engine', () => {
+  it('only a hauler nobody has fired on can be waved away', () => {
+    const g = newGame({ commanderName: 'Test', seed: 30 })
+    for (const kind of ['pirate', 'police', 'bountyHunter', 'alien'] as EncounterKind[]) {
+      const enc = testEncounter(kind)
+      resolveRound(g, enc, 'ignore', new Rng(1))
+      expect(enc.status).toBe('ongoing')
+      expect(enc.round).toBe(0) // refused outright: nothing was spent on it
+    }
+    const hauler = testEncounter('trader')
+    resolveRound(g, hauler, 'ignore', new Rng(1))
+    expect(hauler.status).toBe('ignored')
+  })
+
+  it('amounts are whole units, whatever was typed', () => {
+    const g = newGame({ commanderName: 'Test', seed: 31 })
+    const sys = g.systems[g.currentSystem]
+    sys.buyPrice.water = 10
+    sys.sellPrice.water = 9
+    sys.qty.water = 50
+    g.skills.trader = 0
+
+    expect(buyGood(g, 'water', 2.7).ok).toBe(true)
+    expect(g.ship.cargo.water).toBe(2)
+    expect(g.credits).toBe(1000 - 20)
+    expect(sellGood(g, 'water', 1.9).ok).toBe(true)
+    expect(g.ship.cargo.water).toBe(1)
+    expect(sellGood(g, 'water', 0.9).ok).toBe(false) // less than one unit is none
+
+    expect(getLoan(g, 100.5).ok).toBe(true)
+    expect(g.debt).toBe(100)
+    expect(payDebt(g, 50.99).ok).toBe(true)
+    expect(g.debt).toBe(50)
+    for (const junk of [NaN, Infinity, -Infinity, -5]) {
+      expect(getLoan(g, junk).ok).toBe(false)
+      expect(payDebt(g, junk).ok).toBe(false)
+      expect(buyGood(g, 'water', junk).ok).toBe(false)
+    }
+    expect(Number.isInteger(g.credits)).toBe(true)
+    expect(Number.isInteger(g.debt)).toBe(true)
+  })
+})
+
+describe('two contracts for the same cargo', () => {
+  it('count as ready only as far as the hold will actually stretch', () => {
+    const g = newGame({ commanderName: 'Test', seed: 40 })
+    const fetch = (id: string): Quest => ({
+      id,
+      type: 'fetch',
+      giverSystem: g.currentSystem,
+      targetSystem: g.currentSystem,
+      reward: 1000,
+      status: 'offered',
+      good: 'ore',
+      amount: 5
+    })
+    acceptQuest(g, fetch('a'))
+    acceptQuest(g, fetch('b'))
+
+    g.ship.cargo.ore = 5 // hauled in: nothing on the local ledger
+    // Either could be handed in, taken alone…
+    expect(activeQuests(g).every((q) => canTurnIn(g, q))).toBe(true)
+    // …but not both, and the badge must say so.
+    expect(questsReadyToTurnIn(g).map((q) => q.id)).toEqual(['a'])
+
+    g.ship.cargo.ore = 10
+    expect(questsReadyToTurnIn(g).map((q) => q.id)).toEqual(['a', 'b'])
+    for (const q of questsReadyToTurnIn(g)) expect(turnInQuest(g, q.id)).not.toBeNull()
+    expect(g.ship.cargo.ore).toBe(0)
+  })
+})
+
+describe('losing the ship', () => {
+  it('with a pod: a bare Flea, the insurer pays for the hull lost, the books are cleared', () => {
+    const g = newGame({ commanderName: 'Test', seed: 50 })
+    g.ship.type = 'firefly'
+    g.ship.weapons = ['beam']
+    g.ship.escapePod = true
+    g.ship.crew = ['pax']
+    g.insurance = true
+    g.noClaim = 30
+    g.ship.cargo.ore = 6
+    g.buyingPrice.ore = 80
+    noteLocalSourcing(g, 'ore', 6)
+    const worth = shipValue(g.ship)
+    const before = g.credits
+
+    expect(abandonShip(g)).toBe(true)
+    expect(g.ship.type).toBe('flea')
+    expect(g.ship.hull).toBe(maxHull(g.ship))
+    expect(g.ship.escapePod).toBe(false)
+    expect(g.ship.crew).toEqual([])
+    expect(usedCargoBays(g.ship)).toBe(0)
+    expect(g.buyingPrice.ore).toBe(0)
+    expect(g.sourcedHere?.ore).toBe(0)
+    // Paid on the Firefly that was lost, not on the Flea handed over.
+    expect(g.credits).toBe(before + worth)
+    expect(g.insurance).toBe(false)
+    expect(g.noClaim).toBe(0)
+  })
+
+  it('without one: nothing changes, and the caller is told the run is over', () => {
+    const g = newGame({ commanderName: 'Test', seed: 51 })
+    g.ship.hull = 0
+    const snapshot = JSON.stringify(g)
+    expect(abandonShip(g)).toBe(false)
+    expect(JSON.stringify(g)).toBe(snapshot)
+  })
+
+  it('a passenger does not ride in a one-man pod: the contract lapses', () => {
+    const g = newGame({ commanderName: 'Test', seed: 52 })
+    g.ship.type = 'firefly'
+    g.ship.escapePod = true
+    acceptQuest(g, {
+      id: 'vip',
+      type: 'passenger',
+      giverSystem: g.currentSystem,
+      targetSystem: g.systems.find((s) => s.id !== g.currentSystem)!.id,
+      reward: 900,
+      status: 'offered',
+      passengerName: 'Envoy Sarn'
+    })
+    expect(passengersAboard(g)).toBe(1)
+    expect(abandonShip(g)).toBe(true)
+    expect(passengersAboard(g)).toBe(0)
+    expect(activeQuests(g)).toEqual([])
+    expect(g.log.some((l) => l.key === 'quest.passengerLost')).toBe(true)
+    // The Flea has no cabin to have double-booked.
+    expect(freeBerths(g)).toBe(0)
+  })
+})
+
+describe('alien raiders hunt ships worth hunting', () => {
+  it('take no interest in a commander with nothing, and full interest in a rich one', () => {
+    const g = newGame({ commanderName: 'Test', seed: 60 })
+    expect(alienChance(g)).toBe(0)
+
+    g.credits = ALIEN_NOTICE_WORTH // plus the Flea: just over the line
+    expect(alienChance(g)).toBeGreaterThan(0)
+    expect(alienChance(g)).toBeLessThan(ALIEN_CHANCE * 0.05)
+
+    const middling = alienChance({ ...g, credits: (ALIEN_NOTICE_WORTH + ALIEN_FULL_WORTH) / 2 })
+    expect(middling).toBeGreaterThan(ALIEN_CHANCE * 0.4)
+    expect(middling).toBeLessThan(ALIEN_CHANCE * 0.6)
+
+    g.credits = ALIEN_FULL_WORTH * 10
+    expect(alienChance(g)).toBe(ALIEN_CHANCE)
+  })
+
+  it('never jump a new commander, and do jump a wealthy one', () => {
+    let poorAliens = 0
+    let richAliens = 0
+    // Rolling for an encounter reads the state and changes nothing in it, so
+    // the two commanders can be met four thousand times each.
+    const poor = newGame({ commanderName: 'Test', seed: 61 })
+    const rich = newGame({ commanderName: 'Test', seed: 61 })
+    rich.credits = ALIEN_FULL_WORTH * 2
+    for (let seed = 1; seed <= 4000; seed++) {
+      if (rollEncounter(poor, new Rng(seed))?.kind === 'alien') poorAliens++
+      if (rollEncounter(rich, new Rng(seed))?.kind === 'alien') richAliens++
+    }
+    expect(poorAliens).toBe(0)
+    // 1.5% of 4000 is 60; anything in the neighbourhood proves they still come.
+    expect(richAliens).toBeGreaterThan(30)
+    expect(richAliens).toBeLessThan(100)
+  })
+})
+
+describe('what draws pirates is what the hold is worth', () => {
+  it('a hold full of water adds almost nothing; a hold of gems adds a lot, to a ceiling', () => {
+    const water = newGame({ commanderName: 'Test', seed: 70 })
+    water.ship.cargo.water = totalCargoBays(water.ship)
+    expect(pirateCargoChance(water)).toBeGreaterThan(0)
+    expect(pirateCargoChance(water)).toBeLessThanOrEqual(PIRATE_BULK_RISK + 0.005)
+
+    const gems = newGame({ commanderName: 'Test', seed: 70 })
+    gems.ship.cargo.gems = totalCargoBays(gems.ship)
+    // Ten bays of water are worth 300 credits; ten of gems, thousands.
+    expect(pirateCargoValue(gems)).toBeGreaterThan(pirateCargoValue(water) * 10)
+    expect(pirateCargoChance(gems)).toBeGreaterThan(pirateCargoChance(water) + 0.01)
+
+    gems.ship.cargo.gems = 100000 // more loot than any hold: the cap, not a certainty
+    expect(pirateCargoChance(gems)).toBeCloseTo(PIRATE_BULK_RISK + PIRATE_VALUE_RISK, 10)
+    expect(pirateCargoChance(gems)).toBeLessThan(0.2)
+  })
+})
+
+describe('a ship with no money and no fuel', () => {
+  /** Park the ship `gap` parsecs from its only neighbour, wormholes closed. */
+  function maroon(g: ReturnType<typeof newGame>, gap: number): void {
+    const here = g.systems[g.currentSystem]
+    g.systems.forEach((s, i) => {
+      s.x = 100000 + i * 1000
+      s.y = 100000
+    })
+    here.x = 0
+    here.y = 0
+    here.wormholeTo = null
+    here.unstableWormhole = false
+    const neighbour = g.systems.find((s) => s.id !== here.id)!
+    neighbour.x = gap
+    neighbour.y = 0
+  }
+
+  it('is offered just enough fuel to reach the nearest star, on account', () => {
+    const g = newGame({ commanderName: 'Test', seed: 80 })
+    maroon(g, 12)
+    g.ship.fuel = 4
+    g.credits = 3
+    const pump = fuelPricePerParsec(g)
+
+    const offer = emergencyFuelOffer(g)
+    expect(offer).toEqual({ parsecs: 8, cost: 8 * pump * EMERGENCY_FUEL_MARKUP })
+
+    const res = takeEmergencyFuel(g)
+    expect(res.ok).toBe(true)
+    expect(g.ship.fuel).toBe(12)
+    // The purse goes towards it first; the rest is debt.
+    expect(g.credits).toBe(0)
+    expect(g.debt).toBe(offer!.cost - 3)
+    expect(g.log[0].key).toBe('log.emergencyFuel')
+    // And the jump it was for can now be made.
+    const neighbour = g.systems.find((s) => s.id !== g.currentSystem)!
+    expect(warpRoute(g, neighbour.id)).toBe('drive')
+
+    // It is a way out, not a pump: once the star is in reach there is no more.
+    expect(emergencyFuelOffer(g)).toBeNull()
+    expect(takeEmergencyFuel(g).error).toBe('error.notStranded')
+  })
+
+  it('is advanced the fuel even past the bank\'s loan limit', () => {
+    const g = newGame({ commanderName: 'Test', seed: 81 })
+    maroon(g, 12)
+    g.ship.fuel = 0
+    g.credits = 0
+    g.debt = 50000 // far beyond anything the bank would lend
+    expect(getLoan(g, 100).ok).toBe(false)
+    expect(takeEmergencyFuel(g).ok).toBe(true)
+    expect(g.ship.fuel).toBe(12)
+    expect(g.debt).toBeGreaterThan(50000)
+  })
+
+  it('is not offered it while there is any ordinary way to leave', () => {
+    const g = newGame({ commanderName: 'Test', seed: 82 })
+    maroon(g, 12)
+
+    g.ship.fuel = 12 // the tank already reaches
+    g.credits = 0
+    expect(emergencyFuelOffer(g)).toBeNull()
+
+    g.ship.fuel = 4 // short, but the pump price can be paid
+    g.credits = 8 * fuelPricePerParsec(g)
+    expect(emergencyFuelOffer(g)).toBeNull()
+
+    g.credits = 0
+    expect(emergencyFuelOffer(g)).not.toBeNull()
+    maroon(g, 500) // nothing within a full tank: fuel is not what is missing
+    expect(emergencyFuelOffer(g)).toBeNull()
+  })
+
+  it('is passed through a wormhole on account when that is the only way out', () => {
+    const g = newGame({ commanderName: 'Test', seed: 83 })
+    maroon(g, 500)
+    const here = g.systems[g.currentSystem]
+    const far = g.systems.find((s) => s.id !== here.id)!
+    here.wormholeTo = far.id
+    far.wormholeTo = here.id
+    g.credits = 5
+    const tax = wormholeTax(g)
+    expect(tax).toBeGreaterThan(5)
+
+    expect(tollOnAccount(g)).toBe(true)
+    expect(warpRoute(g, far.id)).toBe('wormhole')
+    expect(warp(g, far.id).ok).toBe(true)
+    expect(g.currentSystem).toBe(far.id)
+    expect(g.log.some((l) => l.key === 'log.tollOnAccount')).toBe(true)
+    expect(g.debt).toBeGreaterThanOrEqual((tax - 5) * EMERGENCY_FUEL_MARKUP)
+  })
+
+  it('is not passed through on account while another way out exists', () => {
+    const g = newGame({ commanderName: 'Test', seed: 84 })
+    maroon(g, 500)
+    const here = g.systems[g.currentSystem]
+    const far = g.systems.find((s) => s.id !== here.id)!
+    here.wormholeTo = far.id
+    g.credits = 0
+
+    here.unstableWormhole = true // a free hole to fall into
+    expect(tollOnAccount(g)).toBe(false)
+    expect(warpRoute(g, far.id)).toBeNull()
+
+    here.unstableWormhole = false
+    maroon(g, 12) // a star within the tank
+    here.wormholeTo = far.id
+    expect(tollOnAccount(g)).toBe(false)
+  })
+})
+
+describe('passengers take a berth', () => {
+  function passenger(g: ReturnType<typeof newGame>, id: string): Quest {
+    return {
+      id,
+      type: 'passenger',
+      giverSystem: g.currentSystem,
+      targetSystem: g.systems.find((s) => s.id !== g.currentSystem)!.id,
+      reward: 900,
+      status: 'offered',
+      passengerName: 'Lady Perrin'
+    }
+  }
+
+  /** A medium hull: four berths, so three beyond the commander's own. */
+  function fourBerthShip(g: ReturnType<typeof newGame>): void {
+    const hull = SHIP_TYPE_IDS.find((id) => SHIP_TYPES[id].crewQuarters === 4)!
+    g.ship.type = hull
+    g.ship.crew = []
+    g.ship.robots = []
+  }
+
+  it('one cabin, one passenger: the second posting is refused', () => {
+    const g = newGame({ commanderName: 'Test', seed: 90 })
+    fourBerthShip(g)
+    g.ship.crew = ['pax', 'mira'] // two of the three spare berths are hands'
+    expect(freeBerths(g)).toBe(1)
+
+    const first = passenger(g, 'p1')
+    expect(boardQuestProblem(g, first)).toBeNull()
+    acceptQuest(g, first)
+    expect(passengersAboard(g)).toBe(1)
+    expect(freeBerths(g)).toBe(0)
+
+    // It used to pass: only an empty berth was checked for, never taken.
+    expect(boardQuestProblem(g, passenger(g, 'p2'))).toBe('error.noQuarters')
+  })
+
+  it('a hand cannot be hired, nor a robot bought, into a passenger\'s cabin', () => {
+    const g = newGame({ commanderName: 'Test', seed: 91 })
+    fourBerthShip(g)
+    g.credits = 1000000
+    const sys = g.systems[g.currentSystem]
+    sys.techLevel = 7
+    sys.mercenaryIds = ['pax', 'mira']
+    for (const id of ['p1', 'p2', 'p3']) acceptQuest(g, passenger(g, id))
+    expect(freeQuarters(g.ship)).toBe(3) // the bunks are physically empty…
+    expect(freeBerths(g)).toBe(0) // …and all three spoken for
+
+    expect(hireMercenary(g, 'pax').error).toBe('error.noQuarters')
+    expect(buyRobot(g, Object.keys(ROBOTS)[0]).error).toBe('error.noQuarters')
+
+    // Deliver one, and the cabin is free again.
+    g.quests[0].status = 'completed'
+    expect(freeBerths(g)).toBe(1)
+    expect(hireMercenary(g, 'pax').ok).toBe(true)
+  })
+
+  it('a new hull must have a cabin for everyone already aboard', () => {
+    const g = newGame({ commanderName: 'Test', seed: 92 })
+    fourBerthShip(g)
+    g.credits = 10000000
+    g.systems[g.currentSystem].techLevel = 7
+    g.ship.crew = ['pax']
+    acceptQuest(g, passenger(g, 'p1'))
+
+    // A Flea has the commander's seat and nothing else.
+    expect(shipPurchaseProblem(g, 'flea')).toBe('error.passengersNeedBerths')
+    expect(buyShip(g, 'flea').error).toBe('error.passengersNeedBerths')
+
+    // A two-berth hull takes the passenger — and has no bunk left for the hand.
+    const twoBerth = SHIP_TYPE_IDS.find(
+      (id) => SHIP_TYPES[id].crewQuarters === 2 && shipPurchaseProblem(g, id) === null
+    )!
+    expect(buyShip(g, twoBerth).ok).toBe(true)
+    expect(g.ship.crew).toEqual([])
+    expect(freeBerths(g)).toBe(0)
+    expect(passengersAboard(g)).toBe(1)
   })
 })

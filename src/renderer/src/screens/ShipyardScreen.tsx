@@ -16,9 +16,13 @@ import {
   GADGETS,
   maxHull,
   maxFuel,
+  usedCargoBays,
+  shipPurchaseProblem,
+  hullRange,
   shipValue,
   traderDiscount,
   fuelPricePerParsec,
+  emergencyFuelOffer,
   hullUpgradePrice,
   HULL_UPGRADE_AMOUNT,
   ESCAPE_POD_PRICE,
@@ -59,11 +63,26 @@ export function ShipyardScreen(): React.JSX.Element {
   const fuelMissing = fuelCap - ship.fuel
   const hullMissing = maxHull(ship) - ship.hull
   const fuelUnit = fuelPricePerParsec(game)
+  // Offered only to a ship that cannot buy its way to the nearest star.
+  const advance = emergencyFuelOffer(game)
 
   // The yard charges what the best negotiator aboard talks it down to — quote
   // that figure, or the button shows one price and the account loses another.
   // (Repairs, fuel and pods are services, not goods: no discount applies.)
   const discounted = (price: number): number => Math.round(price * (1 - traderDiscount(game)))
+
+  // A module can be bought when there is a mount free for it and the money to
+  // pay for it. Both are known before the click, so the button says so rather
+  // than accepting the press and answering with an error.
+  const canFit = (slotFree: boolean, listPrice: number): boolean =>
+    slotFree && game.credits >= discounted(listPrice)
+  const whyNot = (slotFree: boolean, listPrice: number, slotError: string): string | undefined =>
+    !slotFree
+      ? t(slotError)
+      : game.credits < discounted(listPrice)
+        ? t('error.notEnoughCredits')
+        : undefined
+  const holdEmpty = usedCargoBays(ship) === 0
 
   return (
     <div>
@@ -101,6 +120,17 @@ export function ShipyardScreen(): React.JSX.Element {
           >
             {t('shipyard.refuelFull')} · {fmt(fuelMissing * fuelUnit)} {t('common.cr')}
           </button>
+
+          {/* The way out of an empty purse and an empty tank: without it the
+              voyage simply stopped here, with no game over to say so. */}
+          {advance && (
+            <div className="rescue-offer">
+              <button className="btn btn-block btn-primary" onClick={() => s.emergencyFuel()}>
+                ⛽ {t('shipyard.emergencyFuel', { parsecs: advance.parsecs, cost: fmt(advance.cost) })}
+              </button>
+              <div className="rescue-hint">{t('shipyard.emergencyFuelHint')}</div>
+            </div>
+          )}
 
           <label className="checkbox-row" style={{ marginTop: 10 }}>
             <input
@@ -182,7 +212,8 @@ export function ShipyardScreen(): React.JSX.Element {
               <span className="k">{weaponName(id)} <span className="muted">· {WEAPONS[id].power}⚔</span></span>
               <button
                 className="btn btn-sm"
-                disabled={ship.weapons.length >= type.weaponSlots}
+                disabled={!canFit(ship.weapons.length < type.weaponSlots, WEAPONS[id].price)}
+                title={whyNot(ship.weapons.length < type.weaponSlots, WEAPONS[id].price, 'error.noWeaponSlot')}
                 onClick={() => s.buyWeapon(id)}
               >
                 {fmt(discounted(WEAPONS[id].price))}
@@ -196,7 +227,8 @@ export function ShipyardScreen(): React.JSX.Element {
               <span className="k">{shieldName(id)} <span className="muted">· {SHIELDS[id].power}🛡</span></span>
               <button
                 className="btn btn-sm"
-                disabled={ship.shields.length >= type.shieldSlots}
+                disabled={!canFit(ship.shields.length < type.shieldSlots, SHIELDS[id].price)}
+                title={whyNot(ship.shields.length < type.shieldSlots, SHIELDS[id].price, 'error.noShieldSlot')}
                 onClick={() => s.buyShield(id)}
               >
                 {fmt(discounted(SHIELDS[id].price))}
@@ -211,8 +243,13 @@ export function ShipyardScreen(): React.JSX.Element {
               <button
                 className="btn btn-sm"
                 disabled={
-                  ship.gadgets.length >= type.gadgetSlots ||
+                  !canFit(ship.gadgets.length < type.gadgetSlots, GADGETS[id].price) ||
                   (id !== 'cargoBays' && id !== 'nanoHold' && ship.gadgets.includes(id))
+                }
+                title={
+                  id !== 'cargoBays' && id !== 'nanoHold' && ship.gadgets.includes(id)
+                    ? t('error.alreadyOwned')
+                    : whyNot(ship.gadgets.length < type.gadgetSlots, GADGETS[id].price, 'error.noGadgetSlot')
                 }
                 onClick={() => s.buyGadget(id)}
               >
@@ -274,6 +311,20 @@ export function ShipyardScreen(): React.JSX.Element {
         <div className="screen-sub" style={{ marginBottom: 8 }}>
           {t('shipyard.ships')} · {t('shipyard.tradeIn')}: {fmt(shipValue(ship))} {t('common.cr')}
         </div>
+        {/* Said once, up front: every Buy below is off until the hold is empty,
+            and a column of dead buttons with no reason given reads as a bug. */}
+        {!holdEmpty && (
+          <div className="screen-sub warn-text" style={{ marginBottom: 8 }}>
+            ⚠ {t('error.cargoNotEmpty')}
+          </div>
+        )}
+        {/* In words as well as on the button's tooltip, which a phone has no
+            way to show: why some of the lot cannot be bought here at all. */}
+        {hulls.some((id) => id !== ship.type && shipPurchaseProblem(game, id) !== null) && (
+          <div className="screen-sub warn-text" style={{ marginBottom: 8 }}>
+            {t('shipyard.rangeWarning')}
+          </div>
+        )}
         {/* Ten columns, so on a phone this restacks into one card per hull;
             data-label carries each header down to its own cell. */}
         <table className="stacked-table">
@@ -296,6 +347,9 @@ export function ShipyardScreen(): React.JSX.Element {
               const st = SHIP_TYPES[id]
               const net = discounted(st.price) - shipValue(ship)
               const isCurrent = id === ship.type
+              const affordable = game.credits >= net
+              // A hull whose tank cannot reach the nearest star from this yard.
+              const stranded = isCurrent ? null : shipPurchaseProblem(game, id)
               return (
                 <tr key={id} className="row-hover">
                   <td className="stacked-title">
@@ -312,9 +366,16 @@ export function ShipyardScreen(): React.JSX.Element {
                   <td className="num" data-label={t('shipyard.weapons')}>{st.weaponSlots}</td>
                   <td className="num" data-label={t('shipyard.shields')}>{st.shieldSlots}</td>
                   <td className="num" data-label={t('shipyard.gadgets')}>{st.gadgetSlots}</td>
-                  <td className="num" data-label={t('hud.fuel')}>{st.fuelTanks}</td>
                   <td
-                    className={`num ${net > 0 ? '' : 'pos'}`}
+                    className={`num ${stranded ? 'neg' : ''}`}
+                    data-label={t('hud.fuel')}
+                    title={stranded ? t(stranded) : undefined}
+                  >
+                    {hullRange(id)}
+                    {stranded && ' ⚠'}
+                  </td>
+                  <td
+                    className={`num ${isCurrent ? '' : net <= 0 ? 'pos' : affordable ? '' : 'neg'}`}
                     data-label={t('shipyard.netPrice')}
                   >
                     {isCurrent ? '—' : fmt(net)}
@@ -322,7 +383,18 @@ export function ShipyardScreen(): React.JSX.Element {
                   <td className="num stacked-actions">
                     <button
                       className="btn btn-sm btn-primary"
-                      disabled={isCurrent}
+                      disabled={isCurrent || !affordable || !holdEmpty || stranded !== null}
+                      title={
+                        isCurrent
+                          ? undefined
+                          : stranded
+                            ? t(stranded)
+                            : !affordable
+                            ? t('error.notEnoughCredits')
+                            : !holdEmpty
+                              ? t('error.cargoNotEmpty')
+                              : undefined
+                      }
                       onClick={() => s.buyShip(id)}
                     >
                       {isCurrent ? t('system.hereNow') : t('common.buy')}

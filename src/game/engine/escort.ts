@@ -1,7 +1,14 @@
 import type { GameState, Quest } from './types'
 import { Rng } from './rng'
 import { SHIELDS } from '../data/equipment'
-import { advanceDay, atCapital, pushLog, escortShipProblem } from './game'
+import {
+  advanceDay,
+  atCapital,
+  pushLog,
+  escortShipProblem,
+  canLeaveSystem,
+  maxFuel
+} from './game'
 import {
   spawnEncounter,
   resolveRound,
@@ -131,6 +138,13 @@ export function runEscort(state: GameState, questId: string, rng: Rng): EscortRe
   }
   const problem = escortShipProblem(state)
   if (problem) return { ok: false, error: problem }
+  // The convoy delivers its escort to the far end whatever the distance, so a
+  // hull that could not fly back out of there is refused here: the board only
+  // posts runs the ship of the day could return from, but the ship can change
+  // between signing on and forming up.
+  if (!canLeaveSystem(state, maxFuel(state.ship), quest.targetSystem)) {
+    return { ok: false, error: 'error.escortTooFar' }
+  }
 
   const total = escortLegs(state, quest)
   const legs: EscortLeg[] = []

@@ -13,6 +13,8 @@ import {
   maxHull,
   pushLog,
   releaseLocalSourcing,
+  shipValue,
+  wholeAmount,
   type ActionResult
 } from './game'
 import { battleStations } from './crew'
@@ -187,8 +189,10 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
   const dest = state.systems[state.currentSystem]
   const gov = POLITICS[dest.politics]
 
-  // A rare, roaming alien raider can appear anywhere in deep space.
-  if (rng.chance(0.015)) return makeEncounter('alien', state, rng)
+  // A rare, roaming alien raider can appear anywhere in deep space — once the
+  // ship is a prize worth crossing it for. Still exactly one draw, so every
+  // other roll on the leg lands where it always did.
+  if (rng.chance(alienChance(state))) return makeEncounter('alien', state, rng)
 
   // Hired hunters come for the notorious and for bank debtors alike.
   const pHunter = hunterChance(state)
@@ -197,7 +201,7 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
   }
 
   // Base probabilities derived from government strengths.
-  const pPirate = pirateEncounterChance(state, gov.strengthPirates * 0.03)
+  const pPirate = pirateEncounterChance(state, gov.strengthPirates * PIRATE_BASE_RISK)
   const pPolice = gov.strengthPolice * 0.025
   const pTrader = gov.strengthTraders * 0.02
   const roll = rng.next()
@@ -206,6 +210,36 @@ export function rollEncounter(state: GameState, rng: Rng): Encounter | null {
   if (roll < pPirate + pPolice) return makeEncounter('police', state, rng)
   if (roll < pPirate + pPolice + pTrader) return makeEncounter('trader', state, rng)
   return null
+}
+
+/** Per-roll chance of an alien raider against a ship fully worth its while. */
+export const ALIEN_CHANCE = 0.015
+/** What the commander must be worth before a raider takes any interest at all. */
+export const ALIEN_NOTICE_WORTH = 30000
+/** Worth at which the raiders hunt at their full rate. */
+export const ALIEN_FULL_WORTH = 200000
+
+/** Everything a raider could take or ransom: purse, hull and hold. */
+function prizeWorth(state: GameState): number {
+  return state.credits + shipValue(state.ship) + pirateCargoValue(state)
+}
+
+/**
+ * Per-roll chance an alien raider turns up.
+ *
+ * An alien is always a top-tier ship, and it kills a small hull with one volley
+ * that lands nineteen times in twenty. At a flat 1.5% a roll that was not a
+ * rare danger but a clock: about one jump in twenty-five met one, nine meetings
+ * in ten cost the ship however it was flown, and a new commander was dead by
+ * the thirtieth jump with nothing they could have done about it. So the raiders
+ * now ignore prey not worth the trip — nothing below `ALIEN_NOTICE_WORTH`,
+ * rising to the old rate at `ALIEN_FULL_WORTH` — which leaves them what they
+ * were meant to be: the thing a rich captain has to be equipped to meet.
+ */
+export function alienChance(state: GameState): number {
+  const span = ALIEN_FULL_WORTH - ALIEN_NOTICE_WORTH
+  const interest = (prizeWorth(state) - ALIEN_NOTICE_WORTH) / span
+  return ALIEN_CHANCE * Math.max(0, Math.min(1, interest))
 }
 
 /**
@@ -236,10 +270,36 @@ export function pirateCargoValue(state: GameState): number {
   return GOOD_IDS.reduce((total, good) => total + state.ship.cargo[good] * TRADE_GOODS[good].basePrice, 0)
 }
 
-/** Extra pirate chance caused by cargo, capped to keep encounters non-certain. */
+/**
+ * Per-roll pirate chance for each point of a government's `strengthPirates`
+ * (0–7): nothing where the law holds, 14% a roll in an anarchy.
+ */
+export const PIRATE_BASE_RISK = 0.02
+/** Most a merely *full* hold adds to the per-roll pirate chance. */
+export const PIRATE_BULK_RISK = 0.03
+/** Most a *valuable* hold adds — reached at `PIRATE_RICH_CARGO` credits of it. */
+export const PIRATE_VALUE_RISK = 0.1
+export const PIRATE_RICH_CARGO = 50000
+
+/**
+ * Extra pirate chance caused by cargo, capped to keep encounters non-certain.
+ *
+ * What a pirate comes for is what the hold is *worth*; how full it is counts
+ * for little. The two used to add up to +40% a roll, twelve points of it for
+ * simply being full — so ten bays of water drew raiders as surely as ten of
+ * robots. On top of a base of 3% per point of pirate strength, and with a leg
+ * rolled up to three times, a laden ship met pirates on two jumps in three
+ * (nineteen in twenty for a rich one). Every trade run was a fight, which is
+ * not a hazard so much as a tax. The base is now 2% a point and cargo adds at
+ * most 13% — see the playthrough read-out for what that comes to per jump.
+ */
 export function pirateCargoChance(state: GameState): number {
-  const quantityRisk = Math.min(0.12, (usedCargoBays(state.ship) / totalCargoBays(state.ship)) * 0.12)
-  const valueRisk = Math.min(0.28, (pirateCargoValue(state) / 50000) * 0.28)
+  const fill = usedCargoBays(state.ship) / Math.max(1, totalCargoBays(state.ship))
+  const quantityRisk = Math.min(PIRATE_BULK_RISK, fill * PIRATE_BULK_RISK)
+  const valueRisk = Math.min(
+    PIRATE_VALUE_RISK,
+    (pirateCargoValue(state) / PIRATE_RICH_CARGO) * PIRATE_VALUE_RISK
+  )
   return quantityRisk + valueRisk
 }
 
@@ -518,8 +578,13 @@ function makeTradeOffer(rng: Rng): TradeOffer {
       qty: rng.int(1, 8)
     }
   }
-  // Wishlist to buy from the player: 2–4 goods, paying 0.75–1.25× base.
-  for (const g of shuffled(GOOD_IDS, rng).slice(0, rng.int(2, 4))) {
+  // Wishlist to buy from the player: 2–4 goods, paying 0.75–1.25× base. Never
+  // something already on its own stall: the two lists are priced independently,
+  // so a hauler could be selling a good at 0.6× and buying it back at 1.25× —
+  // its whole stock bought and returned to it for double the money.
+  for (const g of shuffled(GOOD_IDS, rng)
+    .filter((id) => !sells[id])
+    .slice(0, rng.int(2, 4))) {
     const base = TRADE_GOODS[g].basePrice
     buys[g] = Math.max(1, Math.round(base * (0.75 + rng.next() * 0.5)))
   }
@@ -542,7 +607,7 @@ export function tradeBuy(
 
   const unit = offer.price
   const qty = Math.min(
-    amount,
+    wholeAmount(amount),
     offer.qty,
     Math.floor(state.credits / unit),
     freeCargoBays(state.ship)
@@ -578,6 +643,7 @@ export function tradeSell(
 
   const have = state.ship.cargo[good]
   if (have <= 0) return { ok: false, error: 'error.nothingToSell' }
+  amount = wholeAmount(amount)
   if (amount <= 0) return { ok: false, error: 'error.nothingToSell' }
 
   const qty = Math.min(amount, have)
@@ -762,7 +828,12 @@ export function resolveRound(
   // from one the player has just shot at. The UI hides each in turn, and this is
   // what makes that a rule rather than a missing button.
   if (action === 'flee' && isPeacefulTrader(enc)) return
-  if (action === 'ignore' && enc.kind === 'trader' && enc.provoked) return
+  // Waving a ship off works on a hauler the player has not fired on, and on
+  // nothing else. It used to be refused only for a *provoked* trader, so the
+  // engine would let a captain "ignore" a pirate ambush, a patrol or an alien
+  // raider straight out of existence — unreachable from the combat screen,
+  // which never offers it, but a rule kept by a missing button is not a rule.
+  if (action === 'ignore' && !isPeacefulTrader(enc)) return
   enc.round++
   const skills = effectiveSkills(state)
   const opp = enc.opponent
@@ -903,6 +974,13 @@ export function resolveRound(
       if (rng.chance(opponentHitChance(state, enc))) {
         dealDamageToPlayer(state, opp, rng, msg)
       }
+    }
+    // A parting shot that finishes the ship ends the run before it is made:
+    // rolling for the escape anyway logged "you managed to flee" on the line
+    // above the one reporting the ship destroyed.
+    if (state.ship.hull <= 0) {
+      checkPlayerDestroyed(state, enc, msg)
+      return
     }
     if (rng.chance(fleeChance(state, enc, skills.pilot))) {
       enc.status = 'playerFled'

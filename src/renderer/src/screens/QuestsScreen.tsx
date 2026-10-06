@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useI18n } from '../hooks/useI18n'
 import {
@@ -37,6 +38,10 @@ export function QuestsScreen(): React.JSX.Element {
   const startEscort = useGameStore((s) => s.startEscort)
   const buy = useGameStore((s) => s.buy)
   const { t } = useI18n()
+  // Abandoning forfeits the contract outright and cannot be taken back, and its
+  // button sits a thumb's width from "Hand in" — so it is armed on its own card
+  // first, the way overwriting a save slot is.
+  const [abandoning, setAbandoning] = useState<string | null>(null)
 
   // Escort contracts only take a military hull with guns and a shield fitted.
   const escortProblem = escortShipProblem(game)
@@ -101,7 +106,7 @@ export function QuestsScreen(): React.JSX.Element {
                   freeCargoBays(game.ship) > 0
                 return (
                   <div className="panel panel-pad" key={q.id}>
-                    <div className="row" style={{ gap: 12 }}>
+                    <div className="row quest-card">
                       <span style={{ fontSize: 26 }}>{ICON[q.type]}</span>
                       <div className="col-fill">
                         <div style={{ fontWeight: 600 }}>{questTypeLabel(q)}</div>
@@ -128,7 +133,24 @@ export function QuestsScreen(): React.JSX.Element {
                       </div>
                       <div className="quest-card-actions">
                         <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
-                        <div className="row-end" style={{ gap: 6, marginTop: 6 }}>
+                        {abandoning === q.id ? (
+                          <div className="confirm-row quest-confirm">
+                            <span className="confirm-text">{t('quest.abandonConfirm')}</span>
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={() => {
+                                setAbandoning(null)
+                                abandon(q.id)
+                              }}
+                            >
+                              {t('common.yes')}
+                            </button>
+                            <button className="btn btn-sm" onClick={() => setAbandoning(null)}>
+                              {t('common.no')}
+                            </button>
+                          </div>
+                        ) : (
+                        <div className="row-end quest-buttons">
                           {q.type === 'bounty' ? (
                             <div className="muted" style={{ fontSize: 11, alignSelf: 'center' }}>{t('quest.viaCombat')}</div>
                           ) : q.type === 'escort' ? (
@@ -138,8 +160,9 @@ export function QuestsScreen(): React.JSX.Element {
                           ) : (
                             <button className="btn btn-sm btn-primary" disabled={!ready} onClick={() => turnIn(q.id)}>{t('quest.turnIn')}</button>
                           )}
-                          <button className="btn btn-sm btn-danger" onClick={() => abandon(q.id)}>{t('quest.abandon')}</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => setAbandoning(q.id)}>{t('quest.abandon')}</button>
                         </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -165,7 +188,7 @@ export function QuestsScreen(): React.JSX.Element {
             const problem = boardQuestProblem(game, q)
             return (
               <div className="panel panel-pad" key={q.id}>
-                <div className="row" style={{ gap: 12 }}>
+                <div className="row quest-card">
                   <span style={{ fontSize: 24 }}>{ICON[q.type]}</span>
                   <div className="col-fill">
                     <div style={{ fontWeight: 600 }}>
@@ -196,8 +219,7 @@ export function QuestsScreen(): React.JSX.Element {
                   <div className="quest-card-actions">
                     <div className="pos" style={{ fontWeight: 600 }}>{fmt(q.reward)} {t('common.cr')}</div>
                     <button
-                      className="btn btn-sm btn-primary"
-                      style={{ marginTop: 6 }}
+                      className="btn btn-sm btn-primary quest-buttons"
                       disabled={problem !== null}
                       onClick={() => acceptBoard(q.id)}
                     >

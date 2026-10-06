@@ -7,7 +7,8 @@ import {
   CREW_ROLES,
   effectiveSkills,
   crewWages,
-  freeQuarters,
+  freeBerths,
+  passengersAboard,
   assignRoles,
   crewCount,
   crewRoster,
@@ -84,7 +85,7 @@ export function PersonnelScreen(): React.JSX.Element {
       <div className="screen-title">🧑‍🚀 {t('crew.title')}</div>
       <div className="screen-sub">
         {t('crew.wages')}: {fmt(crewWages(game))} {t('common.cr')} · {t('crew.quarters')}:{' '}
-        {freeQuarters(game.ship)} · {t('crew.repairRate', { hp: crewRepairPerDay(game) })}
+        {Math.max(0, freeBerths(game))} · {t('crew.repairRate', { hp: crewRepairPerDay(game) })}
       </div>
 
       {/* Manning summary */}
@@ -95,6 +96,14 @@ export function PersonnelScreen(): React.JSX.Element {
             {heads} / {t('crew.minimum')} {required} · {t('crew.recommended')} {advised}
           </span>
         </div>
+        {/* Passengers hold a cabin each, which is why a berth that looks empty
+            on the watch bill may not be free to hire into. */}
+        {passengersAboard(game) > 0 && (
+          <div className="kv">
+            <span className="k">{t('crew.passengers')}</span>
+            <span className="v">{passengersAboard(game)}</span>
+          </div>
+        )}
         {short ? (
           <div className="screen-sub neg" style={{ marginTop: 6 }}>
             ⚠ {t('crew.undercrewed', { load: crewLoad(game).toFixed(1) })}
@@ -213,7 +222,7 @@ export function PersonnelScreen(): React.JSX.Element {
                     <button
                       className="btn btn-sm btn-primary"
                       style={{ marginTop: 6 }}
-                      disabled={freeQuarters(game.ship) <= 0}
+                      disabled={freeBerths(game) <= 0}
                       onClick={() => hire(id)}
                     >
                       {t('crew.hire')}
@@ -223,7 +232,7 @@ export function PersonnelScreen(): React.JSX.Element {
               )
             })
           )}
-          {freeQuarters(game.ship) <= 0 && (
+          {freeBerths(game) <= 0 && (
             <div className="screen-sub" style={{ marginTop: 8 }}>{t('crew.noQuarters')}</div>
           )}
 
@@ -255,7 +264,7 @@ export function PersonnelScreen(): React.JSX.Element {
                     <button
                       className="btn btn-sm btn-primary"
                       style={{ marginTop: 6 }}
-                      disabled={freeQuarters(game.ship) <= 0 || game.credits < price}
+                      disabled={freeBerths(game) <= 0 || game.credits < price}
                       onClick={() => buyRobot(id)}
                     >
                       {t('common.buy')}

@@ -122,6 +122,7 @@ button {
 }
 .hud-stat .value.good { color: var(--good); }
 .hud-stat .value.bad { color: var(--bad); }
+.hud-stat .value.warn { color: var(--warn); }
 .hud-spacer { flex: 1; }
 
 .lang-toggle {
@@ -457,16 +458,30 @@ tr:last-child td { border-bottom: none; }
 }
 
 /* --- Toast --- */
+/* Above every overlay, not below them. At z-index 50 a toast sat *under* the
+   modal backdrop (70) and the warp shell (60): a refused trade in an encounter
+   was reported behind a blurred scrim, and "mined 1 ore" behind the opaque
+   mining overlay, where nobody ever saw it. It takes no pointer events in
+   exchange — a message must never be the thing standing between a thumb and
+   the button it has drifted over. */
 .toast {
   position: fixed;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 50;
+  z-index: 90;
+  pointer-events: none;
+  /* `left: 50%` leaves a shrink-to-fit box only the right half of the screen to
+     size itself in, so on a phone a one-line message wrapped at 187px with the
+     other half of the screen empty. Sized by its content instead, up to the
+     width of the viewport. */
+  width: max-content;
+  max-width: calc(100vw - 32px);
   padding: 12px 22px;
-  border-radius: 999px;
+  border-radius: 22px;
   font-size: 13px;
   font-weight: 600;
+  text-align: center;
   box-shadow: var(--shadow);
   animation: toast-in 0.2s ease;
 }
@@ -515,6 +530,45 @@ tr:last-child td { border-bottom: none; }
    exists to stop — the narrow layouts could never stack them. */
 .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
 .modal-actions .btn { flex: 1; }
+/* The same choices one above the other, for labels too long to share a row. */
+.modal-stack { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.modal-hint { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--text-faint); }
+
+/* The port's offer to a ship that cannot pay its way out of the system: the
+   one button on the yard that matters when it shows, so it is boxed off and
+   says what it will cost before it is pressed. */
+.rescue-offer {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 192, 74, 0.08);
+  border: 1px solid rgba(255, 192, 74, 0.35);
+}
+.rescue-hint { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
+
+/* A destructive action armed in place: the question, then Yes and No, sitting
+   where the button that raised it was. Wraps, because the question is a
+   sentence and the row it replaces was one short word wide. */
+.confirm-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.confirm-row .confirm-text { font-size: 12px; color: var(--warn); }
+/* A quest card: icon, description, and a right-hand column of reward over
+   actions. The gaps are classes rather than inline styles so the narrow layout
+   further down can restack the card — an inline `margin-top` on the buttons
+   could not be taken back off once they moved onto a row of their own. */
+.quest-card { gap: 12px; }
+.quest-buttons { gap: 6px; margin-top: 6px; }
+/* On a quest card the question takes the place of the buttons under the reward. */
+.quest-confirm { margin-top: 6px; }
+/* In the menu card the question reads as a line of its own above the answers. */
+.menu-card .confirm-row { justify-content: center; }
+.menu-card .confirm-row .confirm-text { flex-basis: 100%; font-size: 13px; }
+.menu-card .confirm-row .btn { flex: 1; }
 
 /* --- Amount stepper --- */
 .stepper { display: flex; align-items: center; gap: 6px; }
@@ -528,6 +582,19 @@ tr:last-child td { border-bottom: none; }
   border-radius: 6px;
   color: var(--text);
   font-size: 13px;
+}
+
+/* The slider under the stepper. Full width so its travel is as long as the
+   dialog allows — the longer the track, the finer a thumb can place it. */
+.amount-range {
+  display: block;
+  width: 100%;
+  margin: 0 0 14px;
+  accent-color: var(--accent);
+}
+@media (pointer: coarse) {
+  /* The native track is a few pixels tall; this is the height that is touched. */
+  .amount-range { min-height: 36px; }
 }
 
 /* --- Menu screen --- */
@@ -1068,6 +1135,10 @@ tr:last-child td { border-bottom: none; }
     margin-left: 0;
   }
 
+  /* Lifted clear of the tab strip, which now lives where the toast used to
+     land: a message about the market was printed across the Market tab. */
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+
   .hud {
     padding: 8px 12px;
     padding-top: calc(8px + env(safe-area-inset-top));
@@ -1324,6 +1395,31 @@ tr:last-child td { border-bottom: none; }
   .stacked-actions-row { width: 100%; }
   .stacked-actions-row .btn { flex: 1; }
   .stacked-table td.stacked-actions > .btn { width: 100%; }
+}
+
+/* =========================================================================
+   Quest cards on a narrow column
+
+   Same two layouts as the stacked tables above, for the same reason. The
+   right-hand column does not shrink — it holds the buttons — so on a 375px
+   phone it took half the card and the description beside it wrapped at one
+   word per line, eleven lines tall. Here the reward and the actions drop onto
+   a row of their own under the text, which gets the full width back.
+   ========================================================================= */
+@media (orientation: portrait) and (max-width: 860px),
+  (orientation: landscape) and (max-width: 560px) {
+  .quest-card { flex-wrap: wrap; row-gap: 10px; }
+  .quest-card .quest-card-actions {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    text-align: left;
+  }
+  .quest-card .quest-buttons,
+  .quest-card .quest-confirm { margin-top: 0; }
 }
 
 /* =========================================================================
