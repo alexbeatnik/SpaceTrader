@@ -8,10 +8,16 @@ export function Toast(): React.JSX.Element | null {
   useEffect(() => {
     if (!toast) return
     setVisible(true)
-    const timer = setTimeout(() => setVisible(false), 2600)
+    // An error is the one the player has to act on, so it stays up longer than
+    // a confirmation of something they just did themselves.
+    const timer = setTimeout(() => setVisible(false), toast.type === 'error' ? 4200 : 2600)
     return () => clearTimeout(timer)
   }, [toast])
 
   if (!toast || !visible) return null
-  return <div className={`toast ${toast.type}`}>{toast.text}</div>
+  return (
+    <div className={`toast ${toast.type}`} role={toast.type === 'error' ? 'alert' : 'status'}>
+      {toast.text}
+    </div>
+  )
 }

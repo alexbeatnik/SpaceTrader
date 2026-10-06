@@ -61,7 +61,7 @@ export function BankScreen(): React.JSX.Element {
               type="number"
               value={loanAmt}
               className="stepper-wide"
-              onChange={(e) => setLoanAmt(Math.max(0, Math.min(available, Number(e.target.value) || 0)))}
+              onChange={(e) => setLoanAmt(Math.max(0, Math.min(available, Math.floor(Number(e.target.value) || 0))))}
             />
             <button className="btn btn-primary" disabled={available <= 0} onClick={() => getLoan(loanAmt)}>
               {t('bank.getLoan')}
@@ -74,7 +74,7 @@ export function BankScreen(): React.JSX.Element {
               value={payAmt}
               className="stepper-wide"
               onChange={(e) =>
-                setPayAmt(Math.max(0, Math.min(game.debt, game.credits, Number(e.target.value) || 0)))
+                setPayAmt(Math.max(0, Math.min(game.debt, game.credits, Math.floor(Number(e.target.value) || 0))))
               }
             />
             <button className="btn" disabled={game.debt <= 0} onClick={() => payDebt(payAmt)}>

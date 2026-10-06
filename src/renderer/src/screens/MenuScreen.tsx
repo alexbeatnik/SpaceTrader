@@ -14,6 +14,11 @@ export function MenuScreen(): React.JSX.Element {
   const [hasAutoSave, setHasAutoSave] = useState(false)
   const [hasAnySave, setHasAnySave] = useState(false)
   const [showSaves, setShowSaves] = useState(false)
+  // A new voyage writes straight over the autosave, so with one on disk the
+  // start button arms a question first. It is the largest button on the screen
+  // and Enter in the name field presses it too — one stray keystroke used to
+  // be all it took to replace a hundred-day run with day one.
+  const [confirmNew, setConfirmNew] = useState(false)
 
   // Re-checked when the slot dialog closes too: deleting the last save there
   // has to take the buttons that open it away.
@@ -24,8 +29,15 @@ export function MenuScreen(): React.JSX.Element {
     })
   }, [listSaves, showSaves])
 
-  const onStart = (): void => {
+  const start = (): void => {
     startNewGame({ commanderName: name.trim() || 'Jameson' })
+  }
+
+  // Arms the question when there is something to lose, and never answers it:
+  // only the Yes button does, so Enter pressed twice cannot stand in for it.
+  const onStart = (): void => {
+    if (!hasAutoSave) start()
+    else setConfirmNew(true)
   }
 
   return (
@@ -34,6 +46,18 @@ export function MenuScreen(): React.JSX.Element {
       <p className="menu-tagline">{t('menu.tagline')}</p>
 
       <div className="panel menu-card">
+        {/* With a voyage under way, picking it back up is what the menu is for:
+            it goes first and takes the primary colour. */}
+        {hasAutoSave && (
+          <button
+            className="btn btn-primary btn-block"
+            onClick={() => {
+              void loadGame()
+            }}
+          >
+            ▶ {t('menu.continue')}
+          </button>
+        )}
         <span className="field-label">{t('menu.commanderName')}</span>
         <input
           value={name}
@@ -41,17 +65,22 @@ export function MenuScreen(): React.JSX.Element {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onStart()}
         />
-        <button className="btn btn-primary btn-block" onClick={onStart}>
-          🚀 {t('menu.startGame')}
-        </button>
-        {hasAutoSave && (
+        {confirmNew ? (
+          <div className="confirm-row">
+            <span className="confirm-text">{t('menu.overwriteWarning')}</span>
+            <button className="btn btn-danger" onClick={start}>
+              {t('common.yes')}
+            </button>
+            <button className="btn" onClick={() => setConfirmNew(false)}>
+              {t('common.no')}
+            </button>
+          </div>
+        ) : (
           <button
-            className="btn btn-block"
-            onClick={() => {
-              void loadGame()
-            }}
+            className={`btn btn-block${hasAutoSave ? '' : ' btn-primary'}`}
+            onClick={onStart}
           >
-            {t('menu.continue')}
+            🚀 {t('menu.startGame')}
           </button>
         )}
         {hasAnySave && (

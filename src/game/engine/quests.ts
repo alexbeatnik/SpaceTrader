@@ -1,15 +1,17 @@
-import type { GameState, Quest, GoodId } from './types'
+import type { GameState, Quest, GoodId, SolarSystem } from './types'
 import { Rng } from './rng'
 import {
   atCapital,
   currentSystem,
   pushLog,
-  freeQuarters,
+  freeBerths,
   freeCargoBays,
   totalCargoBays,
   deliverableUnits,
   noteLocalSourcing,
   escortShipProblem,
+  canLeaveSystem,
+  maxFuel,
   type ActionResult
 } from './game'
 import { questSupply } from './sourcing'
@@ -33,6 +35,19 @@ export const PASSENGER_NAMES = [
 const FETCH_GOODS: GoodId[] = ['ore', 'food', 'machines', 'medicine', 'robots', 'furs']
 
 export const MAX_ACTIVE_QUESTS = 5
+
+/**
+ * Systems a contract may send this ship to: everywhere but here, less the ones
+ * it could never fly back out of. A few stars per galaxy lie beyond every drive
+ * and many more beyond a short tank, and a job posted to one of those is either
+ * impossible to finish or — for a convoy run, which delivers the escort to the
+ * far end itself — a one-way trip.
+ */
+function destinations(state: GameState): SolarSystem[] {
+  const here = currentSystem(state)
+  const range = maxFuel(state.ship)
+  return state.systems.filter((s) => s.id !== here.id && canLeaveSystem(state, range, s.id))
+}
 
 export function activeQuests(state: GameState): Quest[] {
   return state.quests.filter((q) => q.status === 'active')
@@ -74,7 +89,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
   if (activeQuests(state).length >= MAX_ACTIVE_QUESTS) return null
 
   const here = currentSystem(state)
-  const others = state.systems.filter((s) => s.id !== here.id)
+  const others = destinations(state)
   if (others.length === 0) return null
 
   const roll = rng.next()
@@ -122,7 +137,7 @@ export function generateQuestOffer(state: GameState, rng: Rng): Quest | null {
   }
 
   // Passenger: ferry a VIP — only if a spare berth is available aboard.
-  if (roll < 0.55 && freeQuarters(state.ship) > 0) {
+  if (roll < 0.55 && freeBerths(state) > 0) {
     const target = rng.pick(others)
     const dist = systemDistance(here, target)
     return {
@@ -191,9 +206,8 @@ export function acceptQuest(state: GameState, quest: Quest): void {
  * Build one posting for a planet's job board. Sizes range from small runs (a
  * couple of units) to bulk contracts (hundreds) meant for large freighters.
  */
-function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
+function makeBoardQuest(state: GameState, rng: Rng, others: SolarSystem[]): Quest | null {
   const here = currentSystem(state)
-  const others = state.systems.filter((s) => s.id !== here.id)
   if (others.length === 0) return null
 
   // Sizes: small runs up to bulk contracts a large freighter can just carry.
@@ -223,7 +237,7 @@ function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
     const reward = cargoReward(state, good, amount, systemDistance(here, crisis), rng)
     return { id: nextQuestId(state), type: 'relief', giverSystem: here.id, targetSystem: crisis.id, reward, status: 'offered', good, amount }
   }
-  if (roll < 0.74 && freeQuarters(state.ship) > 0) {
+  if (roll < 0.74 && freeBerths(state) > 0) {
     // Passenger transport (needs a spare berth).
     const target = rng.pick(others)
     const dist = systemDistance(here, target)
@@ -250,8 +264,11 @@ function makeBoardQuest(state: GameState, rng: Rng): Quest | null {
 export function generateQuestBoard(state: GameState, rng: Rng): Quest[] {
   const board: Quest[] = []
   const n = rng.int(3, 6)
+  // Worked out once for the whole board: it is a scan of the chart against
+  // itself, and nothing a posting does changes where the ship could fly.
+  const others = destinations(state)
   for (let i = 0; i < n; i++) {
-    const q = makeBoardQuest(state, rng)
+    const q = makeBoardQuest(state, rng, others)
     if (q) board.push(q)
   }
   return board
@@ -266,7 +283,7 @@ export function generateQuestBoard(state: GameState, rng: Rng): Quest[] {
  * anywhere in a Flea's ten bays.
  */
 export function boardQuestProblem(state: GameState, quest: Quest): string | null {
-  if (quest.type === 'passenger' && freeQuarters(state.ship) <= 0) return 'error.noQuarters'
+  if (quest.type === 'passenger' && freeBerths(state) <= 0) return 'error.noQuarters'
   // The convoy signs on gunships only — no point taking the job otherwise.
   if (quest.type === 'escort') return escortShipProblem(state)
   const need = questSupply(quest)
@@ -410,9 +427,27 @@ export function questDeliverableMissing(state: GameState, quest: Quest): number 
   return Math.max(0, need.amount - deliverableUnits(state, need.good))
 }
 
-/** Active quests that are ready to be handed in at the current system. */
+/**
+ * Active quests that can be handed in at the current system — all of them, one
+ * after another, not each of them taken alone.
+ *
+ * `canTurnIn` answers for a single contract, so two contracts wanting the same
+ * commodity were each "ready" on a hold that could only settle one: the Quests
+ * badge said two, the arrival toast said two, and the second hand-in was
+ * refused. Cargo is shared out here in journal order, and a contract counts
+ * only if there is still enough left for it once the ones before have had theirs.
+ */
 export function questsReadyToTurnIn(state: GameState): Quest[] {
-  return activeQuests(state).filter((q) => canTurnIn(state, q))
+  const left: Partial<Record<GoodId, number>> = {}
+  return activeQuests(state).filter((q) => {
+    if (!canTurnIn(state, q)) return false
+    const need = questSupply(q)
+    if (!need) return true
+    const have = left[need.good] ?? deliverableUnits(state, need.good)
+    if (have < need.amount) return false
+    left[need.good] = have - need.amount
+    return true
+  })
 }
 
 /**

@@ -422,6 +422,7 @@ export function CombatModal(): React.JSX.Element | null {
               ? enc.trade.sells[tradeDialog.good]?.price ?? 0
               : enc.trade.buys[tradeDialog.good] ?? 0
           }
+          initial={tradeDialog.mode === 'sell' ? ship.cargo[tradeDialog.good] : 1}
           confirmLabel={tradeDialog.mode === 'buy' ? t('common.buy') : t('common.sell')}
           onConfirm={(amount) => {
             if (tradeDialog.mode === 'buy') tradeBuyFromTrader(tradeDialog.good, amount)

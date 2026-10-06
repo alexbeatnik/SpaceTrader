@@ -27,8 +27,5 @@ export function fuelCost(state: GameState, targetId: number): number {
   return systemDistance(here, target)
 }
 
-export function canTravelTo(state: GameState, targetId: number): boolean {
-  const here = state.systems[state.currentSystem]
-  if (here.wormholeTo === targetId) return true
-  return fuelCost(state, targetId) <= state.ship.fuel
-}
+// Whether a jump can be made at all is `warpRoute` in `warp.ts`: it has to
+// weigh the wormhole toll as well as the tank, and the toll lives up there.

@@ -169,6 +169,17 @@ leave an element, so the browser holds the last tapped button lit until
 something else is tapped — misleading on a screen where every button spends
 money. Touch targets get 44px under `(pointer: coarse)`.
 
+**The toast sits above every overlay** (`z-index: 90`, over `.overlay` at 70 and
+`.warp-overlay` at 60) and takes no pointer events. Below them it was drawn
+*behind* the modal scrim and the opaque mining shell, so a refused trade in an
+encounter and every "mined 1 ore" went unseen. `pointer-events: none` is the
+other half of that bargain: a message must never block the button under it. In
+portrait it is lifted clear of the bottom tab strip.
+
+Destructive one-tap actions are armed in place with `.confirm-row` (the question,
+then Yes/No where the button was) — overwriting a slot, abandoning a contract,
+and starting a new voyage over an existing autosave all use it.
+
 Emoji are not a safe icon set: Android has no glyph for `⏻` and draws an empty
 box, exactly as Windows renders `ℹ️` as a serif "i". Check any new icon on both.
 
@@ -245,6 +256,19 @@ Slot ids cross the IPC boundary from the renderer, so they are untrusted: main
 validates every one with `isSaveSlotId` before it reaches a path. Writes go
 through a temp file and a rename, because the autosave fires constantly and a
 half-written file must never replace a good save.
+
+**A lost ship is never autosaved.** `gameOver` lives in the store, not in the
+`GameState`, so a save written with the hull at zero loads as a living wreck —
+"Continue" resurrects a corpse. The autosave therefore stays at the last
+checkpoint *before* the ship was lost, and the game-over screen offers it back
+("Load last save"). Three paths have to hold that line, and the last two used to
+miss it by saving up front: a combat kill (`combatAction` returns before
+`saveGame`), a fatal black hole (`startTravel` skips its save when
+`blackHole.survived` is false — `finishTravel` saves only if a pod got the
+commander out), and a destroyed escort (`startEscort` skips it when
+`run.destroyed`; `finishEscort` does the same). Any new way to die needs the same
+treatment. `ensureBoard` lifts a zero hull to 1 on load for saves the older
+builds already wrote.
 
 `userData` is derived from package.json's `name`, which means **renaming the app
 moves the save folder**. The rename from `star-trader` to `space-trader` did
@@ -339,9 +363,17 @@ resolved by `resolveBlackHole`, which burns days and — on a failed
 `blackHoleEscapeChance` roll — leaves the ship at **zero hull and returns
 `survived: false`**. It does *not* look at the escape pod: that is the store's
 job in `finishTravel`, resolved exactly as a combat kill is
-(`handleDestruction` + `gameOver`), so there is one death path, not two.
+(`abandonShip` + `gameOver`), so there is one death path, not two.
+`abandonShip(state)` lives in the engine (`game.ts`): it swaps in the bare Flea,
+pays the insurer's claim on the hull that was lost and clears the cargo books,
+and returns false — changing nothing — when there was no pod.
 `blackHoleEvent(bh, escapedByPod)` turns it into a `GameEvent` the modal (or the
 game-over screen, via `gameOverCause`) can show.
+
+**A fatal singularity empties the leg's encounter queue.** The hull is already
+at zero when `flyTo` returns, so anyone still queued would be fought by a wreck:
+the first reply destroyed it even on a miss, the pod was spent *there*, and
+`finishTravel` then found no pod and ended the run on the replacement Flea.
 
 ### Timed overlays (warp, mining)
 
@@ -545,6 +577,126 @@ special-resource planet and sold where wanted (complementary resource or hi-tech
 filter them so they only show where tradeable. Any code that builds a goods
 record must iterate `GOOD_IDS`, never hard-code the good keys.
 
+### No trade may pay at the counter it was bought over
+
+Two places price a purchase and a sale independently, and both once let the same
+goods go round in a circle at a profit. `sellablePrice` caps what a planet pays
+at `buy × (1 − MAX_TRADER_DISCOUNT)` wherever it also sells the good — the flat ±
+fluctuation otherwise beat the 8% margin on cheap goods. `makeTradeOffer` keeps
+a trader's wishlist disjoint from its stall. `MAX_TRADER_DISCOUNT` lives in
+`market.ts` (below `game.ts`, which imports it) and is what `traderDiscount`
+clamps to, so the cap and the discount cannot drift apart.
+
+### Systems a ship cannot leave
+
+The chart is not evenly settled: about one system in ten is further from its
+nearest neighbour than the shortest tanks fly (12–14 pc), ~1% is beyond a Flea's
+20, and a couple per galaxy are beyond every drive built. That is fine until
+something leaves the player in one aboard a ship that cannot make the crossing
+back — a voyage that can only end at the menu. `canLeaveSystem(state, range,
+systemId?)` (a star within a full tank, or a wormhole of either kind) is asked
+by **every** path that changes a ship's range or delivers it somewhere it did
+not fly to:
+
+- `buyShip` / `shipPurchaseProblem` — the yard will not sell a hull that could
+  not reach the nearest star (the shipyard greys the row and marks its range ⚠);
+- `sellGadget` — a fuel compactor is not unbolted where only it gets the ship out;
+- `enterUnstableWormhole` — the far end is drawn only from systems the ship
+  could fly on from;
+- `runEscort` and the quest generators (`destinations` in `quests.ts`) — a
+  convoy delivers its escort to the far end itself, and no contract is posted
+  to a system the ship of the day could not return from.
+
+Add a new way to arrive or to shorten a tank, and it needs the same check.
+
+### No dead ends without a game over
+
+A voyage must always be able to continue or end — never simply stop. Two more
+ways it used to stop, both an empty purse:
+
+- **No fuel, no money.** `emergencyFuelOffer(state)` is non-null when the ship
+  is at a yard, the tank will not reach the nearest star, and the credits will
+  not buy the difference; `takeEmergencyFuel` puts in exactly enough to reach
+  that star at `EMERGENCY_FUEL_MARKUP`× the pump price — the purse first, the
+  rest as debt, **past the bank's loan limit if need be**. The shipyard shows
+  the button only while the offer exists.
+- **A wormhole as the only exit, and no money for the toll.** `tollOnAccount`
+  is true when the surveyed hole is the sole way out (no star within a full
+  tank, no unmapped hole) and the toll cannot be paid; `warpRoute` then still
+  answers `'wormhole'` and `warp` bills the shortfall to the debt at the same
+  markup. The chart says so before the jump.
+
+Neither is a kindness: debt compounds at 10% a day, and an advance left unpaid
+grows until the bank sends hunters. That is an ending, which is the point.
+
+### Passengers hold a berth
+
+`freeBerths(state)` is `freeQuarters(ship)` less `passengersAboard(state)` (the
+active passenger contracts). A passenger used only to be *checked* against a
+spare bunk, never given one, so one free berth signed any number of VIPs and
+could then be hired into as well. Everything that fills a berth asks
+`freeBerths`: `hireMercenary`, `buyRobot`, and the three places a passenger
+contract is offered or accepted. `shipPurchaseProblem` refuses a hull with fewer
+cabins than there are passengers, `buyShip` gives the crew what is left after
+them, and `abandonShip` voids passenger contracts — a pod seats one.
+`freeQuarters` is still the physical count; use it only to display bunks.
+
+### Encounter odds are measured, not guessed
+
+The numbers live in `combat.ts` as named constants and the playthrough read-out
+is where to check what they come to in play:
+
+- **Aliens** — `alienChance(state)` ramps from nothing below
+  `ALIEN_NOTICE_WORTH` (purse + hull + hold) to `ALIEN_CHANCE` at
+  `ALIEN_FULL_WORTH`. An alien is always top-tier and one-shots a small hull; at
+  a flat rate it killed nine new commanders in ten who met one, about one jump
+  in twenty-five. Still exactly one rng draw, so no other roll on the leg moved.
+- **Pirates** — `PIRATE_BASE_RISK` per point of `strengthPirates`, plus at most
+  `PIRATE_BULK_RISK` for a full hold and `PIRATE_VALUE_RISK` for a valuable one.
+  A leg is rolled up to three times, so these are per roll: the old figures
+  (3% a point, +12%, +28%) came to a pirate on 53% of an ordinary hauler's
+  jumps and 74% of a rich one's; the current ones to about 27% and 34%.
+- **A bounty contract is an invitation.** While one is active every pirate met
+  is the target and a third of quiet legs are ambushed. Measure uninvited
+  pirates on legs flown without one, as the read-out does, or the bounties
+  drown everything else out.
+
+### Which way a jump goes
+
+`warpRoute(state, targetId)` answers `'wormhole' | 'drive' | null`, and the
+engine, the chart and the travel overlay all ask it rather than testing
+`wormholeTo` themselves. A surveyed pair is paired at random and can sit within
+drive range; the hole is taken when the toll can be paid, otherwise the drive if
+the tank reaches. Testing `wormholeTo === target` alone made the far end
+unreachable to a captain with a full tank and no money for the toll.
+
+### Whole-game playthroughs
+
+`src/game/engine/playthrough.test.ts` flies ~110 seeded careers with a bot that
+presses what the UI offers — trading, contracts, combat, mining, impulse
+crossings, hull purchases, convoy runs — and holds the state against a list of
+invariants **after every action**: integer, in-range credits/fuel/hull/cargo,
+the local-sourcing ledger never exceeding the hold, no price on the books for
+cargo that is gone, crew within berths, and every log line, combat message,
+event, incident and news item rendering to real prose in both locales (a key
+that resolves, no `{param}` left over, no raw id). It also fuzzes junk input
+(fractional, negative and non-numeric amounts, ids that name nothing, combat
+actions the screen is not offering) and replays one career to prove determinism.
+
+It is the test that finds what lives *between* two features. Everything in the
+last three sections came out of it, each then pinned by a named unit test in
+`game.test.ts`. Two things to know when it goes red:
+
+- The failure names the rule and gives one worked example ("after sell ore").
+  Fix the engine, then add a focused test — do not just widen the invariant.
+- It prints a **balance read-out** (survival, net worth by day, losses per kind
+  of meeting). That is information, not an assertion; a balance change will
+  move it, and the "actually exercise the game" thresholds exist only so the
+  suite cannot pass vacuously on bots that all die on day three.
+
+Engine amounts go through `wholeAmount`: cargo, fuel and credits are integers,
+and no engine function may trust its caller to have rounded.
+
 ### Adding a game mechanic (typical flow)
 
 1. Add/extend types in `src/game/engine/types.ts`.
@@ -587,7 +739,7 @@ builds the same renderer into `dist-web/` for Capacitor, rooted at
 `vitest.config.mts` exists **only** to stop the runner adopting `vite.config.mts`
 — it did, silently narrowed the suite to a directory with no tests, and reported
 "no test files" rather than failing. If you add a root Vite config, check
-`npm test` still collects 4 files.
+`npm test` still collects 5 files.
 
 **The two `.mts` extensions are deliberate.** `package.json` carries no
 `"type": "module"` and must not get one — Electron's main and preload are
